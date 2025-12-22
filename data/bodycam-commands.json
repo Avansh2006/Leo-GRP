@@ -1,0 +1,155 @@
+{
+  "categories": [
+    {
+      "id": "uniform",
+      "name": "Attaching Bodycam (Uniform)",
+      "commands": [
+        {
+          "id": "uniform-1",
+          "label": "Attach to Vest",
+          "command": "/me takes out a bodycam from their vest pocket and attaches it securely to the shoulder strap"
+        },
+        {
+          "id": "uniform-2",
+          "label": "Turn On Bodycam",
+          "command": "/me presses the power button on the bodycam, ensuring it starts recording"
+        },
+        {
+          "id": "uniform-3",
+          "label": "Check Recording",
+          "command": "/me taps the bodycam display to verify active recording status"
+        }
+      ]
+    },
+    {
+      "id": "undercover",
+      "name": "Attaching Bodycam (Undercover)",
+      "commands": [
+        {
+          "id": "undercover-1",
+          "label": "Conceal on Shirt",
+          "command": "/me discreetly clips a small bodycam inside their shirt collar"
+        },
+        {
+          "id": "undercover-2",
+          "label": "Activate Recording",
+          "command": "/me subtly activates the hidden bodycam with a quick button press"
+        },
+        {
+          "id": "undercover-3",
+          "label": "Verify Active",
+          "command": "/do The bodycam blinks once, indicating it's recording"
+        }
+      ]
+    },
+    {
+      "id": "traffic-stop",
+      "name": "Traffic Stop Commands",
+      "commands": [
+        {
+          "id": "traffic-1",
+          "label": "Approach Vehicle",
+          "command": "/me approaches the vehicle cautiously, keeping hand near sidearm, bodycam recording"
+        },
+        {
+          "id": "traffic-2",
+          "label": "Request Documents",
+          "command": "/me taps on the window and requests license, registration, and insurance"
+        },
+        {
+          "id": "traffic-3",
+          "label": "Examine Documents",
+          "command": "/me examines the documents carefully while maintaining situational awareness"
+        },
+        {
+          "id": "traffic-4",
+          "label": "Return Documents",
+          "command": "/me returns the documents along with a citation/warning"
+        }
+      ]
+    },
+    {
+      "id": "arrest",
+      "name": "Arrest Procedure",
+      "commands": [
+        {
+          "id": "arrest-1",
+          "label": "Announce Arrest",
+          "command": "/me announces: 'You are under arrest for [charges]. You have the right to remain silent.'"
+        },
+        {
+          "id": "arrest-2",
+          "label": "Handcuff Suspect",
+          "command": "/me instructs the suspect to turn around and place hands behind back, then applies handcuffs"
+        },
+        {
+          "id": "arrest-3",
+          "label": "Pat Down",
+          "command": "/me conducts a thorough pat-down search for weapons and contraband"
+        },
+        {
+          "id": "arrest-4",
+          "label": "Read Miranda Rights",
+          "command": "/me recites Miranda rights: 'You have the right to remain silent. Anything you say can be used against you in court...'"
+        },
+        {
+          "id": "arrest-5",
+          "label": "Transport to Cruiser",
+          "command": "/me escorts the handcuffed suspect to the patrol vehicle and secures them in the back seat"
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "name": "Evidence Collection",
+      "commands": [
+        {
+          "id": "evidence-1",
+          "label": "Secure Scene",
+          "command": "/me secures the crime scene with police tape, ensuring no contamination"
+        },
+        {
+          "id": "evidence-2",
+          "label": "Photograph Evidence",
+          "command": "/me takes out a camera and photographs the evidence from multiple angles"
+        },
+        {
+          "id": "evidence-3",
+          "label": "Collect Item",
+          "command": "/me puts on latex gloves and carefully places evidence into a labeled evidence bag"
+        },
+        {
+          "id": "evidence-4",
+          "label": "Log Evidence",
+          "command": "/me logs the evidence in their notepad with location, time, and description"
+        }
+      ]
+    },
+    {
+      "id": "pursuit",
+      "name": "Vehicle Pursuit",
+      "commands": [
+        {
+          "id": "pursuit-1",
+          "label": "Initiate Pursuit",
+          "command": "/me activates lights and sirens, announcing pursuit over radio: 'Unit [number] in pursuit of [vehicle description] heading [direction]'"
+        },
+        {
+          "id": "pursuit-2",
+          "label": "Call Out Location",
+          "command": "/me updates dispatch: 'Now heading [direction] on [street name], speed approximately [speed]'"
+        },
+        {
+          "id": "pursuit-3",
+          "label": "Deploy Spike Strips",
+          "command": "/me deploys spike strips across the roadway to disable the fleeing vehicle"
+        },
+        {
+          "id": "pursuit-4",
+          "label": "Terminate Pursuit",
+          "command": "/me announces over radio: 'Terminating pursuit due to [safety concerns/heavy traffic/etc.]'"
+        }
+      ]
+    }
+  ]
+}
