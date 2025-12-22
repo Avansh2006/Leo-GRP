@@ -29,121 +29,168 @@ export default function BodycamCommandsPage() {
       icon: '📹',
       commands: [
         {
-          label: 'Attaching Bodycam (Uniform)',
+          label: 'ATTACHING BODYCAM (Uniform) - Must be done: in offices, next to NPCs at HQ, locker rooms, armory, or next to FIB car. Re-attach after Bad Dream, Code A, Change of Clothes, or every 4 hours.',
           text: '/me Takes out bodycam, attaches it to chest, checks its ballistic, water proof'
         },
         { text: '/me makes sure it is recording and checks for the red light' },
         { text: '/do It is recording, is ballistic and water proof' },
-        { text: '/me connects PDA to the nearest cell tower' },
         {
-          label: 'While Undercover',
+          label: 'ATTACHING BODYCAM UNDERCOVER - Must be done: in offices, next to NPCs at HQ, locker rooms, armory, or next to FIB car. Re-attach after Bad Dream, Code A, Change of Clothes, or every 4 hours.',
           text: '/me takes out bodycam and attaches it to belt, hides it, checks its ballistic and water proof'
         },
         { text: '/me makes sure it is recording and checks for the red light' },
-        { text: '/do It is recording, is ballistic and water proof' },
-        { text: '/me connects PDA to the nearest cell tower' },
+        { text: '/do It is recording, is ballistic and water proof.' },
+        { 
+          label: 'Optional:',
+          text: '/me puts the ID in the car / on desk / in the closet' 
+        },
       ]
     },
     {
       id: 'refreshing',
-      name: '📹 Refreshing Bodycam',
-      icon: '📹',
+      name: '🔄 Refreshing Bodycam',
+      icon: '🔄',
       commands: [
-        { label: 'Refreshing Bodycam', text: '/me refreshing bodycam' },
-        { text: '/do It is recording' },
+        { 
+          label: 'REFRESHING BODYCAM - POV must start before refreshing bodycam, so refresh can be visible in POV. Exception: Refresh not required if POV starts with attaching bodycam.',
+          text: '/me refreshing bodycam' 
+        },
+        { text: '/do It is recording.' },
       ]
     },
     {
       id: 'saving',
-      name: '🎥 Saving Bodycam',
-      icon: '🎥',
+      name: '💾 Saving a Situation',
+      icon: '💾',
       commands: [
         {
-          label: 'Saving Bodycam',
+          label: 'SAVING A SITUATION - Bodycam needs to be uploaded to the FIB cloud to be valid.',
           text: `/me saves bodycam, uploads it to the ${selectedOrg} Cloud and continues recording`
         },
-        { text: '/do It is recording' },
+        { text: '/do It is recording.' },
       ]
     },
     {
-      id: 'jumpsuit',
-      name: '🧥 Taking Jumpsuit from Bench',
-      icon: '🧥',
+      id: 'unconscious',
+      name: '🏥 After Getting Patched Up',
+      icon: '🏥',
       commands: [
         {
-          label: 'Taking Jumpsuit from Bench',
-          text: '/me takes the XYZ size Jumpsuit from the Bench'
+          label: 'IF YOU WERE UNCONSCIOUS AND GOT PATCHED UP - Must ensure bodycam is still recording after you get patched up.',
+          text: '/me checks that the bodycam is still recording'
         },
-        { text: '/me Places the Jumpsuit On the Bed' },
+        { text: '/do It is recording.' },
+      ]
+    },
+    {
+      id: 'pda',
+      name: '📱 PDA Commands',
+      icon: '📱',
+      commands: [
+        {
+          label: 'CONNECT PDA - PDA needs to be connected to the nearest cell tower to look up information.',
+          text: `/me connects PDA to the nearest ${selectedOrg} cell tower`
+        },
       ]
     },
     {
       id: 'drone',
-      name: '✈ Drone Commands',
-      icon: '✈',
+      name: '🚁 Drone Commands',
+      icon: '🚁',
       commands: [
         {
-          label: 'While in Work Uniform',
-          text: `/me launches the ${selectedOrg} Drone`
+          label: 'WHILE ON DUTY - If in duty clothes, launch the FIB drone.',
+          text: `/me launches ${selectedOrg} drone`
         },
-        { text: `/me Takes the ${selectedOrg} Drone from the Ground and put it back in backpack` },
         {
-          label: 'While Undercover',
+          label: 'WHILE UNDERCOVER - Take drone from FIB car (or lockers) and put in backpack. Cannot launch 2 drones in a row unless you picked it up off the ground.',
           text: `/me takes the ${selectedOrg} drone from the trunk and puts it in the backpack`
         },
-        { text: `/me takes the ${selectedOrg} drone from the backpack and launches it` },
-        { text: `/me takes the ${selectedOrg} drone from the ground and puts it in the backpack` },
+        { 
+          label: 'Later:',
+          text: `/me takes the ${selectedOrg} drone from the backpack and launches it` 
+        },
+        { 
+          label: 'After situation recorded:',
+          text: `/me takes the ${selectedOrg} drone from the ground and puts it in the backpack` 
+        },
       ]
     },
     {
-      id: 'lawyer',
-      name: '⚖️ Handing Footage to the Lawyer',
-      icon: '⚖️',
+      id: 'vehicle',
+      name: '🚗 Checking Vehicle Owner',
+      icon: '🚗',
       commands: [
         {
-          label: 'Handing Footage to the Lawyer',
-          text: `/me saves bodycam contents onto an SD card and uploads contents to ${selectedOrg} servers`
+          label: 'LEARN THE OWNER OF A VEHICLE WITHOUT A LICENSE PLATE',
+          text: '/me feels the edges of the vehicle for VIN and checks for ownership'
         },
-        { text: '/me Takes SD card out of the bodycam and hands it to the lawyer' },
-      ]
-    },
-    {
-      id: 'shift',
-      name: '🏁 Finishing Your Shift',
-      icon: '🏁',
-      commands: [
         {
-          label: 'Finishing Your Shift',
-          text: `/me saves bodycam contents onto an SD card and uploads contents to ${selectedOrg} servers`
+          label: 'OR',
+          text: '/me looks up the VIN in the database for license plate and owner information'
         },
-        { text: '/me puts the badge in the locker' },
       ]
     },
     {
       id: 'searching',
-      name: '🔎 Searching a Trunk',
-      icon: '🔎',
+      name: '🔍 Searching the Trunk',
+      icon: '🔍',
       commands: [
         {
-          label: 'Searching a Trunk',
-          text: '/me carefully inspects the trunk and uses a crowbar to attempt opening it'
+          label: 'ℹ️ All bodycam commands must be done outside of vehicle, with clothes visible and without holding weapons or PDA! Commands can be modified as long as they are realistic, fit the situation and comply with RP rules.',
+          text: '/me breaks the trunk of vehicle with crowbar'
         },
-        { text: '/me applies pressure with the crowbar to force the trunk open' },
       ]
     },
     {
-      id: 'evidence',
-      name: '🕵️‍♀️ Taking Evidence',
-      icon: '🕵️‍♀️',
+      id: 'lawyer',
+      name: '⚖️ Handing SSD to Lawyer',
+      icon: '⚖️',
       commands: [
         {
-          label: 'When License Plate Not Visible',
-          text: '/me feels the edges of the vehicle for VIN and checks for ownership'
+          label: 'Option 1:',
+          text: `/do saves bodycam onto an SSD Card and uploads into PDA to ${selectedOrg} Cloud servers and continues recording`
         },
+        { text: '/me downloads bodycam onto USB stick using PDA and then hands over USB stick to Attorney' },
         {
-          label: 'When License Plate of Bike Not Visible',
-          text: '/me checks the VIN from the steering neck of the bike and checks for ownership'
+          label: 'OR Option 2:',
+          text: '/me Takes SSD out of the Bodycam'
         },
+        { text: '/me Hands over bodycam SSD to the lawyer' },
+      ]
+    },
+    {
+      id: 'contracts',
+      name: '📝 FIB Contracts',
+      icon: '📝',
+      commands: [
+        {
+          label: 'FIB CONTRACTS:',
+          text: `/me Signs the ${selectedOrg} Employment Contract on the desk`
+        },
+        { text: `/me Signs the ${selectedOrg} Code of Conduct` },
+      ]
+    },
+    {
+      id: 'cuffing',
+      name: '🔗 Cuffing Person Under a Car',
+      icon: '🔗',
+      commands: [
+        {
+          label: 'CUFFING PERSON UNDER A CAR:',
+          text: '/try reaches under the car and cuffs the person underneath it'
+        },
+      ]
+    },
+    {
+      id: 'jumpsuit',
+      name: '👔 Jumpsuit Commands',
+      icon: '👔',
+      commands: [
+        { text: '/me grabs the detainee by left arm' },
+        { text: '/me takes a universal size jumpsuit from behind the counter.' },
+        { text: '/me grabs the detainee by right arm' },
+        { text: '/me drops the jumpsuit on the bed' },
       ]
     },
   ]
