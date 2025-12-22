@@ -56,7 +56,7 @@ export default function PatrolmanGuidePage() {
   }
 
   const handleCopyRow = (entry: LawEntry) => {
-    const text = `${entry.code} - ${entry.description}\nFine: ${entry.fine} | Sentence: ${entry.sentence} | Stars: ${entry.stars}${entry.remarks ? `\nRemarks: ${entry.remarks}` : ''}`
+    const text = `${entry.code} ${entry.description}`
     navigator.clipboard.writeText(text)
     showToast('Law code copied!', 'success')
   }
