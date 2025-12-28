@@ -18,6 +18,8 @@ interface DutyContextType {
   currentDutyStart: string | null
   arrestCount: number
   fineCount: number
+  currentShiftArrests: number
+  currentShiftFines: number
   weaponsTaken: string[]
   dutyLogs: DutyLog[]
   startDuty: (weapons: string[]) => void
@@ -35,19 +37,27 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   const [fineCount, setFineCount] = useState(0)
   const [weaponsTaken, setWeaponsTaken] = useState<string[]>([])
   const [dutyLogs, setDutyLogs] = useState<DutyLog[]>([])
+  const [currentShiftArrests, setCurrentShiftArrests] = useState(0)
+  const [currentShiftFines, setCurrentShiftFines] = useState(0)
 
   useEffect(() => {
     const savedLogs = localStorage.getItem('dutyLogs')
     if (savedLogs) {
       setDutyLogs(JSON.parse(savedLogs))
     }
+    
+    // Load lifetime counts from localStorage
+    const savedArrests = localStorage.getItem('lifetimeArrests')
+    const savedFines = localStorage.getItem('lifetimeFines')
+    if (savedArrests) setArrestCount(parseInt(savedArrests))
+    if (savedFines) setFineCount(parseInt(savedFines))
   }, [])
 
   const startDuty = (weapons: string[]) => {
     setIsOnDuty(true)
     setCurrentDutyStart(new Date().toISOString())
-    setArrestCount(0)
-    setFineCount(0)
+    setCurrentShiftArrests(0)
+    setCurrentShiftFines(0)
     setWeaponsTaken(weapons)
   }
 
@@ -58,8 +68,8 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       id: Date.now().toString(),
       onDutyTime: currentDutyStart,
       offDutyTime: new Date().toISOString(),
-      totalArrests: arrestCount,
-      totalFines: fineCount,
+      totalArrests: currentShiftArrests,
+      totalFines: currentShiftFines,
       weaponsTaken,
       weaponsReturned,
       eventsAttended,
@@ -71,17 +81,31 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
     setIsOnDuty(false)
     setCurrentDutyStart(null)
-    setArrestCount(0)
-    setFineCount(0)
+    setCurrentShiftArrests(0)
+    setCurrentShiftFines(0)
     setWeaponsTaken([])
   }
 
   const incrementArrests = () => {
-    setArrestCount((prev) => prev + 1)
+    const newCount = arrestCount + 1
+    setArrestCount(newCount)
+    localStorage.setItem('lifetimeArrests', newCount.toString())
+    
+    // Also increment current shift count if on duty
+    if (isOnDuty) {
+      setCurrentShiftArrests((prev) => prev + 1)
+    }
   }
 
   const incrementFines = () => {
-    setFineCount((prev) => prev + 1)
+    const newCount = fineCount + 1
+    setFineCount(newCount)
+    localStorage.setItem('lifetimeFines', newCount.toString())
+    
+    // Also increment current shift count if on duty
+    if (isOnDuty) {
+      setCurrentShiftFines((prev) => prev + 1)
+    }
   }
 
   return (
@@ -91,6 +115,8 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         currentDutyStart,
         arrestCount,
         fineCount,
+        currentShiftArrests,
+        currentShiftFines,
         weaponsTaken,
         dutyLogs,
         startDuty,

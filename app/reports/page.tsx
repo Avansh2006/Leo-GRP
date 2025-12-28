@@ -32,7 +32,7 @@ const WEAPONS = [
 
 export default function ReportsPage() {
   const { showToast } = useToast()
-  const { isOnDuty, arrestCount, fineCount, weaponsTaken, startDuty, endDuty, incrementFines } = useDuty()
+  const { isOnDuty, arrestCount, fineCount, currentShiftArrests, currentShiftFines, weaponsTaken, startDuty, endDuty, incrementFines } = useDuty()
   
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -208,9 +208,9 @@ ${weaponsTakenList}
 ----------------------------------------------------------------
 Events Attended: ${eventsAttended}
 ----------------------------------------------------------------
-Total Arrests: ${arrestCount}
+Total Arrests: ${currentShiftArrests}
 ----------------------------------------------------------------
-Total Fines: ${fineCount}
+Total Fines: ${currentShiftFines}
 ----------------------------------------------------------------
 OFF DUTY: ${formatTime(gameTime)}
 ----------------------------------------------------------------
@@ -488,7 +488,8 @@ ${weaponsTakenList}
               <p className={`text-2xl font-bold ${isOnDuty ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>
                 {isOnDuty ? 'ON DUTY' : 'OFF DUTY'}
               </p>
-              {isOnDuty && <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Arrests: {arrestCount} | Fines: {fineCount}</p>}
+              {isOnDuty && <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">This Shift - Arrests: {currentShiftArrests} | Fines: {currentShiftFines}</p>}
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Lifetime - Arrests: {arrestCount} | Fines: {fineCount}</p>
             </div>
             
             {!isOnDuty ? (
