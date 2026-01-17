@@ -5,7 +5,7 @@ import CopyButton from '@/components/CopyButton'
 import { useToast } from '@/components/ToastProvider'
 import { useDuty } from '@/contexts/DutyContext'
 import { loadAllLawData, filterLawEntries, LawEntry } from '@/utils/htmlParser'
-import { CHARGE_TEMPLATES, ChargeTemplate, saveCustomChargeTemplate, getCustomChargeTemplates, deleteCustomChargeTemplate } from '@/utils/presets'
+import { ChargeTemplate, getCustomChargeTemplates, saveCustomChargeTemplate, deleteCustomChargeTemplate } from '@/utils/presets'
 
 export default function PatrolmanGuidePage() {
   const { showToast } = useToast()
@@ -255,7 +255,7 @@ export default function PatrolmanGuidePage() {
       {/* Charge Templates */}
       <div className="card p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-blue-400">⚡ Quick Templates</h3>
+          <h3 className="text-lg font-semibold text-blue-400">⚡ My Charge Templates</h3>
           <button
             onClick={() => setShowTemplates(!showTemplates)}
             className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
@@ -265,39 +265,50 @@ export default function PatrolmanGuidePage() {
         </div>
 
         {showTemplates && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {CHARGE_TEMPLATES.map((template) => (
-              <button
-                key={template.id}
-                onClick={() => applyChargeTemplate(template)}
-                className="p-3 text-left bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg border-2 border-green-200 dark:border-green-800 transition-colors"
-              >
-                <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">{template.name}</div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">{template.description}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">{template.chargeCodes.length} charges</div>
-              </button>
-            ))}
-            {customTemplates.map((template) => (
-              <div key={template.id} className="relative">
-                <button
-                  onClick={() => applyChargeTemplate(template)}
-                  className="w-full p-3 text-left bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg border-2 border-purple-200 dark:border-purple-800 transition-colors"
-                >
-                  <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">⭐ {template.name}</div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">{template.description}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">{template.chargeCodes.length} charges</div>
-                </button>
-                <button
-                  onClick={() => deleteTemplate(template.id)}
-                  className="absolute top-2 right-2 p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+          <>
+            {customTemplates.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <svg className="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p className="font-medium mb-1">No templates yet</p>
+                <p className="text-sm">Select charges below and save them as a template for quick access!</p>
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {customTemplates.map((template) => (
+                  <div key={template.id} className="relative">
+                    <button
+                      onClick={() => applyChargeTemplate(template)}
+                      className="w-full p-4 text-left bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg border-2 border-purple-200 dark:border-purple-800 transition-colors"
+                    >
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="text-xl">⭐</span>
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900 dark:text-gray-100">{template.name}</div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{template.description}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200 px-2 py-1 rounded-full font-medium">
+                          {template.chargeCodes.length} charges
+                        </span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => deleteTemplate(template.id)}
+                      className="absolute top-2 right-2 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md transition-colors"
+                      title="Delete template"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -320,29 +331,40 @@ export default function PatrolmanGuidePage() {
           </div>
 
           {/* Save as Template */}
-          <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-            <p className="text-sm text-purple-800 dark:text-purple-300 mb-2 font-medium">💾 Save as Template</p>
-            <div className="flex gap-2">
+          <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+              <p className="font-semibold text-purple-800 dark:text-purple-300">Save Current Selection as Template</p>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+              Create a reusable template with your selected charges for future use
+            </p>
+            <div className="space-y-2">
               <input
                 type="text"
                 value={saveTemplateName}
                 onChange={(e) => setSaveTemplateName(e.target.value)}
-                placeholder="Template name..."
-                className="input flex-1"
+                placeholder="Template name (e.g., 'Armed Robbery', 'DUI Stop')..."
+                className="input w-full"
               />
-              <input
-                type="text"
+              <textarea
                 value={saveTemplateDesc}
                 onChange={(e) => setSaveTemplateDesc(e.target.value)}
-                placeholder="Description (optional)..."
-                className="input flex-1"
+                placeholder="Description (optional - e.g., 'Common charges for armed store robbery')..."
+                className="input w-full resize-none"
+                rows={2}
               />
               <button
                 onClick={saveCurrentAsTemplate}
-                className="btn bg-purple-600 text-white hover:bg-purple-700"
+                className="btn w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 font-medium"
                 disabled={!saveTemplateName.trim()}
               >
-                Save
+                <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Save as Template
               </button>
             </div>
           </div>
