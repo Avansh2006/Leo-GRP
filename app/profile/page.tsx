@@ -4,15 +4,48 @@ import { useState, useEffect } from 'react'
 import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
 import { useNotifications } from '@/contexts/NotificationContext'
+import { useUserProfile, WeaponLoadout } from '@/contexts/UserProfileContext'
 import SimpleBarChart from '@/components/SimpleBarChart'
 
 export default function ProfilePage() {
   const { dutyLogs } = useDuty()
   const { showToast } = useToast()
   const { achievements, checkAchievements } = useNotifications()
+  const { profile, updateProfile, addLoadout, removeLoadout, updateLoadout } = useUserProfile()
+  
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'returned' | 'lost' | 'broken' | 'used'>('all')
   const [showAchievements, setShowAchievements] = useState(false)
+  const [showProfileEdit, setShowProfileEdit] = useState(false)
+  const [showLoadoutModal, setShowLoadoutModal] = useState(false)
+  const [editingLoadout, setEditingLoadout] = useState<WeaponLoadout | null>(null)
+
+  // Form states
+  const [profileForm, setProfileForm] = useState({
+    name: profile.name,
+    id: profile.id,
+    rank: profile.rank,
+    badgeNumber: profile.badgeNumber,
+  })
+
+  const [loadoutForm, setLoadoutForm] = useState<WeaponLoadout>({
+    id: '',
+    name: '',
+    vests: [],
+    weapons: [],
+  })
+
+  const [newVest, setNewVest] = useState('')
+  const [newWeapon, setNewWeapon] = useState({ weapon: '', ammo: '' })
+
+  useEffect(() => {
+    setProfileForm({
+      name: profile.name,
+      id: profile.id,
+      rank: profile.rank,
+      badgeNumber: profile.badgeNumber,
+    })
+  }, [profile])
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString)
@@ -114,13 +147,97 @@ export default function ProfilePage() {
     }
   }
 
+  const handleProfileSave = () => {
+    updateProfile(profileForm)
+    setShowProfileEdit(false)
+    showToast('Profile updated successfully', 'success')
+  }
+
+  const handleLoadoutSave = () => {
+    if (!loadoutForm.name.trim()) {
+      showToast('Please enter a loadout name', 'error')
+      return
+    }
+
+    if (editingLoadout) {
+      updateLoadout(editingLoadout.id, loadoutForm)
+      showToast('Loadout updated successfully', 'success')
+    } else {
+      const newLoadout = { ...loadoutForm, id: Date.now().toString() }
+      addLoadout(newLoadout)
+      showToast('Loadout created successfully', 'success')
+    }
+    
+    resetLoadoutForm()
+    setShowLoadoutModal(false)
+  }
+
+  const handleDeleteLoadout = (id: string) => {
+    if (confirm('Are you sure you want to delete this loadout?')) {
+      removeLoadout(id)
+      showToast('Loadout deleted successfully', 'success')
+    }
+  }
+
+  const handleEditLoadout = (loadout: WeaponLoadout) => {
+    setEditingLoadout(loadout)
+    setLoadoutForm({ ...loadout })
+    setShowLoadoutModal(true)
+  }
+
+  const resetLoadoutForm = () => {
+    setLoadoutForm({
+      id: '',
+      name: '',
+      vests: [],
+      weapons: [],
+    })
+    setEditingLoadout(null)
+    setNewVest('')
+    setNewWeapon({ weapon: '', ammo: '' })
+  }
+
+  const addVestToLoadout = () => {
+    if (newVest.trim()) {
+      setLoadoutForm(prev => ({
+        ...prev,
+        vests: [...prev.vests, newVest.trim()],
+      }))
+      setNewVest('')
+    }
+  }
+
+  const removeVestFromLoadout = (index: number) => {
+    setLoadoutForm(prev => ({
+      ...prev,
+      vests: prev.vests.filter((_, i) => i !== index),
+    }))
+  }
+
+  const addWeaponToLoadout = () => {
+    if (newWeapon.weapon.trim() && newWeapon.ammo.trim()) {
+      setLoadoutForm(prev => ({
+        ...prev,
+        weapons: [...prev.weapons, { ...newWeapon }],
+      }))
+      setNewWeapon({ weapon: '', ammo: '' })
+    }
+  }
+
+  const removeWeaponFromLoadout = (index: number) => {
+    setLoadoutForm(prev => ({
+      ...prev,
+      weapons: prev.weapons.filter((_, i) => i !== index),
+    }))
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">Officer Profile</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            View your comprehensive performance statistics and shift history.
+            Manage your profile, loadouts, and view performance statistics.
           </p>
         </div>
         <div className="flex gap-2">
@@ -142,6 +259,324 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* User Profile Card */}
+      <div className="card mb-6">
+        <div className="flex items-start justify-between mb-4">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">👤 Officer Information</h2>
+          <button
+            onClick={() => setShowProfileEdit(true)}
+            className="btn bg-blue-600 text-white hover:bg-blue-700"
+          >
+            ✏️ Edit Profile
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Name</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {profile.name || 'Not set'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">ID</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {profile.id || 'Not set'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Rank</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {profile.rank || 'Not set'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Badge Number</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {profile.badgeNumber || 'Not set'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Loadouts Card */}
+      <div className="card mb-6">
+        <div className="flex items-start justify-between mb-4">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">🔫 Custom Loadouts</h2>
+          <button
+            onClick={() => {
+              resetLoadoutForm()
+              setShowLoadoutModal(true)
+            }}
+            className="btn bg-green-600 text-white hover:bg-green-700"
+          >
+            ➕ Create Loadout
+          </button>
+        </div>
+
+        {profile.loadouts.length === 0 ? (
+          <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+            No custom loadouts created yet. Click "Create Loadout" to add your first loadout.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {profile.loadouts.map((loadout) => (
+              <div
+                key={loadout.id}
+                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">{loadout.name}</h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditLoadout(loadout)}
+                      className="text-blue-600 hover:text-blue-700 text-sm"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteLoadout(loadout.id)}
+                      className="text-red-600 hover:text-red-700 text-sm"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+                
+                {loadout.vests.length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Vests:</p>
+                    {loadout.vests.map((vest, idx) => (
+                      <span key={idx} className="inline-block bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs mr-1 mb-1">
+                        {vest}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                
+                {loadout.weapons.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Weapons:</p>
+                    {loadout.weapons.map((weapon, idx) => (
+                      <div key={idx} className="text-xs text-gray-700 dark:text-gray-300 mb-1">
+                        • {weapon.weapon} ({weapon.ammo} ammo)
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Profile Edit Modal */}
+      {showProfileEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Edit Profile</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    placeholder="John Doe"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    ID
+                  </label>
+                  <input
+                    type="text"
+                    value={profileForm.id}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    placeholder="12345"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Rank
+                  </label>
+                  <input
+                    type="text"
+                    value={profileForm.rank}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, rank: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    placeholder="Officer"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Badge Number
+                  </label>
+                  <input
+                    type="text"
+                    value={profileForm.badgeNumber}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, badgeNumber: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    placeholder="B-1234"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={handleProfileSave}
+                  className="flex-1 btn bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setShowProfileEdit(false)}
+                  className="flex-1 btn bg-gray-500 text-white hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loadout Modal */}
+      {showLoadoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                {editingLoadout ? 'Edit Loadout' : 'Create New Loadout'}
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Loadout Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={loadoutForm.name}
+                    onChange={(e) => setLoadoutForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    placeholder="e.g., Standard Patrol"
+                  />
+                </div>
+                
+                {/* Vests Section */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Vests
+                  </label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={newVest}
+                      onChange={(e) => setNewVest(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addVestToLoadout()}
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      placeholder="e.g., Vest Level 3"
+                    />
+                    <button
+                      onClick={addVestToLoadout}
+                      className="btn bg-green-600 text-white hover:bg-green-700"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {loadoutForm.vests.map((vest, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded">
+                        <span className="text-sm text-gray-900 dark:text-gray-100">{vest}</span>
+                        <button
+                          onClick={() => removeVestFromLoadout(idx)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Weapons Section */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Weapons
+                  </label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={newWeapon.weapon}
+                      onChange={(e) => setNewWeapon(prev => ({ ...prev, weapon: e.target.value }))}
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      placeholder="Weapon name"
+                    />
+                    <input
+                      type="text"
+                      value={newWeapon.ammo}
+                      onChange={(e) => setNewWeapon(prev => ({ ...prev, ammo: e.target.value }))}
+                      onKeyPress={(e) => e.key === 'Enter' && addWeaponToLoadout()}
+                      className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      placeholder="Ammo"
+                    />
+                    <button
+                      onClick={addWeaponToLoadout}
+                      className="btn bg-green-600 text-white hover:bg-green-700"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {loadoutForm.weapons.map((weapon, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded">
+                        <span className="text-sm text-gray-900 dark:text-gray-100">
+                          {weapon.weapon} ({weapon.ammo} ammo)
+                        </span>
+                        <button
+                          onClick={() => removeWeaponFromLoadout(idx)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={handleLoadoutSave}
+                  className="flex-1 btn bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  {editingLoadout ? 'Update' : 'Create'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLoadoutModal(false)
+                    resetLoadoutForm()
+                  }}
+                  className="flex-1 btn bg-gray-500 text-white hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Achievements Modal */}
       {showAchievements && (

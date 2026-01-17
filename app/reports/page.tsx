@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useToast } from '@/components/ToastProvider'
 import { useDuty } from '@/contexts/DutyContext'
+import { useUserProfile } from '@/contexts/UserProfileContext'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
-import { WEAPON_PRESETS, WeaponPreset, EVENT_PRESETS, saveCustomWeaponPreset, getCustomWeaponPresets, deleteCustomWeaponPreset } from '@/utils/presets'
+import { EVENT_PRESETS } from '@/utils/presets'
 
 const VESTS = [
   'Vest Level 1',
@@ -33,6 +34,7 @@ const WEAPONS = [
 
 export default function ReportsPage() {
   const { showToast } = useToast()
+  const { profile } = useUserProfile()
   const { 
     isOnDuty, 
     arrestCount, 
@@ -63,10 +65,6 @@ export default function ReportsPage() {
   const [showChargeDropdown, setShowChargeDropdown] = useState(false)
   const [allCharges, setAllCharges] = useState<LawEntry[]>([])
 
-  const [officerName, setOfficerName] = useState('')
-  const [officerId, setOfficerId] = useState('')
-  const [rank, setRank] = useState('')
-  const [badgeNumber, setBadgeNumber] = useState('')
   const [eventsAttended, setEventsAttended] = useState('')
   const [selectedWeapons, setSelectedWeapons] = useState<{weapon: string, ammo: string}[]>([])
   const [selectedVests, setSelectedVests] = useState<string[]>([])
@@ -74,9 +72,13 @@ export default function ReportsPage() {
   const [showWeaponDropdown, setShowWeaponDropdown] = useState(false)
   const weaponDropdownRef = useRef<HTMLDivElement>(null)
 
+  // Populate officer info from profile
+  useEffect(() => {
+    // Profile info is now managed in Profile page, no need for local state
+  }, [profile])
+
   useEffect(() => {
     loadCharges()
-    setCustomWeaponPresets(getCustomWeaponPresets())
     
     const handleClickOutside = (event: MouseEvent) => {
       if (weaponDropdownRef.current && !weaponDropdownRef.current.contains(event.target as Node)) {
@@ -157,8 +159,8 @@ ${chargesList || '- No charges added'}
   }
 
   const handleStartDuty = () => {
-    if (!officerName.trim() || !officerId.trim() || !rank.trim() || !badgeNumber.trim()) {
-      showToast('Please fill in all officer information', 'error')
+    if (!profile.name || !profile.id || !profile.rank || !profile.badgeNumber) {
+      showToast('Please complete your profile information first', 'error')
       return
     }
     if (selectedVests.length === 0) {
@@ -194,9 +196,7 @@ ${chargesList || '- No charges added'}
   const [showWeaponModal, setShowWeaponModal] = useState(false)
   const [weaponStatuses, setWeaponStatuses] = useState<{[key: string]: 'returned' | 'lost' | 'broken' | 'used'}>({})
   const [newEventName, setNewEventName] = useState('')
-  const [customWeaponPresets, setCustomWeaponPresets] = useState<WeaponPreset[]>([])
   const [showPresets, setShowPresets] = useState(false)
-  const [savePresetName, setSavePresetName] = useState('')
 
   const showWeaponStatusModal = () => {
     // Initialize all weapons as returned
@@ -265,11 +265,11 @@ ${chargesList || '- No charges added'}
     }
 
     const report = `----------------------------------------------------------------
-Name: ${officerName}
-ID: ${officerId}
+Name: ${profile.name || 'Not set'}
+ID: ${profile.id || 'Not set'}
 ----------------------------------------------------------------
-Rank: ${rank}
-Badge Number: ${badgeNumber}
+Rank: ${profile.rank || 'Not set'}
+Badge Number: ${profile.badgeNumber || 'Not set'}
 ----------------------------------------------------------------
 ON DUTY: ${formatTime(onDutyTime)}
 ----------------------------------------------------------------
@@ -323,38 +323,14 @@ ${weaponsReturnedSection}
     setShowWeaponDropdown(false)
   }
 
-  const applyWeaponPreset = (preset: WeaponPreset) => {
-    setSelectedVests(preset.vests)
-    setSelectedWeapons(preset.weapons)
+  const applyWeaponPreset = (loadoutId: string) => {
+    const loadout = profile.loadouts.find(l => l.id === loadoutId)
+    if (!loadout) return
+    
+    setSelectedVests(loadout.vests)
+    setSelectedWeapons(loadout.weapons)
     setShowPresets(false)
-    showToast(`Applied preset: ${preset.name}`, 'success')
-  }
-
-  const saveCurrentAsPreset = () => {
-    if (!savePresetName.trim()) {
-      showToast('Please enter a preset name', 'error')
-      return
-    }
-
-    const newPreset: WeaponPreset = {
-      id: Date.now().toString(),
-      name: savePresetName,
-      vests: selectedVests,
-      weapons: selectedWeapons,
-    }
-
-    saveCustomWeaponPreset(newPreset)
-    setCustomWeaponPresets(getCustomWeaponPresets())
-    setSavePresetName('')
-    showToast('Preset saved!', 'success')
-  }
-
-  const deletePreset = (id: string) => {
-    if (confirm('Delete this preset?')) {
-      deleteCustomWeaponPreset(id)
-      setCustomWeaponPresets(getCustomWeaponPresets())
-      showToast('Preset deleted', 'success')
-    }
+    showToast(`Applied loadout: ${loadout.name}`, 'success')
   }
 
   return (
@@ -462,23 +438,39 @@ ${weaponsReturnedSection}
         </div>
 
         <div className="card p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name *</label>
-              <input type="text" value={officerName} onChange={(e) => setOfficerName(e.target.value)} className="input w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ID *</label>
-              <input type="text" value={officerId} onChange={(e) => setOfficerId(e.target.value)} className="input w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Rank *</label>
-              <input type="text" value={rank} onChange={(e) => setRank(e.target.value)} className="input w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Badge Number *</label>
-              <input type="text" value={badgeNumber} onChange={(e) => setBadgeNumber(e.target.value)} className="input w-full" />
-            </div>
+          {/* Display Officer Info from Profile */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">👤 Officer Information</h3>
+            {(!profile.name || !profile.id || !profile.rank || !profile.badgeNumber) ? (
+              <div className="text-center py-2">
+                <p className="text-gray-600 dark:text-gray-400 mb-2">Profile information incomplete</p>
+                <a 
+                  href="/profile" 
+                  className="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium"
+                >
+                  Complete your profile →
+                </a>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400">Name</p>
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{profile.name}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400">ID</p>
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{profile.id}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400">Rank</p>
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{profile.rank}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400">Badge Number</p>
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{profile.badgeNumber}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {!isOnDuty && (
@@ -491,70 +483,37 @@ ${weaponsReturnedSection}
                     onClick={() => setShowPresets(!showPresets)}
                     className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                   >
-                    {showPresets ? 'Hide' : 'Show'} Presets
+                    {showPresets ? 'Hide' : 'Show'} Loadouts
                   </button>
                 </div>
 
                 {showPresets && (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {WEAPON_PRESETS.map((preset) => (
-                        <button
-                          key={preset.id}
-                          onClick={() => applyWeaponPreset(preset)}
-                          className="p-4 text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg border-2 border-blue-200 dark:border-blue-800 transition-colors"
+                    {profile.loadouts.length === 0 ? (
+                      <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <p className="text-gray-500 dark:text-gray-400 mb-2">No custom loadouts created yet.</p>
+                        <a 
+                          href="/profile" 
+                          className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
                         >
-                          <div className="font-medium text-gray-900 dark:text-gray-100 mb-2">{preset.name}</div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                            <div>{preset.vests.length} vest(s)</div>
-                            <div>{preset.weapons.length} weapon(s)</div>
-                          </div>
-                        </button>
-                      ))}
-                      {customWeaponPresets.map((preset) => (
-                        <div key={preset.id} className="relative">
+                          Go to Profile to create loadouts →
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {profile.loadouts.map((loadout) => (
                           <button
-                            onClick={() => applyWeaponPreset(preset)}
-                            className="w-full p-4 text-left bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg border-2 border-purple-200 dark:border-purple-800 transition-colors"
+                            key={loadout.id}
+                            onClick={() => applyWeaponPreset(loadout.id)}
+                            className="p-4 text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg border-2 border-blue-200 dark:border-blue-800 transition-colors"
                           >
-                            <div className="font-medium text-gray-900 dark:text-gray-100 mb-2">⭐ {preset.name}</div>
+                            <div className="font-medium text-gray-900 dark:text-gray-100 mb-2">{loadout.name}</div>
                             <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                              <div>{preset.vests.length} vest(s)</div>
-                              <div>{preset.weapons.length} weapon(s)</div>
+                              <div>{loadout.vests.length} vest(s)</div>
+                              <div>{loadout.weapons.length} weapon(s)</div>
                             </div>
                           </button>
-                          <button
-                            onClick={() => deletePreset(preset.id)}
-                            className="absolute top-2 right-2 p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Save Current Loadout */}
-                    {(selectedVests.length > 0 || selectedWeapons.length > 0) && (
-                      <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Save current loadout as preset:</p>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={savePresetName}
-                            onChange={(e) => setSavePresetName(e.target.value)}
-                            placeholder="Enter preset name..."
-                            className="input flex-1"
-                          />
-                          <button
-                            onClick={saveCurrentAsPreset}
-                            className="btn btn-primary"
-                            disabled={!savePresetName.trim()}
-                          >
-                            Save Preset
-                          </button>
-                        </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -775,7 +734,13 @@ ${weaponsReturnedSection}
             </div>
             
             {!isOnDuty ? (
-              <button onClick={handleStartDuty} className="btn btn-primary" disabled={!officerName || !officerId || !rank || !badgeNumber}>Start Duty</button>
+              <button 
+                onClick={handleStartDuty} 
+                className="btn btn-primary" 
+                disabled={!profile.name || !profile.id || !profile.rank || !profile.badgeNumber}
+              >
+                Start Duty
+              </button>
             ) : (
               <div className="space-y-2">
                 <input type="text" value={eventsAttended} onChange={(e) => setEventsAttended(e.target.value)} className="input w-full" placeholder="Events Attended..." />

@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ToastProvider'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { DutyProvider } from '@/contexts/DutyContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
+import { UserProfileProvider } from '@/contexts/UserProfileContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -25,14 +26,16 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider>
           <NotificationProvider>
-            <DutyProvider>
-              <ToastProvider>
-                <Navbar />
-                <main className="container mx-auto px-4 py-8">
-                  {children}
-                </main>
-              </ToastProvider>
-            </DutyProvider>
+            <UserProfileProvider>
+              <DutyProvider>
+                <ToastProvider>
+                  <Navbar />
+                  <main className="container mx-auto px-4 py-8">
+                    {children}
+                  </main>
+                </ToastProvider>
+              </DutyProvider>
+            </UserProfileProvider>
           </NotificationProvider>
         </ThemeProvider>
         <Analytics />
