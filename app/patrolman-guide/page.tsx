@@ -8,7 +8,7 @@ import { loadAllLawData, filterLawEntries, LawEntry } from '@/utils/htmlParser'
 
 export default function PatrolmanGuidePage() {
   const { showToast } = useToast()
-  const { incrementArrests } = useDuty()
+  const { incrementArrests, addArrestRecord } = useDuty()
   const [data, setData] = useState<LawEntry[]>([])
   const [filteredData, setFilteredData] = useState<LawEntry[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -17,6 +17,8 @@ export default function PatrolmanGuidePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [categories, setCategories] = useState<string[]>([])
   const [selectedCharges, setSelectedCharges] = useState<LawEntry[]>([])
+  const [suspectName, setSuspectName] = useState('')
+  const [showArrestModal, setShowArrestModal] = useState(false)
   const itemsPerPage = 20
 
   useEffect(() => {
@@ -79,10 +81,42 @@ export default function PatrolmanGuidePage() {
       showToast('No charges to copy', 'error')
       return
     }
+    setShowArrestModal(true)
+  }
+
+  const finalizeArrest = () => {
+    const text = selectedCharges.map(charge => `- ${charge.code} ${charge.description}`).join('\n')
+    navigator.clipboard.writeText(text)
+    
+    // Calculate total fines
+    const totalFines = selectedCharges.reduce((sum, charge) => {
+      const fineStr = charge.fine?.replace(/[^0-9]/g, '') || '0'
+      return sum + parseInt(fineStr)
+    }, 0)
+    
+    // Add arrest record if on duty
+    if (suspectName.trim()) {
+      addArrestRecord(
+        suspectName,
+        selectedCharges.map(c => `${c.code} ${c.description}`),
+        totalFines
+      )
+    }
+    
+    incrementArrests()
+    showToast(`${selectedCharges.length} charges copied! Arrest count increased${suspectName ? ` for ${suspectName}` : ''}`, 'success')
+    
+    // Reset
+    setShowArrestModal(false)
+    setSuspectName('')
+  }
+
+  const quickCopy = () => {
     const text = selectedCharges.map(charge => `- ${charge.code} ${charge.description}`).join('\n')
     navigator.clipboard.writeText(text)
     incrementArrests()
     showToast(`${selectedCharges.length} charges copied! Arrest count increased`, 'success')
+    setShowArrestModal(false)
   }
 
   // Pagination
@@ -371,6 +405,65 @@ export default function PatrolmanGuidePage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Arrest Modal */}
+      {showArrestModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-lg max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-blue-400 mb-4">Record Arrest</h2>
+            <p className="text-gray-400 mb-4">
+              Enter the suspect's name to log this arrest (optional).
+            </p>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Suspect Name (Optional)
+              </label>
+              <input
+                type="text"
+                value={suspectName}
+                onChange={(e) => setSuspectName(e.target.value)}
+                placeholder="e.g., John Doe"
+                className="input w-full"
+                autoFocus
+              />
+            </div>
+
+            <div className="bg-gray-800 p-4 rounded-md mb-4">
+              <p className="text-sm text-gray-400 mb-2">Charges to copy:</p>
+              <div className="text-sm text-gray-300">
+                {selectedCharges.slice(0, 3).map(c => (
+                  <div key={c.code}>• {c.code}</div>
+                ))}
+                {selectedCharges.length > 3 && (
+                  <div className="text-gray-500">... and {selectedCharges.length - 3} more</div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowArrestModal(false)}
+                className="flex-1 btn bg-gray-700 text-white hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={quickCopy}
+                className="flex-1 btn bg-gray-600 text-white hover:bg-gray-500"
+              >
+                Skip & Copy
+              </button>
+              <button
+                onClick={finalizeArrest}
+                className="flex-1 btn btn-primary"
+              >
+                {suspectName ? 'Log & Copy' : 'Copy'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

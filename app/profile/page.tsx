@@ -9,7 +9,17 @@ export default function ProfilePage() {
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString)
-    return date.toLocaleString()
+    // Display in GMT+1 (server time)
+    const utc = date.getTime() + (date.getTimezoneOffset() * 60000)
+    const gmt1 = new Date(utc + (3600000 * 1))
+    return gmt1.toLocaleString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }) + ' (GMT+1)'
   }
 
   const calculateDuration = (start: string, end?: string) => {
@@ -262,20 +272,77 @@ export default function ProfilePage() {
                         ))}
                       </ul>
                     </div>
-                    <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Weapons Returned</p>
-                      <ul className="text-sm text-gray-900 dark:text-gray-100 space-y-1">
-                        {log.weaponsReturned.map((weapon, idx) => (
-                          <li key={idx} className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                            {weapon}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    
+                    {/* Weapon Status with colors */}
+                    {log.weaponStatus && log.weaponStatus.length > 0 && (
+                      <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Weapon Status</p>
+                        <ul className="text-sm text-gray-900 dark:text-gray-100 space-y-1">
+                          {log.weaponStatus.map((weapon, idx) => (
+                            <li key={idx} className="flex items-center gap-2">
+                              {weapon.status === 'returned' && <span className="text-green-500">✅</span>}
+                              {weapon.status === 'lost' && <span className="text-red-500">🔴</span>}
+                              {weapon.status === 'broken' && <span className="text-orange-500">💔</span>}
+                              {weapon.status === 'used' && <span className="text-yellow-500">⚡</span>}
+                              <span className={
+                                weapon.status === 'returned' ? 'text-green-600 dark:text-green-400' :
+                                weapon.status === 'lost' ? 'text-red-600 dark:text-red-400' :
+                                weapon.status === 'broken' ? 'text-orange-600 dark:text-orange-400' :
+                                'text-yellow-600 dark:text-yellow-400'
+                              }>
+                                {weapon.name} - {weapon.status.toUpperCase()}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* Arrest Records */}
+              {log.arrestRecords && log.arrestRecords.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Arrest Records ({log.arrestRecords.length})</h4>
+                  <div className="space-y-3">
+                    {log.arrestRecords.map((arrest) => (
+                      <div key={arrest.id} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">{arrest.suspectName}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(arrest.timestamp)}</p>
+                          </div>
+                          <span className="text-sm font-bold text-green-600 dark:text-green-400">${arrest.fines}</span>
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <p className="font-medium mb-1">Charges:</p>
+                          <ul className="space-y-1 text-xs">
+                            {arrest.charges.map((charge, idx) => (
+                              <li key={idx}>• {charge}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Event Counters */}
+              {log.eventCounters && log.eventCounters.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Event Counters</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {log.eventCounters.map((event) => (
+                      <div key={event.name} className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{event.name}</p>
+                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{event.count}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

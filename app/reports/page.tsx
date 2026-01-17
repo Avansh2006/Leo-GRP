@@ -32,7 +32,22 @@ const WEAPONS = [
 
 export default function ReportsPage() {
   const { showToast } = useToast()
-  const { isOnDuty, arrestCount, fineCount, currentShiftArrests, currentShiftFines, weaponsTaken, startDuty, endDuty, incrementFines } = useDuty()
+  const { 
+    isOnDuty, 
+    arrestCount, 
+    fineCount, 
+    currentShiftArrests, 
+    currentShiftFines, 
+    weaponsTaken, 
+    currentDutyStart, 
+    currentEventCounters,
+    startDuty, 
+    endDuty, 
+    incrementFines,
+    addEventCounter,
+    incrementEventCounter,
+    removeEventCounter,
+  } = useDuty()
   
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -170,18 +185,52 @@ ${chargesList || '- No charges added'}
       return
     }
 
-    generateShiftReport()
-    endDuty(weaponsTaken, eventsAttended)
+    // Open weapon status modal
+    showWeaponStatusModal()
+  }
+
+  const [showWeaponModal, setShowWeaponModal] = useState(false)
+  const [weaponStatuses, setWeaponStatuses] = useState<{[key: string]: 'returned' | 'lost' | 'broken' | 'used'}>({})
+  const [newEventName, setNewEventName] = useState('')
+
+  const showWeaponStatusModal = () => {
+    // Initialize all weapons as returned
+    const initialStatuses: {[key: string]: 'returned' | 'lost' | 'broken' | 'used'} = {}
+    weaponsTaken.forEach(weapon => {
+      initialStatuses[weapon] = 'returned'
+    })
+    setWeaponStatuses(initialStatuses)
+    setShowWeaponModal(true)
+  }
+
+  const finalizeEndDuty = () => {
+    const weaponStatusArray = Object.entries(weaponStatuses).map(([name, status]) => ({
+      name,
+      status
+    }))
+
+    generateShiftReport(weaponStatusArray)
+    endDuty(weaponStatusArray, eventsAttended)
     
     setEventsAttended('')
     setSelectedWeapons([])
     setSelectedVests([])
     setWeaponAmmo({})
+    setShowWeaponModal(false)
+    setWeaponStatuses({})
   }
 
-  const generateShiftReport = () => {
-    const pcTime = new Date()
-    const gameTime = new Date(pcTime.getTime() + (60 * 60 * 1000)) // GMT+1
+  const generateShiftReport = (weaponStatusArray: {name: string, status: string}[]) => {
+    // Get GMT+1 server time
+    const getGMT1Time = () => {
+      const now = new Date()
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
+      const gmt1 = new Date(utc + (3600000 * 1)) // GMT+1
+      return gmt1
+    }
+
+    const onDutyTime = new Date(currentDutyStart || '')
+    const offDutyTime = getGMT1Time()
     
     const formatTime = (date: Date) => date.toLocaleString('en-US', { 
       month: '2-digit', 
@@ -193,6 +242,22 @@ ${chargesList || '- No charges added'}
     })
 
     const weaponsTakenList = weaponsTaken.join('\n')
+    
+    const returnedWeapons = weaponStatusArray.filter(w => w.status === 'returned')
+    const lostWeapons = weaponStatusArray.filter(w => w.status === 'lost')
+    const brokenWeapons = weaponStatusArray.filter(w => w.status === 'broken')
+    const usedWeapons = weaponStatusArray.filter(w => w.status === 'used')
+    
+    let weaponsReturnedSection = returnedWeapons.map(w => w.name).join('\n')
+    if (lostWeapons.length > 0) {
+      weaponsReturnedSection += '\n\n🔴 LOST:\n' + lostWeapons.map(w => w.name).join('\n')
+    }
+    if (brokenWeapons.length > 0) {
+      weaponsReturnedSection += '\n\n💔 BROKEN:\n' + brokenWeapons.map(w => w.name).join('\n')
+    }
+    if (usedWeapons.length > 0) {
+      weaponsReturnedSection += '\n\n⚡ USED:\n' + usedWeapons.map(w => w.name).join('\n')
+    }
 
     const report = `----------------------------------------------------------------
 Name: ${officerName}
@@ -201,7 +266,7 @@ ID: ${officerId}
 Rank: ${rank}
 Badge Number: ${badgeNumber}
 ----------------------------------------------------------------
-ON DUTY: ${formatTime(gameTime)}
+ON DUTY: ${formatTime(onDutyTime)}
 ----------------------------------------------------------------
 Weapons Taken: ( with Ammunation )
 ${weaponsTakenList}
@@ -212,10 +277,10 @@ Total Arrests: ${currentShiftArrests}
 ----------------------------------------------------------------
 Total Fines: ${currentShiftFines}
 ----------------------------------------------------------------
-OFF DUTY: ${formatTime(gameTime)}
+OFF DUTY: ${formatTime(offDutyTime)}
 ----------------------------------------------------------------
 Weapons Returned: ( with Ammunation )
-${weaponsTakenList}
+${weaponsReturnedSection}
 ----------------------------------------------------------------`
 
     navigator.clipboard.writeText(report)
@@ -482,6 +547,83 @@ ${weaponsTakenList}
             </>
           )}
 
+          {/* Event Counters Section */}
+          {isOnDuty && (
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Event Counters</h3>
+              
+              {/* Add New Event */}
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newEventName}
+                  onChange={(e) => setNewEventName(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && newEventName.trim()) {
+                      addEventCounter(newEventName.trim())
+                      setNewEventName('')
+                      showToast('Event counter added!', 'success')
+                    }
+                  }}
+                  placeholder="Add event counter (e.g., Store Robbery, Traffic Stop)..."
+                  className="input flex-1"
+                />
+                <button
+                  onClick={() => {
+                    if (newEventName.trim()) {
+                      addEventCounter(newEventName.trim())
+                      setNewEventName('')
+                      showToast('Event counter added!', 'success')
+                    }
+                  }}
+                  className="btn btn-primary"
+                  disabled={!newEventName.trim()}
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Event Counters List */}
+              {currentEventCounters.length > 0 ? (
+                <div className="space-y-2">
+                  {currentEventCounters.map((event) => (
+                    <div key={event.name} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
+                      <div className="flex items-center gap-3 flex-1">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{event.name}</span>
+                        <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{event.count}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => incrementEventCounter(event.name)}
+                          className="btn bg-green-600 text-white hover:bg-green-700 px-4 py-2"
+                        >
+                          + 1
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove "${event.name}" counter?`)) {
+                              removeEventCounter(event.name)
+                              showToast('Event counter removed', 'success')
+                            }
+                          }}
+                          className="text-red-600 dark:text-red-400 hover:text-red-800 p-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                  <p>No event counters yet. Add one to track events during your shift!</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
             <div>
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Status</p>
@@ -503,6 +645,87 @@ ${weaponsTakenList}
           </div>
         </div>
       </div>
+
+      {/* Weapon Status Modal */}
+      {showWeaponModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-4">
+                Weapon Status Check
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Please mark the status of each weapon taken during your shift:
+              </p>
+              
+              <div className="space-y-4">
+                {weaponsTaken.map((weapon) => (
+                  <div key={weapon} className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mb-3">{weapon}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <button
+                        onClick={() => setWeaponStatuses(prev => ({ ...prev, [weapon]: 'returned' }))}
+                        className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                          weaponStatuses[weapon] === 'returned'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        ✅ Returned
+                      </button>
+                      <button
+                        onClick={() => setWeaponStatuses(prev => ({ ...prev, [weapon]: 'lost' }))}
+                        className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                          weaponStatuses[weapon] === 'lost'
+                            ? 'bg-red-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        🔴 Lost
+                      </button>
+                      <button
+                        onClick={() => setWeaponStatuses(prev => ({ ...prev, [weapon]: 'broken' }))}
+                        className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                          weaponStatuses[weapon] === 'broken'
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        💔 Broken
+                      </button>
+                      <button
+                        onClick={() => setWeaponStatuses(prev => ({ ...prev, [weapon]: 'used' }))}
+                        className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                          weaponStatuses[weapon] === 'used'
+                            ? 'bg-yellow-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        ⚡ Used
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowWeaponModal(false)}
+                  className="flex-1 btn bg-gray-500 text-white hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={finalizeEndDuty}
+                  className="flex-1 btn btn-primary"
+                >
+                  Complete & End Duty
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer className="text-center py-6 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700">
         Made by <span className="font-semibold text-blue-600 dark:text-blue-400">Avansh Yadav (EN3)</span> - Currently Server Administrator

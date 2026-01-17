@@ -2,6 +2,32 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
+// Helper function to get GMT+1 time
+const getGMT1Time = () => {
+  const now = new Date()
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
+  const gmt1 = new Date(utc + (3600000 * 1)) // GMT+1
+  return gmt1.toISOString()
+}
+
+interface WeaponStatus {
+  name: string
+  status: 'returned' | 'lost' | 'broken' | 'used'
+}
+
+interface ArrestRecord {
+  id: string
+  suspectName: string
+  charges: string[]
+  fines: number
+  timestamp: string
+}
+
+interface EventCounter {
+  name: string
+  count: number
+}
+
 interface DutyLog {
   id: string
   onDutyTime: string
@@ -10,7 +36,10 @@ interface DutyLog {
   totalFines: number
   weaponsTaken: string[]
   weaponsReturned: string[]
+  weaponStatus: WeaponStatus[]
   eventsAttended: string
+  arrestRecords: ArrestRecord[]
+  eventCounters: EventCounter[]
 }
 
 interface DutyContextType {
@@ -22,10 +51,16 @@ interface DutyContextType {
   currentShiftFines: number
   weaponsTaken: string[]
   dutyLogs: DutyLog[]
+  currentArrestRecords: ArrestRecord[]
+  currentEventCounters: EventCounter[]
   startDuty: (weapons: string[]) => void
-  endDuty: (weaponsReturned: string[], eventsAttended: string) => void
+  endDuty: (weaponStatus: WeaponStatus[], eventsAttended: string) => void
   incrementArrests: () => void
   incrementFines: () => void
+  addArrestRecord: (suspectName: string, charges: string[], fines: number) => void
+  addEventCounter: (eventName: string) => void
+  incrementEventCounter: (eventName: string) => void
+  removeEventCounter: (eventName: string) => void
 }
 
 const DutyContext = createContext<DutyContextType | undefined>(undefined)
@@ -39,6 +74,8 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   const [dutyLogs, setDutyLogs] = useState<DutyLog[]>([])
   const [currentShiftArrests, setCurrentShiftArrests] = useState(0)
   const [currentShiftFines, setCurrentShiftFines] = useState(0)
+  const [currentArrestRecords, setCurrentArrestRecords] = useState<ArrestRecord[]>([])
+  const [currentEventCounters, setCurrentEventCounters] = useState<EventCounter[]>([])
 
   useEffect(() => {
     const savedLogs = localStorage.getItem('dutyLogs')
@@ -55,24 +92,29 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
   const startDuty = (weapons: string[]) => {
     setIsOnDuty(true)
-    setCurrentDutyStart(new Date().toISOString())
+    setCurrentDutyStart(getGMT1Time()) // Use GMT+1 time
     setCurrentShiftArrests(0)
     setCurrentShiftFines(0)
     setWeaponsTaken(weapons)
+    setCurrentArrestRecords([])
+    setCurrentEventCounters([])
   }
 
-  const endDuty = (weaponsReturned: string[], eventsAttended: string) => {
+  const endDuty = (weaponStatus: WeaponStatus[], eventsAttended: string) => {
     if (!currentDutyStart) return
 
     const newLog: DutyLog = {
       id: Date.now().toString(),
       onDutyTime: currentDutyStart,
-      offDutyTime: new Date().toISOString(),
+      offDutyTime: getGMT1Time(), // Use GMT+1 time
       totalArrests: currentShiftArrests,
       totalFines: currentShiftFines,
       weaponsTaken,
-      weaponsReturned,
+      weaponsReturned: weaponStatus.filter(w => w.status === 'returned').map(w => w.name),
+      weaponStatus,
       eventsAttended,
+      arrestRecords: currentArrestRecords,
+      eventCounters: currentEventCounters,
     }
 
     const updatedLogs = [newLog, ...dutyLogs]
@@ -84,6 +126,8 @@ export function DutyProvider({ children }: { children: ReactNode }) {
     setCurrentShiftArrests(0)
     setCurrentShiftFines(0)
     setWeaponsTaken([])
+    setCurrentArrestRecords([])
+    setCurrentEventCounters([])
   }
 
   const incrementArrests = () => {
@@ -108,6 +152,37 @@ export function DutyProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const addArrestRecord = (suspectName: string, charges: string[], fines: number) => {
+    const newRecord: ArrestRecord = {
+      id: Date.now().toString(),
+      suspectName,
+      charges,
+      fines,
+      timestamp: getGMT1Time()
+    }
+    setCurrentArrestRecords(prev => [...prev, newRecord])
+  }
+
+  const addEventCounter = (eventName: string) => {
+    if (!currentEventCounters.find(e => e.name === eventName)) {
+      setCurrentEventCounters(prev => [...prev, { name: eventName, count: 1 }])
+    }
+  }
+
+  const incrementEventCounter = (eventName: string) => {
+    setCurrentEventCounters(prev => 
+      prev.map(counter => 
+        counter.name === eventName 
+          ? { ...counter, count: counter.count + 1 }
+          : counter
+      )
+    )
+  }
+
+  const removeEventCounter = (eventName: string) => {
+    setCurrentEventCounters(prev => prev.filter(e => e.name !== eventName))
+  }
+
   return (
     <DutyContext.Provider
       value={{
@@ -119,10 +194,16 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         currentShiftFines,
         weaponsTaken,
         dutyLogs,
+        currentArrestRecords,
+        currentEventCounters,
         startDuty,
         endDuty,
         incrementArrests,
         incrementFines,
+        addArrestRecord,
+        addEventCounter,
+        incrementEventCounter,
+        removeEventCounter,
       }}
     >
       {children}
