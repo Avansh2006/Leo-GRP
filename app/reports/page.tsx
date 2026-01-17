@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useToast } from '@/components/ToastProvider'
 import { useDuty } from '@/contexts/DutyContext'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
+import { WEAPON_PRESETS, WeaponPreset, EVENT_PRESETS, saveCustomWeaponPreset, getCustomWeaponPresets, deleteCustomWeaponPreset } from '@/utils/presets'
 
 const VESTS = [
   'Vest Level 1',
@@ -75,6 +76,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     loadCharges()
+    setCustomWeaponPresets(getCustomWeaponPresets())
     
     const handleClickOutside = (event: MouseEvent) => {
       if (weaponDropdownRef.current && !weaponDropdownRef.current.contains(event.target as Node)) {
@@ -192,6 +194,9 @@ ${chargesList || '- No charges added'}
   const [showWeaponModal, setShowWeaponModal] = useState(false)
   const [weaponStatuses, setWeaponStatuses] = useState<{[key: string]: 'returned' | 'lost' | 'broken' | 'used'}>({})
   const [newEventName, setNewEventName] = useState('')
+  const [customWeaponPresets, setCustomWeaponPresets] = useState<WeaponPreset[]>([])
+  const [showPresets, setShowPresets] = useState(false)
+  const [savePresetName, setSavePresetName] = useState('')
 
   const showWeaponStatusModal = () => {
     // Initialize all weapons as returned
@@ -316,6 +321,40 @@ ${weaponsReturnedSection}
       setSelectedWeapons(prev => [...prev, { weapon, ammo: '' }])
     }
     setShowWeaponDropdown(false)
+  }
+
+  const applyWeaponPreset = (preset: WeaponPreset) => {
+    setSelectedVests(preset.vests)
+    setSelectedWeapons(preset.weapons)
+    setShowPresets(false)
+    showToast(`Applied preset: ${preset.name}`, 'success')
+  }
+
+  const saveCurrentAsPreset = () => {
+    if (!savePresetName.trim()) {
+      showToast('Please enter a preset name', 'error')
+      return
+    }
+
+    const newPreset: WeaponPreset = {
+      id: Date.now().toString(),
+      name: savePresetName,
+      vests: selectedVests,
+      weapons: selectedWeapons,
+    }
+
+    saveCustomWeaponPreset(newPreset)
+    setCustomWeaponPresets(getCustomWeaponPresets())
+    setSavePresetName('')
+    showToast('Preset saved!', 'success')
+  }
+
+  const deletePreset = (id: string) => {
+    if (confirm('Delete this preset?')) {
+      deleteCustomWeaponPreset(id)
+      setCustomWeaponPresets(getCustomWeaponPresets())
+      showToast('Preset deleted', 'success')
+    }
   }
 
   return (
@@ -444,6 +483,84 @@ ${weaponsReturnedSection}
 
           {!isOnDuty && (
             <>
+              {/* Weapon Loadout Presets */}
+              <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">⚡ Quick Loadouts</h3>
+                  <button
+                    onClick={() => setShowPresets(!showPresets)}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {showPresets ? 'Hide' : 'Show'} Presets
+                  </button>
+                </div>
+
+                {showPresets && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {WEAPON_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          onClick={() => applyWeaponPreset(preset)}
+                          className="p-4 text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg border-2 border-blue-200 dark:border-blue-800 transition-colors"
+                        >
+                          <div className="font-medium text-gray-900 dark:text-gray-100 mb-2">{preset.name}</div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                            <div>{preset.vests.length} vest(s)</div>
+                            <div>{preset.weapons.length} weapon(s)</div>
+                          </div>
+                        </button>
+                      ))}
+                      {customWeaponPresets.map((preset) => (
+                        <div key={preset.id} className="relative">
+                          <button
+                            onClick={() => applyWeaponPreset(preset)}
+                            className="w-full p-4 text-left bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg border-2 border-purple-200 dark:border-purple-800 transition-colors"
+                          >
+                            <div className="font-medium text-gray-900 dark:text-gray-100 mb-2">⭐ {preset.name}</div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                              <div>{preset.vests.length} vest(s)</div>
+                              <div>{preset.weapons.length} weapon(s)</div>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => deletePreset(preset.id)}
+                            className="absolute top-2 right-2 p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Save Current Loadout */}
+                    {(selectedVests.length > 0 || selectedWeapons.length > 0) && (
+                      <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Save current loadout as preset:</p>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={savePresetName}
+                            onChange={(e) => setSavePresetName(e.target.value)}
+                            placeholder="Enter preset name..."
+                            className="input flex-1"
+                          />
+                          <button
+                            onClick={saveCurrentAsPreset}
+                            className="btn btn-primary"
+                            disabled={!savePresetName.trim()}
+                          >
+                            Save Preset
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Vests *</label>
                 <div className="space-y-2">
@@ -552,6 +669,29 @@ ${weaponsReturnedSection}
             <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Event Counters</h3>
               
+              {/* Event Presets */}
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-blue-800 dark:text-blue-300 mb-2 font-medium">⚡ Quick Events</p>
+                <div className="flex flex-wrap gap-2">
+                  {EVENT_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      onClick={() => {
+                        if (!currentEventCounters.find(e => e.name === preset.name)) {
+                          addEventCounter(preset.name)
+                          showToast(`Added "${preset.name}" counter`, 'success')
+                        } else {
+                          showToast('Counter already exists', 'info')
+                        }
+                      }}
+                      className="px-3 py-1 bg-white dark:bg-gray-800 hover:bg-blue-100 dark:hover:bg-blue-800 rounded-md border border-blue-200 dark:border-blue-700 text-sm font-medium text-gray-900 dark:text-gray-100 transition-colors"
+                    >
+                      {preset.icon} {preset.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Add New Event */}
               <div className="flex gap-2 mb-4">
                 <input

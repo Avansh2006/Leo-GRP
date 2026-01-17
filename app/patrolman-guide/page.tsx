@@ -5,6 +5,7 @@ import CopyButton from '@/components/CopyButton'
 import { useToast } from '@/components/ToastProvider'
 import { useDuty } from '@/contexts/DutyContext'
 import { loadAllLawData, filterLawEntries, LawEntry } from '@/utils/htmlParser'
+import { CHARGE_TEMPLATES, ChargeTemplate, saveCustomChargeTemplate, getCustomChargeTemplates, deleteCustomChargeTemplate } from '@/utils/presets'
 
 export default function PatrolmanGuidePage() {
   const { showToast } = useToast()
@@ -19,10 +20,16 @@ export default function PatrolmanGuidePage() {
   const [selectedCharges, setSelectedCharges] = useState<LawEntry[]>([])
   const [suspectName, setSuspectName] = useState('')
   const [showArrestModal, setShowArrestModal] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [customTemplates, setCustomTemplates] = useState<ChargeTemplate[]>([])
+  const [saveTemplateName, setSaveTemplateName] = useState('')
+  const [saveTemplateDesc, setSaveTemplateDesc] = useState('')
+  const [allCharges, setAllCharges] = useState<LawEntry[]>([])
   const itemsPerPage = 20
 
   useEffect(() => {
     loadData()
+    setCustomTemplates(getCustomChargeTemplates())
   }, [])
 
   useEffect(() => {
@@ -43,6 +50,7 @@ export default function PatrolmanGuidePage() {
       const lawData = await loadAllLawData()
       setData(lawData.allEntries)
       setFilteredData(lawData.allEntries)
+      setAllCharges(lawData.allEntries)
       
       // Extract unique categories
       const uniqueCategories = Array.from(
@@ -117,6 +125,51 @@ export default function PatrolmanGuidePage() {
     incrementArrests()
     showToast(`${selectedCharges.length} charges copied! Arrest count increased`, 'success')
     setShowArrestModal(false)
+  }
+
+  const applyChargeTemplate = (template: ChargeTemplate) => {
+    const matchedCharges = allCharges.filter(charge => 
+      template.chargeCodes.includes(charge.code)
+    )
+    const newCharges = matchedCharges.filter(c => !selectedCharges.find(sc => sc.code === c.code))
+    if (newCharges.length > 0) {
+      setSelectedCharges([...selectedCharges, ...newCharges])
+      showToast(`Added ${newCharges.length} charges from template`, 'success')
+    } else {
+      showToast('All template charges already added', 'info')
+    }
+  }
+
+  const saveCurrentAsTemplate = () => {
+    if (!saveTemplateName.trim()) {
+      showToast('Please enter a template name', 'error')
+      return
+    }
+    if (selectedCharges.length === 0) {
+      showToast('Please select charges first', 'error')
+      return
+    }
+
+    const newTemplate: ChargeTemplate = {
+      id: Date.now().toString(),
+      name: saveTemplateName,
+      description: saveTemplateDesc || 'Custom template',
+      chargeCodes: selectedCharges.map(c => c.code),
+    }
+
+    saveCustomChargeTemplate(newTemplate)
+    setCustomTemplates(getCustomChargeTemplates())
+    setSaveTemplateName('')
+    setSaveTemplateDesc('')
+    showToast('Template saved!', 'success')
+  }
+
+  const deleteTemplate = (id: string) => {
+    if (confirm('Delete this template?')) {
+      deleteCustomChargeTemplate(id)
+      setCustomTemplates(getCustomChargeTemplates())
+      showToast('Template deleted', 'success')
+    }
   }
 
   // Pagination
@@ -199,6 +252,55 @@ export default function PatrolmanGuidePage() {
         </div>
       </div>
 
+      {/* Charge Templates */}
+      <div className="card p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-blue-400">⚡ Quick Templates</h3>
+          <button
+            onClick={() => setShowTemplates(!showTemplates)}
+            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            {showTemplates ? 'Hide' : 'Show'} Templates
+          </button>
+        </div>
+
+        {showTemplates && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {CHARGE_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => applyChargeTemplate(template)}
+                className="p-3 text-left bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg border-2 border-green-200 dark:border-green-800 transition-colors"
+              >
+                <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">{template.name}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">{template.description}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">{template.chargeCodes.length} charges</div>
+              </button>
+            ))}
+            {customTemplates.map((template) => (
+              <div key={template.id} className="relative">
+                <button
+                  onClick={() => applyChargeTemplate(template)}
+                  className="w-full p-3 text-left bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg border-2 border-purple-200 dark:border-purple-800 transition-colors"
+                >
+                  <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">⭐ {template.name}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">{template.description}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">{template.chargeCodes.length} charges</div>
+                </button>
+                <button
+                  onClick={() => deleteTemplate(template.id)}
+                  className="absolute top-2 right-2 p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Selected Charges Section */}
       {selectedCharges.length > 0 && (
         <div className="card p-4 mb-6">
@@ -216,6 +318,35 @@ export default function PatrolmanGuidePage() {
               </button>
             </div>
           </div>
+
+          {/* Save as Template */}
+          <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+            <p className="text-sm text-purple-800 dark:text-purple-300 mb-2 font-medium">💾 Save as Template</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={saveTemplateName}
+                onChange={(e) => setSaveTemplateName(e.target.value)}
+                placeholder="Template name..."
+                className="input flex-1"
+              />
+              <input
+                type="text"
+                value={saveTemplateDesc}
+                onChange={(e) => setSaveTemplateDesc(e.target.value)}
+                placeholder="Description (optional)..."
+                className="input flex-1"
+              />
+              <button
+                onClick={saveCurrentAsTemplate}
+                className="btn bg-purple-600 text-white hover:bg-purple-700"
+                disabled={!saveTemplateName.trim()}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-2">
             {selectedCharges.map((charge) => (
               <div key={charge.code} className="bg-gray-800 p-3 rounded-md flex items-start justify-between">
