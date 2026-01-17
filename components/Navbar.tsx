@@ -35,13 +35,6 @@ const Navbar = () => {
     { value: 'red' as const, label: 'Red', color: 'bg-red-500' },
     { value: 'orange' as const, label: 'Orange', color: 'bg-orange-500' },
   ]
-  
-  const navItems = [
-    { name: 'Bodycam Commands', href: '/bodycam-commands' },
-    { name: 'Patrolman\'s Guide', href: '/patrolman-guide' },
-    { name: 'Reports', href: '/reports' },
-    { name: 'Profile', href: '/profile' },
-  ]
 
   return (
     <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 shadow-sm">
