@@ -39,7 +39,7 @@ Made with ❤️ by **Avansh Yadav (EN3)** - Server Administrator
 
 ### 📝 Evidence & Shift Report Generator
 - **Evidence Reports**:
-  - Date and time tracking (PC time displayed, GMT+1 for reports)
+  - Date and time tracking (PC time displayed, GMT+0 for reports)
   - Detailed incident description
   - Charge search and selection from patrolman's guide
   - Bodycam footage, proof, and license plate links
@@ -53,7 +53,7 @@ Made with ❤️ by **Avansh Yadav (EN3)** - Server Administrator
     - Dropdown menu with 13+ weapon types
     - Custom ammo amount for each weapon
     - Easy add/remove functionality
-  - Duty tracking with start/end timestamps (GMT+1)
+  - Duty tracking with start/end timestamps (GMT+0)
   - Events attended logging
   - Arrest and fine counters
   - Automated weapon tracking (taken & returned)
@@ -197,7 +197,7 @@ leo-grp/
 
 ### Dual Time System
 - **PC Time**: Displayed to user for reference
-- **Game Time (GMT+1)**: Used in generated reports for server consistency
+- **Game Time (GMT+0)**: Used in generated reports for server consistency
 - Automatic conversion ensures accurate timestamps
 
 ### Performance Tracking

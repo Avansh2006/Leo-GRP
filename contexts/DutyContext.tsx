@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
-// Helper function to get GMT+1 time
-const getGMT1Time = () => {
+// Helper function to get GMT+0 time
+const getGMT0Time = () => {
   const now = new Date()
   const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
-  const gmt1 = new Date(utc + (3600000 * 1)) // GMT+1
-  return gmt1.toISOString()
+  const gmt0 = new Date(utc) // GMT+0
+  return gmt0.toISOString()
 }
 
 interface WeaponStatus {
@@ -18,6 +18,7 @@ interface WeaponStatus {
 interface ArrestRecord {
   id: string
   suspectName: string
+  suspectId?: string
   charges: string[]
   fines: number
   timestamp: string
@@ -57,7 +58,7 @@ interface DutyContextType {
   endDuty: (weaponStatus: WeaponStatus[], eventsAttended: string) => void
   incrementArrests: () => void
   incrementFines: () => void
-  addArrestRecord: (suspectName: string, charges: string[], fines: number) => void
+  addArrestRecord: (suspectName: string, charges: string[], fines: number, suspectId?: string) => void
   addEventCounter: (eventName: string) => void
   incrementEventCounter: (eventName: string) => void
   removeEventCounter: (eventName: string) => void
@@ -92,7 +93,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
   const startDuty = (weapons: string[]) => {
     setIsOnDuty(true)
-    setCurrentDutyStart(getGMT1Time()) // Use GMT+1 time
+    setCurrentDutyStart(getGMT0Time()) // Use GMT+0 time
     setCurrentShiftArrests(0)
     setCurrentShiftFines(0)
     setWeaponsTaken(weapons)
@@ -152,13 +153,14 @@ export function DutyProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const addArrestRecord = (suspectName: string, charges: string[], fines: number) => {
+  const addArrestRecord = (suspectName: string, charges: string[], fines: number, suspectId?: string) => {
     const newRecord: ArrestRecord = {
       id: Date.now().toString(),
       suspectName,
+      suspectId,
       charges,
       fines,
-      timestamp: getGMT1Time()
+      timestamp: getGMT0Time()
     }
     setCurrentArrestRecords(prev => [...prev, newRecord])
   }

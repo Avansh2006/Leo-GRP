@@ -19,6 +19,7 @@ export default function PatrolmanGuidePage() {
   const [categories, setCategories] = useState<string[]>([])
   const [selectedCharges, setSelectedCharges] = useState<LawEntry[]>([])
   const [suspectName, setSuspectName] = useState('')
+  const [suspectId, setSuspectId] = useState('')
   const [showArrestModal, setShowArrestModal] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [customTemplates, setCustomTemplates] = useState<ChargeTemplate[]>([])
@@ -107,7 +108,8 @@ export default function PatrolmanGuidePage() {
       addArrestRecord(
         suspectName,
         selectedCharges.map(c => `${c.code} ${c.description}`),
-        totalFines
+        totalFines,
+        suspectId.trim() || undefined
       )
     }
     
@@ -117,6 +119,7 @@ export default function PatrolmanGuidePage() {
     // Reset
     setShowArrestModal(false)
     setSuspectName('')
+    setSuspectId('')
   }
 
   const quickCopy = () => {
@@ -566,21 +569,39 @@ export default function PatrolmanGuidePage() {
           <div className="bg-gray-900 rounded-lg max-w-md w-full p-6">
             <h2 className="text-2xl font-bold text-blue-400 mb-4">Record Arrest</h2>
             <p className="text-gray-400 mb-4">
-              Enter the suspect's name to log this arrest (optional).
+              Enter the suspect's details to log this arrest (optional).
             </p>
             
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Suspect Name (Optional)
-              </label>
-              <input
-                type="text"
-                value={suspectName}
-                onChange={(e) => setSuspectName(e.target.value)}
-                placeholder="e.g., John Doe"
-                className="input w-full"
-                autoFocus
-              />
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Suspect Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={suspectName}
+                  onChange={(e) => setSuspectName(e.target.value)}
+                  placeholder="e.g., John Doe"
+                  className="input w-full"
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Suspect ID (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={suspectId}
+                  onChange={(e) => setSuspectId(e.target.value)}
+                  placeholder="e.g., 12345"
+                  className="input w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Can be searched later to find this 10-15
+                </p>
+              </div>
             </div>
 
             <div className="bg-gray-800 p-4 rounded-md mb-4">

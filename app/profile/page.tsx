@@ -49,17 +49,17 @@ export default function ProfilePage() {
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString)
-    // Display in GMT+1 (server time)
+    // Display in GMT+0 (server time)
     const utc = date.getTime() + (date.getTimezoneOffset() * 60000)
-    const gmt1 = new Date(utc + (3600000 * 1))
-    return gmt1.toLocaleString('en-US', {
+    const gmt0 = new Date(utc)
+    return gmt0.toLocaleString('en-US', {
       month: '2-digit',
       day: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
-    }) + ' (GMT+1)'
+    }) + ' (GMT+0)'
   }
 
   const calculateDuration = (start: string, end?: string) => {
@@ -130,7 +130,10 @@ export default function ProfilePage() {
   const filteredLogs = dutyLogs.filter(log => {
     const matchesSearch = searchTerm === '' || 
       log.eventsAttended?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.arrestRecords?.some(r => r.suspectName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      log.arrestRecords?.some(r => 
+        r.suspectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (r.suspectId && r.suspectId.toLowerCase().includes(searchTerm.toLowerCase()))
+      ) ||
       formatDate(log.onDutyTime).toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesFilter = filterStatus === 'all' ||
@@ -959,6 +962,9 @@ export default function ProfilePage() {
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <p className="font-semibold text-gray-900 dark:text-gray-100">{arrest.suspectName}</p>
+                            {arrest.suspectId && (
+                              <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">ID: {arrest.suspectId}</p>
+                            )}
                             <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(arrest.timestamp)}</p>
                           </div>
                           <span className="text-sm font-bold text-green-600 dark:text-green-400">${arrest.fines}</span>

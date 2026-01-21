@@ -226,16 +226,16 @@ ${chargesList || '- No charges added'}
   }
 
   const generateShiftReport = (weaponStatusArray: {name: string, status: string}[]) => {
-    // Get GMT+1 server time
-    const getGMT1Time = () => {
+    // Get GMT+0 server time
+    const getGMT0Time = () => {
       const now = new Date()
       const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
-      const gmt1 = new Date(utc + (3600000 * 1)) // GMT+1
-      return gmt1
+      const gmt0 = new Date(utc) // GMT+0
+      return gmt0
     }
 
     const onDutyTime = new Date(currentDutyStart || '')
-    const offDutyTime = getGMT1Time()
+    const offDutyTime = getGMT0Time()
     
     const formatTime = (date: Date) => date.toLocaleString('en-US', { 
       month: '2-digit', 
