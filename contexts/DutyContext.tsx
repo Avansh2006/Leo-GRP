@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
-// Helper function to get GMT+0 time
-const getGMT0Time = () => {
+// Helper function to get GMT+1 time
+const getGMT1Time = () => {
   const now = new Date()
   const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
-  const gmt0 = new Date(utc) // GMT+0
-  return gmt0.toISOString()
+  const gmt1 = new Date(utc + (3600000 * 1)) // GMT+1
+  return gmt1.toISOString()
 }
 
 interface WeaponStatus {
@@ -93,7 +93,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
   const startDuty = (weapons: string[]) => {
     setIsOnDuty(true)
-    setCurrentDutyStart(getGMT0Time()) // Use GMT+0 time
+    setCurrentDutyStart(getGMT1Time()) // Use GMT+1 time
     setCurrentShiftArrests(0)
     setCurrentShiftFines(0)
     setWeaponsTaken(weapons)
@@ -160,7 +160,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       suspectId,
       charges,
       fines,
-      timestamp: getGMT0Time()
+      timestamp: getGMT1Time()
     }
     setCurrentArrestRecords(prev => [...prev, newRecord])
   }
