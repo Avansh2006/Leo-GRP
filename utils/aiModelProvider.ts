@@ -1,6 +1,6 @@
 /**
  * AI Model Provider & Local LLM Abstraction Layer for LEO-GRP
- * 100% Client-side browser inference with lazy-loading, WebGPU detection, explicit consent, question-aware generation, and debug tracing.
+ * 100% Client-side browser inference with lazy-loading, WebGPU detection, explicit consent, question-aware generation, and scenario debug tracing.
  */
 
 import { RetrievalResult, ConversationTurn, generateQuestionAwareResponse } from './legislationRetriever'
@@ -26,9 +26,31 @@ export interface ModelMetadata {
 
 export interface AIDebugTrace {
   userQuery: string
-  intent: string
+  normalizedQuery: string
+  detectedConcepts: {
+    actions: string[]
+    negatedActions: string[]
+    objects: string[]
+    locations: string[]
+    actor: string
+    primaryTopic: string
+  }
   detectedSection?: string
-  retrievedSources: Array<{ code: string; title: string; score: number; fine?: string; sentence?: string }>
+  retrievedSources: Array<{
+    code: string
+    title: string
+    score: number
+    fine?: string
+    sentence?: string
+    applicabilityStatus?: string
+    missingFacts?: string
+  }>
+  rejectedSources: Array<{
+    code: string
+    title: string
+    topic: string
+    reason: string
+  }>
   finalPrompt: string
   generatedResponse: string
   timestamp: string
@@ -171,14 +193,21 @@ Do not invent laws, penalties, procedures, or legal interpretations.
 USER QUESTION:
 ${query}
 
+DETECTED SCENARIO & TOPIC:
+- Primary Topic: ${retrieval.concepts.primaryTopic}
+- Actions: ${retrieval.concepts.actions.join(', ') || 'None'}
+- Excluded / Negated: ${retrieval.concepts.negatedActions.join(', ') || 'None'}
+- Location: ${retrieval.concepts.locations.join(', ') || 'Unspecified'}
+
 RELEVANT LEGISLATION:
-${retrieval.contextText || 'No relevant provisions found.'}
+${retrieval.contextText || 'No matching provisions found in active database.'}
 
 INSTRUCTIONS:
-- Answer the user's specific question directly.
-- Explain the relevant provision in clear officer-friendly language.
-- Cite the relevant provisions using bracketed notation (e.g. [§ T.C. 3.5]).
-- If the provided legislation does not answer the question, explicitly state that the available legislation does not provide enough information.`.trim()
+- Answer the user's specific scenario directly.
+- Distinguish between a topically relevant provision and whether facts prove all elements apply.
+- Explain what facts are missing if applicability cannot be conclusively established.
+- Never recommend an inapplicable or unrelated charge.
+- Cite the relevant provisions using bracketed notation (e.g. [§ T.C. 6.2.f]).`.trim()
   }
 
   /**
@@ -198,10 +227,18 @@ INSTRUCTIONS:
     const finalPrompt = this.buildPrompt(query, retrieval)
     const generatedResponse = generateQuestionAwareResponse(query, retrieval, conversationHistory)
 
-    // Record developer debug trace
+    // Record developer debug trace with full scenario information
     this.lastDebugTrace = {
       userQuery: query,
-      intent: retrieval.intent,
+      normalizedQuery: retrieval.normalizedQuery,
+      detectedConcepts: {
+        actions: retrieval.concepts.actions,
+        negatedActions: retrieval.concepts.negatedActions,
+        objects: retrieval.concepts.objects,
+        locations: retrieval.concepts.locations,
+        actor: retrieval.concepts.actor,
+        primaryTopic: retrieval.concepts.primaryTopic,
+      },
       detectedSection: retrieval.detectedSection,
       retrievedSources: retrieval.sources.map((s) => ({
         code: s.code,
@@ -209,6 +246,14 @@ INSTRUCTIONS:
         score: s.relevanceScore,
         fine: s.fine,
         sentence: s.sentence,
+        applicabilityStatus: s.applicabilityStatus,
+        missingFacts: s.missingFacts,
+      })),
+      rejectedSources: retrieval.rejectedSources.map((r) => ({
+        code: r.code,
+        title: r.title,
+        topic: r.topic,
+        reason: r.reason,
       })),
       finalPrompt,
       generatedResponse,

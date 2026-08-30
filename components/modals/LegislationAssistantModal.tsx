@@ -164,7 +164,15 @@ export default function LegislationAssistantModal({
 
         const debugTrace: AIDebugTrace = {
           userQuery: query,
-          intent: retrieval.intent,
+          normalizedQuery: retrieval.normalizedQuery,
+          detectedConcepts: {
+            actions: retrieval.concepts.actions,
+            negatedActions: retrieval.concepts.negatedActions,
+            objects: retrieval.concepts.objects,
+            locations: retrieval.concepts.locations,
+            actor: retrieval.concepts.actor,
+            primaryTopic: retrieval.concepts.primaryTopic,
+          },
           detectedSection: retrieval.detectedSection,
           retrievedSources: retrieval.sources.map((s) => ({
             code: s.code,
@@ -172,6 +180,14 @@ export default function LegislationAssistantModal({
             score: s.relevanceScore,
             fine: s.fine,
             sentence: s.sentence,
+            applicabilityStatus: s.applicabilityStatus,
+            missingFacts: s.missingFacts,
+          })),
+          rejectedSources: retrieval.rejectedSources.map((r) => ({
+            code: r.code,
+            title: r.title,
+            topic: r.topic,
+            reason: r.reason,
           })),
           finalPrompt,
           generatedResponse: explanation,
@@ -310,30 +326,55 @@ export default function LegislationAssistantModal({
 
         {/* Developer Debug Trace Drawer */}
         {showDebugTrace && currentDebugTrace && (
-          <div className="p-3 bg-black/90 border-b border-amber-500/40 text-xs font-mono space-y-2 animate-fadeIn flex-shrink-0 max-h-48 overflow-y-auto">
+          <div className="p-3 bg-black/95 border-b border-amber-500/40 text-xs font-mono space-y-2 animate-fadeIn flex-shrink-0 max-h-60 overflow-y-auto">
             <div className="flex items-center justify-between text-amber-400 font-bold border-b border-amber-500/20 pb-1">
               <span>🐞 Developer Debug Trace</span>
-              <span className="text-[10px] text-amber-300/70">Intent: {currentDebugTrace.intent.toUpperCase()}</span>
+              <span className="text-[10px] text-amber-300/80">
+                Topic: {currentDebugTrace.detectedConcepts?.primaryTopic || 'GENERAL'}
+              </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+
+            {/* Concepts and Exclusions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] bg-surface-container-lowest/60 p-2 rounded border border-outline-variant/40">
               <div>
-                <strong className="text-on-surface">User Query:</strong>
-                <div className="text-on-surface-variant truncate">{currentDebugTrace.userQuery}</div>
-                {currentDebugTrace.detectedSection && (
-                  <div className="text-secondary">Target Section: {currentDebugTrace.detectedSection}</div>
+                <strong className="text-on-surface">Normalized Query:</strong>
+                <div className="text-on-surface-variant truncate">{currentDebugTrace.normalizedQuery || currentDebugTrace.userQuery}</div>
+                <div className="text-[10px] text-primary mt-1">
+                  Actions: {currentDebugTrace.detectedConcepts?.actions?.join(', ') || 'None'} | Objects: {currentDebugTrace.detectedConcepts?.objects?.join(', ') || 'None'}
+                </div>
+                {currentDebugTrace.detectedConcepts?.negatedActions?.length > 0 && (
+                  <div className="text-[10px] text-rose-400 font-bold">
+                    ⛔ Excluded / Negated: {currentDebugTrace.detectedConcepts.negatedActions.join(', ')}
+                  </div>
                 )}
               </div>
+
               <div>
                 <strong className="text-on-surface">Retrieved Provisions ({currentDebugTrace.retrievedSources.length}):</strong>
-                <ul className="text-[10px] text-on-surface-variant space-y-0.5">
+                <ul className="text-[10px] text-on-surface-variant space-y-0.5 mt-0.5">
+                  {currentDebugTrace.retrievedSources.length === 0 && <li className="text-amber-400/80">No provisions passed confidence threshold</li>}
                   {currentDebugTrace.retrievedSources.map((s, idx) => (
-                    <li key={idx} className="truncate">
+                    <li key={idx} className="truncate text-secondary">
                       #{idx + 1} § {s.code} (Score: {s.score}) — {s.title}
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
+
+            {/* Rejected / Suppressed provisions */}
+            {currentDebugTrace.rejectedSources?.length > 0 && (
+              <div className="text-[10px] text-on-surface-variant/80 border-t border-outline-variant/30 pt-1">
+                <span className="text-rose-400 font-semibold">Excluded Candidates ({currentDebugTrace.rejectedSources.length}):</span>
+                <ul className="space-y-0.5 mt-0.5">
+                  {currentDebugTrace.rejectedSources.slice(0, 3).map((r, idx) => (
+                    <li key={idx} className="truncate">
+                      • § {r.code} ({r.topic}): {r.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 

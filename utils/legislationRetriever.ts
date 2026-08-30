@@ -1,9 +1,31 @@
 /**
  * Legislation Retriever & Context Engine for LEO-GRP Legislation Assistant
- * 100% Client-side, offline-first, question-aware retrieval and structured context builder.
+ * 100% Client-side, offline-first, scenario-aware retrieval, topic filtering, and structured legal reasoning.
  */
 
 import { loadAllLawData, LawEntry } from './htmlParser'
+
+export type LegalDomainTopic =
+  | 'PARKING'
+  | 'MOVING_TRAFFIC'
+  | 'THEFT_GTA'
+  | 'PUBLIC_SERVANT_DUTY'
+  | 'DISOBEDIENCE_EVADING'
+  | 'WEAPONS'
+  | 'DRUGS'
+  | 'VIOLENT_CRIMES'
+  | 'ARREST_PROCEDURE'
+  | 'GENERAL'
+
+export interface ScenarioConcepts {
+  actions: string[]
+  negatedActions: string[]
+  objects: string[]
+  locations: string[]
+  actor: 'CITIZEN' | 'PUBLIC_SERVANT' | 'LAWYER' | 'UNKNOWN'
+  primaryTopic: LegalDomainTopic
+  secondaryTopics: LegalDomainTopic[]
+}
 
 export interface RetrievedSource {
   code: string
@@ -15,15 +37,28 @@ export interface RetrievedSource {
   bail?: string
   remarks?: string
   relevanceScore: number
+  topicScore: number
   matchedTokens?: string[]
+  applicabilityStatus?: 'APPLICABLE' | 'POTENTIALLY_APPLICABLE' | 'UNCERTAIN'
+  missingFacts?: string
+}
+
+export interface RejectedSource {
+  code: string
+  title: string
+  topic: LegalDomainTopic
+  score: number
+  reason: string
 }
 
 export interface RetrievalResult {
   query: string
-  cleanedQuery: string
+  normalizedQuery: string
+  concepts: ScenarioConcepts
   detectedSection?: string
-  intent: 'penalty' | 'arrest' | 'refusal_id' | 'dui_traffic' | 'weapons' | 'lawyer' | 'general'
+  intent: 'charge_inquiry' | 'penalty' | 'arrest' | 'procedure' | 'general'
   sources: RetrievedSource[]
+  rejectedSources: RejectedSource[]
   contextText: string
   hasMatch: boolean
 }
@@ -39,11 +74,12 @@ const STOP_WORDS = new Set([
   'does', 'how', 'when', 'where', 'why', 'should', 'would', 'could', 'about', 'under',
   'are', 'if', 'someone', 'person', 'say', 'tell', 'mean', 'meaning', 'apply', 'applies',
   'happens', 'mention', 'mentioned', 'situation', 'based', 'provision', 'rule', 'rules',
-  'law', 'laws', 'act', 'code', 'codes', 'give', 'gives', 'get', 'gets'
+  'law', 'laws', 'act', 'code', 'codes', 'give', 'gives', 'get', 'gets', 'add', 'put',
+  'charge', 'charges', 'he', 'she', 'his', 'her', 'their', 'them', 'him', 'has', 'have', 'had', 'been'
 ])
 
 /**
- * Normalize query for consistent matching without losing legal specifics
+ * Normalize query string
  */
 export function normalizeQuery(query: string): string {
   return query
@@ -54,13 +90,11 @@ export function normalizeQuery(query: string): string {
 }
 
 /**
- * Extract exact section code references from query
- * e.g. "§ 3.5", "3.5", "tc 3.5", "p.c. 2.1.1", "2.1.1", "tc 7.1", "proc 1.4"
+ * Extract exact section code from query (e.g. "§ 3.5", "3.5", "tc 6.2.f", "p.c. 2.1.1")
  */
 export function extractSectionCode(query: string): string | undefined {
   const norm = query.toLowerCase().replace(/§/g, '').trim()
   
-  // Match patterns like "p.c. 2.1.1", "pc 2.1.1", "t.c. 3.5", "tc 3.5", "proc 1.5", "7.1", "2.6.4", "3.5"
   const fullCodeMatch = norm.match(/\b(p\.c\.|t\.c\.|pc|tc|proc)\s*([0-9]+(?:\.[0-9a-z]+)*)\b/i)
   if (fullCodeMatch) {
     const prefix = fullCodeMatch[1].toUpperCase().replace(/\./g, '')
@@ -77,48 +111,191 @@ export function extractSectionCode(query: string): string | undefined {
 }
 
 /**
- * Detect user legal intent from query
+ * Extract semantic scenario concepts, negations, objects, and topics
  */
-export function detectQueryIntent(query: string): 'penalty' | 'arrest' | 'refusal_id' | 'dui_traffic' | 'weapons' | 'lawyer' | 'general' {
-  const q = query.toLowerCase()
+export function extractScenarioConcepts(query: string, history: ConversationTurn[] = []): ScenarioConcepts {
+  const norm = normalizeQuery(query)
+  const actions: string[] = []
+  const negatedActions: string[] = []
+  const objects: string[] = []
+  const locations: string[] = []
+  let actor: 'CITIZEN' | 'PUBLIC_SERVANT' | 'LAWYER' | 'UNKNOWN' = 'UNKNOWN'
 
-  if (q.includes('fine') || q.includes('sentence') || q.includes('jail') || q.includes('month') || q.includes('star') || q.includes('bail') || q.includes('penalty') || q.includes('penalties') || q.includes('how much') || q.includes('cost')) {
-    return 'penalty'
+  // 1. Check for explicit negations / contrasts
+  if (norm.match(/\b(not|hasn't|didn't|never|without)\s+stop(?:ped|ping)?\b/)) {
+    negatedActions.push('STOPPING')
   }
-  if (q.includes('refus') || q.includes('identif') || q.includes('passport') || q.includes('mask') || q.includes('name') || q.includes('show id') || q.includes('disobey') || q.includes('comply')) {
-    return 'refusal_id'
+  if (norm.match(/\b(not|hasn't|didn't|never|without)\s+park(?:ed|ing)?\b/)) {
+    negatedActions.push('PARKING')
   }
-  if (q.includes('lawyer') || q.includes('attorney') || q.includes('counsel') || q.includes('miranda') || q.includes('rights')) {
-    return 'lawyer'
-  }
-  if (q.includes('dui') || q.includes('drunk') || q.includes('alcohol') || q.includes('drugs') || q.includes('speed') || q.includes('lane') || q.includes('racing') || q.includes('park') || q.includes('tow') || q.includes('impound') || q.includes('traffic')) {
-    return 'dui_traffic'
-  }
-  if (q.includes('weapon') || q.includes('gun') || q.includes('open carry') || q.includes('brandish') || q.includes('serial') || q.includes('ammo') || q.includes('firearm') || q.includes('xxx')) {
-    return 'weapons'
-  }
-  if (q.includes('arrest') || q.includes('detain') || q.includes('handcuff') || q.includes('taze') || q.includes('search')) {
-    return 'arrest'
+  if (norm.match(/\b(not|hasn't|didn't|never|without)\s+steal(?:ing)?|stolen\b/)) {
+    negatedActions.push('THEFT')
   }
 
-  return 'general'
+  // 2. Actor identification
+  if (norm.match(/\b(public servant|civil servant|officer|cop|police|deputy|trooper)\b/)) {
+    actor = 'PUBLIC_SERVANT'
+  } else if (norm.match(/\b(lawyer|attorney|counsel)\b/)) {
+    actor = 'LAWYER'
+  } else {
+    actor = 'CITIZEN'
+  }
+
+  // 3. Identify Positive Actions
+  if (norm.match(/\bpark(?:ed|ing|s)?\b/) && !negatedActions.includes('PARKING')) {
+    actions.push('PARKING')
+  }
+  if (norm.match(/\bstop(?:ped|ping|s)?\b/) && !negatedActions.includes('STOPPING')) {
+    actions.push('STOPPING')
+  }
+  if (
+    norm.match(/\b(stole|steal|stolen|theft|rob|robbed|gta)\b/) ||
+    norm.match(/\b(took|take|taking)\b.*\b(vehicle|car|automobile|property|money|goods|item|keys)\b/) ||
+    norm.match(/\b(took|take|taking)\s+another\s+(?:person's|someone's)\s+(?:vehicle|car|property)\b/)
+  ) {
+    if (!negatedActions.includes('THEFT')) {
+      actions.push('THEFT')
+    }
+  }
+  if (norm.match(/\b(speed|speeding|fast|km\/h|mph|limit)\b/)) {
+    actions.push('SPEEDING')
+  }
+  if (norm.match(/\b(follow(?:ing)?|distance|tailgat(?:e|ing)|closely)\b/)) {
+    actions.push('FOLLOWING_DISTANCE')
+  }
+  if (norm.match(/\b(dui|drunk|alcohol|breathalyzer|intoxicated|drugs?)\b/)) {
+    actions.push('DUI')
+  }
+  if (norm.match(/\b(refus(?:e|ed|ing|al)|disobey(?:ed|ing)?|ignore(?:d|ing)?)\b/)) {
+    actions.push('DISOBEDIENCE')
+  }
+  if (norm.match(/\b(mask|passport|show\s+id|identify|identity)\b/)) {
+    actions.push('IDENTIFICATION')
+  }
+  if (norm.match(/\b(open\s+carry|weapon|gun|firearm|brandish|ammo)\b/)) {
+    actions.push('WEAPON_POSSESSION')
+  }
+
+  // 4. Identify Objects
+  if (norm.match(/\b(car|vehicle|automobile|truck|bike|motorcycle|transport)\b/)) {
+    objects.push('VEHICLE')
+  }
+  if (norm.match(/\b(gun|weapon|firearm|pistol|rifle|ammo)\b/)) {
+    objects.push('WEAPON')
+  }
+  if (norm.match(/\b(mask|balaclava)\b/)) {
+    objects.push('MASK')
+  }
+  if (norm.match(/\b(passport|id|identification|badge)\b/)) {
+    objects.push('ID_CARD')
+  }
+  if (norm.match(/\b(marking|markings|lines?|yellow|curb|red\s+curb)\b/)) {
+    objects.push('ROAD_MARKINGS')
+  }
+
+  // 5. Identify Locations
+  if (norm.match(/\b(road|street|freeway|highway|lane|driving\s+lane|sidewalk|crosswalk|lawn|bus\s+stop|bridge|tunnel)\b/)) {
+    if (norm.includes('driving lane') || norm.includes('lane')) locations.push('DRIVING_LANE')
+    else if (norm.includes('highway') || norm.includes('freeway')) locations.push('HIGHWAY')
+    else if (norm.includes('sidewalk')) locations.push('SIDEWALK')
+    else if (norm.includes('crosswalk')) locations.push('CROSSWALK')
+    else if (norm.includes('red curb') || norm.includes('curb')) locations.push('RED_CURB')
+    else if (norm.includes('road marking') || norm.includes('marking')) locations.push('ROAD_MARKINGS')
+    else locations.push('ROAD')
+  }
+
+  // 6. Determine Primary Topic
+  let primaryTopic: LegalDomainTopic = 'GENERAL'
+  const secondaryTopics: LegalDomainTopic[] = []
+
+  if (actions.includes('THEFT')) {
+    primaryTopic = 'THEFT_GTA'
+  } else if (actor === 'PUBLIC_SERVANT' && (actions.includes('DISOBEDIENCE') || norm.includes('order') || norm.includes('duty') || norm.includes('act'))) {
+    primaryTopic = 'PUBLIC_SERVANT_DUTY'
+  } else if (actions.includes('PARKING') || (objects.includes('VEHICLE') && locations.length > 0 && !actions.includes('SPEEDING') && !actions.includes('THEFT') && !actions.includes('DUI') && !actions.includes('FOLLOWING_DISTANCE'))) {
+    primaryTopic = 'PARKING'
+  } else if (actions.includes('DISOBEDIENCE') || actions.includes('IDENTIFICATION')) {
+    primaryTopic = 'DISOBEDIENCE_EVADING'
+    secondaryTopics.push('ARREST_PROCEDURE')
+  } else if (actions.includes('DUI') || actions.includes('SPEEDING') || actions.includes('FOLLOWING_DISTANCE') || actions.includes('STOPPING')) {
+    primaryTopic = 'MOVING_TRAFFIC'
+  } else if (actions.includes('WEAPON_POSSESSION')) {
+    primaryTopic = 'WEAPONS'
+  }
+
+  return {
+    actions,
+    negatedActions,
+    objects,
+    locations,
+    actor,
+    primaryTopic,
+    secondaryTopics,
+  }
 }
 
 /**
- * Retrieve top relevant legislation provisions for a user query with question-awareness
+ * Classify a LawEntry into its native domain topic
+ */
+export function classifyEntryTopic(entry: LawEntry): LegalDomainTopic {
+  const code = entry.code.toUpperCase()
+  const desc = entry.description.toLowerCase()
+  const cat = entry.category.toUpperCase()
+
+  if (code.startsWith('PROC')) return 'ARREST_PROCEDURE'
+  if (code.startsWith('TC 7.') || code.startsWith('T.C. 6.2') || desc.includes('parking') || cat.includes('PARKING')) {
+    return 'PARKING'
+  }
+  if (code.startsWith('T.C. 3.') || code.startsWith('T.C. 5.') || code.startsWith('§3.1') || desc.includes('speed limit') || desc.includes('distance') || desc.includes('influence') || desc.includes('stopping')) {
+    return 'MOVING_TRAFFIC'
+  }
+  if (desc.includes('theft') || desc.includes('robbery') || desc.includes('grand theft auto') || desc.includes('stolen')) {
+    return 'THEFT_GTA'
+  }
+  if (cat.includes('CIVIL SERVANT') || desc.includes('public servant') || desc.includes('civil servant') || code.startsWith('P.C. 2.7.') || code.startsWith('P.C. 4.3.')) {
+    return 'PUBLIC_SERVANT_DUTY'
+  }
+  if (desc.includes('disobedience') || desc.includes('resisting') || desc.includes('evading') || desc.includes('lawful order') || code.startsWith('P.C. 2.3.') || code.startsWith('P.C. 3.18.')) {
+    return 'DISOBEDIENCE_EVADING'
+  }
+  if (desc.includes('weapon') || desc.includes('open carry') || desc.includes('brandishing') || cat.includes('WEAPON') || code.startsWith('P.C. 2.5.') || code.startsWith('§2.4')) {
+    return 'WEAPONS'
+  }
+  if (cat.includes('DRUGS') || desc.includes('cocaine') || desc.includes('cannabis') || code.startsWith('P.C. 2.1.') || code.startsWith('P.C. 2.2.')) {
+    return 'DRUGS'
+  }
+  if (desc.includes('murder') || desc.includes('manslaughter') || desc.includes('battery') || desc.includes('assault') || code.startsWith('P.C. 2.6.') || code.startsWith('P.C. 2.8.')) {
+    return 'VIOLENT_CRIMES'
+  }
+
+  return 'GENERAL'
+}
+
+/**
+ * Retrieve top relevant legislation provisions with strict scenario & topic filtering
  */
 export async function retrieveLegislationContext(
   query: string,
-  topK = 4,
+  topK = 3,
   conversationHistory: ConversationTurn[] = []
 ): Promise<RetrievalResult> {
   const normQuery = normalizeQuery(query)
   if (!normQuery) {
     return {
       query,
-      cleanedQuery: '',
+      normalizedQuery: '',
+      concepts: {
+        actions: [],
+        negatedActions: [],
+        objects: [],
+        locations: [],
+        actor: 'UNKNOWN',
+        primaryTopic: 'GENERAL',
+        secondaryTopics: [],
+      },
       intent: 'general',
       sources: [],
+      rejectedSources: [],
       contextText: '',
       hasMatch: false,
     }
@@ -126,111 +303,219 @@ export async function retrieveLegislationContext(
 
   const { allEntries } = await loadAllLawData()
   const detectedSection = extractSectionCode(query)
-  const intent = detectQueryIntent(query)
+  const concepts = extractScenarioConcepts(query, conversationHistory)
+  const isChargeQuery = normQuery.includes('charge') || normQuery.includes('what can i add') || normQuery.includes('violation') || normQuery.includes('what applies')
+  const intent = isChargeQuery ? 'charge_inquiry' : 'general'
 
-  // Meaningful content tokens (excluding stop words)
   const queryTokens = normQuery
     .split(' ')
     .filter((t) => t.length > 1 && !STOP_WORDS.has(t))
 
-  // If follow-up question (e.g. "what about the penalty for this?"), incorporate previous user/assistant context
-  const previousTopicTokens: string[] = []
-  if (conversationHistory.length > 0 && queryTokens.length <= 3) {
-    const lastAssistantMsg = [...conversationHistory].reverse().find((m) => m.sender === 'assistant')
-    if (lastAssistantMsg) {
-      const prevSection = extractSectionCode(lastAssistantMsg.text)
-      if (prevSection) {
-        previousTopicTokens.push(prevSection.toLowerCase())
-      }
-    }
-  }
-
   const scoredSources: RetrievedSource[] = []
+  const rejectedSources: RejectedSource[] = []
 
   for (const entry of allEntries) {
+    const entryTopic = classifyEntryTopic(entry)
     const codeNorm = normalizeQuery(entry.code)
     const descNorm = normalizeQuery(entry.description)
     const remarksNorm = normalizeQuery(entry.remarks || '')
-    const catNorm = normalizeQuery(entry.category || '')
 
     let score = 0
+    let topicScore = 0
     const matchedTokens: string[] = []
 
-    // 1. Direct section number matching
+    // 1. Direct section number query (highest priority)
     if (detectedSection) {
       const cleanTarget = detectedSection.toLowerCase().replace(/[^0-9a-z]/g, '')
       const cleanCode = codeNorm.replace(/[^0-9a-z]/g, '')
       if (cleanCode.endsWith(cleanTarget) || cleanCode === cleanTarget || codeNorm.includes(detectedSection.toLowerCase())) {
-        score += 250
+        score += 300
         matchedTokens.push(`Section: ${entry.code}`)
       }
     }
 
-    // 2. Exact / strong title match
+    // 2. Exact or high-match Title
     if (descNorm === normQuery) {
-      score += 180
-      matchedTokens.push('Exact Title')
+      score += 200
+      matchedTokens.push('Exact Title Match')
     } else if (descNorm.startsWith(normQuery)) {
-      score += 120
-      matchedTokens.push('Title Prefix')
+      score += 130
+      matchedTokens.push('Title Prefix Match')
     } else if (descNorm.includes(normQuery) && normQuery.length > 3) {
       score += 80
-      matchedTokens.push('Title Match')
+      matchedTokens.push('Title Substring Match')
     }
 
-    // 3. Meaningful token matches
+    // 3. Meaningful content token overlap
     for (const token of queryTokens) {
-      let tokenMatched = false
       if (codeNorm.includes(token)) {
-        score += 45
-        tokenMatched = true
+        score += 30
+        matchedTokens.push(token)
       }
       if (descNorm.includes(token)) {
-        score += 35
-        tokenMatched = true
-      }
-      if (catNorm.includes(token)) {
-        score += 15
-        tokenMatched = true
+        score += 25
+        matchedTokens.push(token)
       }
       if (remarksNorm.includes(token)) {
-        score += 12
-        tokenMatched = true
-      }
-      if (tokenMatched) {
+        score += 10
         matchedTokens.push(token)
       }
     }
 
-    // 4. Intent & Domain boost
-    if (intent === 'refusal_id') {
-      if (entry.code.includes('PROC 1.5') || entry.code.includes('PROC 1.1')) score += 90
-      if (entry.description.toLowerCase().includes('mask') || entry.description.toLowerCase().includes('identification') || entry.description.toLowerCase().includes('disobedience') || entry.description.toLowerCase().includes('resisting')) score += 70
-      if (entry.remarks.toLowerCase().includes('mask') || entry.remarks.toLowerCase().includes('passport') || entry.remarks.toLowerCase().includes('identification')) score += 40
-    } else if (intent === 'lawyer') {
-      if (entry.code.includes('PROC 1.4') || entry.code.includes('PROC 1.3')) score += 100
-    } else if (intent === 'dui_traffic' || normQuery.includes('traffic')) {
-      if (entry.documentType === 'traffic' || entry.documentType === 'article7') score += 60
-      if (normQuery.includes('dui') || normQuery.includes('drunk') || normQuery.includes('alcohol')) {
-        if (entry.code.includes('3.5')) score += 150
+    // 4. Scenario & Topic Weighting / Cross-Topic Negative Penalties
+    if (concepts.primaryTopic !== 'GENERAL') {
+      if (entryTopic === concepts.primaryTopic) {
+        topicScore += 140
+        score += 140
+      } else if (concepts.secondaryTopics.includes(entryTopic)) {
+        topicScore += 70
+        score += 70
+      } else {
+        // HEAVY NEGATIVE PENALTIES FOR TOPIC MISMATCHES
+        if (concepts.primaryTopic === 'PARKING') {
+          if (entryTopic === 'THEFT_GTA' || entryTopic === 'PUBLIC_SERVANT_DUTY' || entryTopic === 'DRUGS' || entryTopic === 'VIOLENT_CRIMES') {
+            score -= 500
+            rejectedSources.push({
+              code: entry.code,
+              title: entry.description,
+              topic: entryTopic,
+              score,
+              reason: `Topic Mismatch: Query is about PARKING, but provision is ${entryTopic}`,
+            })
+            continue
+          }
+          if (entryTopic === 'MOVING_TRAFFIC') {
+            score -= 300
+            rejectedSources.push({
+              code: entry.code,
+              title: entry.description,
+              topic: entryTopic,
+              score,
+              reason: `Topic Mismatch: Query is about PARKING, but provision is MOVING_TRAFFIC (${entry.description})`,
+            })
+            continue
+          }
+        } else if (concepts.primaryTopic === 'THEFT_GTA') {
+          if (entryTopic === 'PARKING' || entryTopic === 'PUBLIC_SERVANT_DUTY' || entryTopic === 'MOVING_TRAFFIC') {
+            score -= 500
+            rejectedSources.push({
+              code: entry.code,
+              title: entry.description,
+              topic: entryTopic,
+              score,
+              reason: `Topic Mismatch: Query is about THEFT, but provision is ${entryTopic}`,
+            })
+            continue
+          }
+        } else if (concepts.primaryTopic === 'PUBLIC_SERVANT_DUTY') {
+          if (entryTopic === 'PARKING' || entryTopic === 'THEFT_GTA' || entryTopic === 'MOVING_TRAFFIC') {
+            score -= 500
+            rejectedSources.push({
+              code: entry.code,
+              title: entry.description,
+              topic: entryTopic,
+              score,
+              reason: `Topic Mismatch: Query is about PUBLIC_SERVANT, but provision is ${entryTopic}`,
+            })
+            continue
+          }
+        } else if (concepts.primaryTopic === 'MOVING_TRAFFIC') {
+          if (entryTopic === 'PARKING' || entryTopic === 'THEFT_GTA' || entryTopic === 'PUBLIC_SERVANT_DUTY') {
+            score -= 500
+            rejectedSources.push({
+              code: entry.code,
+              title: entry.description,
+              topic: entryTopic,
+              score,
+              reason: `Topic Mismatch: Query is about MOVING_TRAFFIC, but provision is ${entryTopic}`,
+            })
+            continue
+          }
+          if (entry.documentType === 'penal' && !normQuery.includes('p.c.') && !normQuery.includes('pc')) {
+            score -= 400
+            rejectedSources.push({
+              code: entry.code,
+              title: entry.description,
+              topic: entryTopic,
+              score,
+              reason: `Document Mismatch: Query is about MOVING_TRAFFIC, penal code suppressed without explicit P.C. reference`,
+            })
+            continue
+          }
+        }
       }
-      if (normQuery.includes('speed') && entry.code.includes('3.1')) score += 120
-    } else if (intent === 'weapons') {
-      if (entry.category.toLowerCase().includes('weapon') || entry.category.toLowerCase().includes('prohibited')) score += 40
-      if (normQuery.includes('open carry') && entry.code.includes('2.5.3')) score += 120
-      if (normQuery.includes('brandish') && entry.code.includes('2.5.6')) score += 120
-      if (normQuery.includes('license') && entry.code.includes('2.5.1')) score += 120
     }
 
-    // 5. Previous follow-up context boost
-    for (const prevTok of previousTopicTokens) {
-      if (codeNorm.includes(prevTok)) {
-        score += 80
-        matchedTokens.push(`Follow-up context: ${prevTok}`)
+    // 5. Explicit Negation / Contrast Suppression
+    if (concepts.negatedActions.includes('STOPPING')) {
+      if (entry.code.includes('3.2.3') || entry.code.includes('3.2.4') || descNorm.includes('stopping')) {
+        score -= 800
+        rejectedSources.push({
+          code: entry.code,
+          title: entry.description,
+          topic: entryTopic,
+          score,
+          reason: 'Explicitly Excluded: User negated stopping ("not stopped")',
+        })
+        continue
       }
     }
 
-    if (score > 30) {
+    // 6. Domain-Specific Nuance Boosts
+    if (concepts.primaryTopic === 'PARKING') {
+      if (concepts.locations.includes('DRIVING_LANE') && entry.code.includes('6.2.f')) score += 140
+      if (concepts.locations.includes('ROAD_MARKINGS') && entry.code.includes('6.2.n')) score += 160
+      if (concepts.locations.includes('CROSSWALK') && entry.code.includes('6.2.d')) score += 160
+      if (concepts.locations.includes('RED_CURB') && entry.code.includes('6.2.a')) score += 160
+      if (concepts.locations.includes('SIDEWALK') && entry.code.includes('6.2.e')) score += 160
+      if (concepts.locations.includes('HIGHWAY') && entry.code.includes('6.2.i')) score += 160
+      
+      // General road parking query -> prioritize lane obstruction and surface markings
+      if (concepts.locations.includes('ROAD')) {
+        if (entry.code.includes('6.2.f') || entry.code.includes('6.2.n') || entry.code.includes('6.2.b')) {
+          score += 90
+        }
+      }
+    } else if (concepts.primaryTopic === 'THEFT_GTA') {
+      if (concepts.objects.includes('VEHICLE') || normQuery.includes('car') || normQuery.includes('vehicle')) {
+        if (entry.code.includes('2.10.5')) score += 180 // Grand Theft Auto
+        if (entry.code.includes('2.10.3')) score += 130 // Theft of Property
+      }
+    } else if (concepts.primaryTopic === 'PUBLIC_SERVANT_DUTY') {
+      // Disobedience / Failure to act vs violent crimes
+      if (normQuery.includes('order') || normQuery.includes('ignore') || normQuery.includes('disobey') || normQuery.includes('duty')) {
+        if (entry.code.includes('2.7.2')) score += 180 // Refusal of duty to act
+        if (entry.code.includes('2.7.3')) score += 160 // Failure to act by civil servant
+        if (entry.code.includes('2.7.4')) score += 150 // Negligence
+        if (entry.code.includes('2.3.1')) score += 150 // Disobedience to lawful order
+        // Suppress assault/battery against public servant when user query is about duty/order
+        if (entry.code.includes('3.9') || entry.code.includes('3.10')) score -= 200
+      }
+    } else if (concepts.primaryTopic === 'MOVING_TRAFFIC') {
+      if (concepts.actions.includes('FOLLOWING_DISTANCE')) {
+        if (entry.code.includes('3.4.3')) score += 250 // Failure to keep distance
+      } else if (concepts.actions.includes('DUI')) {
+        if (entry.code.includes('3.5')) score += 250 // DUI
+      } else if (concepts.actions.includes('SPEEDING')) {
+        if (entry.code.includes('3.1') || entry.code.includes('5.5')) score += 200
+      }
+    }
+
+    // 7. Strict Confidence Minimum Threshold
+    if (score >= 60) {
+      let applicabilityStatus: 'APPLICABLE' | 'POTENTIALLY_APPLICABLE' | 'UNCERTAIN' = 'POTENTIALLY_APPLICABLE'
+      let missingFacts = ''
+
+      if (entry.code.includes('6.2.n')) {
+        missingFacts = 'Requires confirmation that parking violated painted road lines or surface markings.'
+      } else if (entry.code.includes('6.2.f')) {
+        missingFacts = 'Requires confirmation that the vehicle was parked inside an active travel lane.'
+      } else if (entry.code.includes('6.2.b')) {
+        missingFacts = 'Requires confirmation that the vehicle interfered with regular lane traffic.'
+      } else if (entry.code.includes('2.10.5')) {
+        missingFacts = 'Requires evidence that the vehicle was unlawfully seized/driven without owner consent.'
+      }
+
       scoredSources.push({
         code: entry.code,
         title: entry.description,
@@ -241,50 +526,64 @@ export async function retrieveLegislationContext(
         bail: entry.bail,
         remarks: entry.remarks,
         relevanceScore: score,
+        topicScore,
         matchedTokens: Array.from(new Set(matchedTokens)),
+        applicabilityStatus,
+        missingFacts,
       })
     }
   }
 
   scoredSources.sort((a, b) => b.relevanceScore - a.relevanceScore)
-  const topSources = scoredSources.slice(0, topK)
 
-  if (topSources.length === 0) {
+  // Dynamic Top-K: Only return top provisions that are within 50% of the top match
+  let finalSources: RetrievedSource[] = []
+  if (scoredSources.length > 0) {
+    const topScore = scoredSources[0].relevanceScore
+    finalSources = scoredSources
+      .filter((s) => s.relevanceScore >= topScore * 0.5)
+      .slice(0, topK)
+  }
+
+  if (finalSources.length === 0) {
     return {
       query,
-      cleanedQuery: queryTokens.join(' '),
+      normalizedQuery: normQuery,
+      concepts,
       detectedSection,
       intent,
       sources: [],
-      contextText: 'No matching legislation provision found in the active Traffic Code (2nd Rendition) or Penal Code.',
+      rejectedSources: rejectedSources.slice(0, 5),
+      contextText: 'I couldn\'t find a provision in the active legislation that directly matches the situation described.',
       hasMatch: false,
     }
   }
 
-  // Construct structured context text
-  const contextLines = topSources.map((s, idx) => {
+  const contextLines = finalSources.map((s, idx) => {
     let line = `[Source ${idx + 1}] § ${s.code} — ${s.title} (${s.sourceDocument})\n`
     if (s.fine && s.fine !== '-') line += `  • Fine: ${s.fine}\n`
     if (s.sentence && s.sentence !== '-') line += `  • Sentence: ${s.sentence}\n`
     if (s.stars && s.stars !== '-') line += `  • Wanted Level: ${s.stars}\n`
-    if (s.bail && s.bail !== '-') line += `  • Bail: ${s.bail}\n`
-    if (s.remarks && s.remarks !== '-') line += `  • Official Legal Text / Requirements: ${s.remarks}\n`
+    if (s.remarks && s.remarks !== '-') line += `  • Statutory Requirement: ${s.remarks}\n`
+    if (s.missingFacts) line += `  • Evidentiary Fact Needed: ${s.missingFacts}\n`
     return line
   })
 
   return {
     query,
-    cleanedQuery: queryTokens.join(' '),
+    normalizedQuery: normQuery,
+    concepts,
     detectedSection,
     intent,
-    sources: topSources,
+    sources: finalSources,
+    rejectedSources: rejectedSources.slice(0, 5),
     contextText: contextLines.join('\n'),
     hasMatch: true,
   }
 }
 
 /**
- * Generates a dynamic, question-aware legal response directly answering the user's specific inquiry
+ * Generate a structured, question-aware legal response distinguishing applicability from relevance
  */
 export function generateQuestionAwareResponse(
   query: string,
@@ -292,83 +591,94 @@ export function generateQuestionAwareResponse(
   conversationHistory: ConversationTurn[] = []
 ): string {
   if (!result.hasMatch || result.sources.length === 0) {
-    return `I couldn't find a provision in the active Traffic Code (2nd Rendition — 28.07.2025) or Penal Codes that directly answers: "${query}".\n\n💡 **Search Tips:**\n• Search by section code (e.g. \`§ 3.5\`, \`2.1.1\`, \`2.6.4\`, \`PROC 1.5\`)\n• Search by specific legal keyword (e.g. \`DUI\`, \`speed limit\`, \`refusal to identify\`, \`mask\`, \`brandishing\`)`
+    return `I couldn't find a provision in the active Traffic Code (2nd Rendition — 28.07.2025) or Penal Codes that directly matches the situation described in: "${query}".\n\n💡 **Clarification Needed:**\n• Provide specific facts (e.g. was the vehicle obstructing a driving lane, parked on painted lines, or parked on a red curb?)\n• Or search by section code (e.g. \`§ 6.2.f\`, \`2.10.5\`, \`3.5\`)`
   }
 
   const primary = result.sources[0]
   const qLower = query.toLowerCase()
-  let response = ''
 
-  // 1. SPECIFIC INTENT: Penalties / Fines
-  if (result.intent === 'penalty' || qLower.includes('how much') || qLower.includes('fine') || qLower.includes('sentence') || qLower.includes('bail')) {
-    response += `Under **§ ${primary.code} (${primary.title})** [${primary.sourceDocument}], the penalties are defined as:\n\n`
+  // 1. CHARGE INQUIRY & SCENARIO ANALYSIS
+  if (result.intent === 'charge_inquiry' || result.concepts.primaryTopic === 'PARKING' || result.concepts.primaryTopic === 'THEFT_GTA') {
+    let response = `### Potentially Applicable Provisions\n\n`
+
+    result.sources.forEach((s) => {
+      response += `**§ ${s.code} — ${s.title}**\n`
+      if (s.remarks && s.remarks !== '-') {
+        response += `• **Why it may apply:** ${s.remarks}\n`
+      }
+      if (s.fine && s.fine !== '-') {
+        response += `• **Penalties:** Fine: ${s.fine}${s.sentence && s.sentence !== '-' ? ` | Sentence: ${s.sentence}` : ''}\n`
+      }
+      if (s.missingFacts) {
+        response += `• ⚠️ **What is missing:** ${s.missingFacts}\n`
+      }
+      response += `\n`
+    })
+
+    response += `### Officer Guidance & Legal Assessment\n`
+    if (result.concepts.primaryTopic === 'PARKING') {
+      response += `Do not charge automatically. A parking violation requires specific factual evidence that the vehicle was either in an active driving lane (§ 6.2.f) or in direct breach of road markings (§ 6.2.n). If the vehicle constitutes an active traffic obstruction, towing is authorized under officer discretion (§ 6.2).\n`
+    } else if (result.concepts.primaryTopic === 'THEFT_GTA') {
+      response += `Verify vehicle ownership and whether the suspect unlawfully entered or drove the vehicle without authorization before applying grand theft auto (§ 2.10.5).\n`
+    } else {
+      response += `Only apply charges when observed facts satisfy all statutory elements of the cited provision.\n`
+    }
+
+    response += `\n### Authoritative Sources\n`
+    result.sources.forEach((s) => {
+      response += `[§ ${s.code}] `
+    })
+
+    return response.trim()
+  }
+
+  // 2. PENALTIES & FINES
+  if (qLower.includes('how much') || qLower.includes('fine') || qLower.includes('penalty') || qLower.includes('sentence')) {
+    let response = `Under **§ ${primary.code} (${primary.title})** [${primary.sourceDocument}]:\n\n`
     if (primary.fine && primary.fine !== '-') response += `• 💰 **Fine:** ${primary.fine}\n`
     if (primary.sentence && primary.sentence !== '-') response += `• ⏳ **Incarceration:** ${primary.sentence}\n`
     if (primary.stars && primary.stars !== '-') response += `• ⭐ **Wanted Level:** ${primary.stars}\n`
     if (primary.bail && primary.bail !== '-') response += `• ⚖️ **Bail Status:** ${primary.bail}\n`
     if (primary.remarks && primary.remarks !== '-') response += `\n**Statutory Definition:**\n${primary.remarks}\n`
+    response += `\n*Source: [§ ${primary.code}]*`
+    return response
   }
-  // 2. SPECIFIC INTENT: Can I arrest / Custodial Enforcement
-  else if (result.intent === 'arrest' || qLower.includes('can i arrest') || qLower.includes('custody')) {
+
+  // 3. ARREST AUTHORITY
+  if (qLower.includes('can i arrest') || qLower.includes('custody')) {
     const hasSentence = primary.sentence && primary.sentence !== '-'
     const hasStars = primary.stars && primary.stars !== '-'
 
-    response += `**Custodial Authority for § ${primary.code} (${primary.title}):**\n\n`
+    let response = `**Custodial Enforcement for § ${primary.code} (${primary.title}):**\n\n`
     if (hasSentence || hasStars) {
       response += `✅ **Yes, custodial arrest is authorized.**\n`
-      response += `• This provision carries a jail sentence of **${primary.sentence}** and a wanted level of **${primary.stars}**.\n`
+      response += `• This offense carries a sentence of **${primary.sentence}** and a wanted level of **${primary.stars}**.\n`
       if (primary.bail && primary.bail.toLowerCase().includes('no bail')) {
         response += `• ⚠️ **Bail Status:** NO BAIL permitted for this offense.\n`
       }
     } else {
-      response += `ℹ️ **Citation / Fine Only (Non-Custodial):**\n`
-      response += `• § ${primary.code} is punishable by a **${primary.fine || 'fine'}** without a mandatory jail sentence, unless the suspect fails to comply or commits related offenses.\n`
+      response += `ℹ️ **Non-Custodial (Citation / Fine Only):**\n`
+      response += `• § ${primary.code} is punishable by **${primary.fine || 'a fine'}** without an automatic custodial jail sentence, unless the suspect refuses compliance or commits additional offenses.\n`
     }
-
-    if (primary.remarks && primary.remarks !== '-') {
-      response += `\n**Legal Grounding:**\n${primary.remarks}\n`
-    }
-  }
-  // 3. SPECIFIC INTENT: Refusal to identify / Mask removal / Compliance
-  else if (result.intent === 'refusal_id' || qLower.includes('refus') || qLower.includes('mask') || qLower.includes('identify')) {
-    response += `Under official arrest and identification protocols (**§ ${primary.code} — ${primary.title}**):\n\n`
-    
-    if (primary.code.includes('PROC')) {
-      response += `• **Mask Protocol:** Give the suspect **10 seconds** to voluntarily remove any mask/facial covering.\n`
-      response += `• **Refusal / Resistance:** If they refuse or attempt to flee, officers are authorized to taze, handcuff, forcefully remove, and destroy the mask.\n`
-      response += `• **Identification Search:** Search suspect pockets via *Organisation > Find personal information* to retrieve passport/state identification.\n`
-    } else {
-      response += `• **Statutory Requirement:** ${primary.remarks || primary.title}\n`
-      if (primary.fine && primary.fine !== '-') response += `• **Fine:** ${primary.fine}\n`
-      if (primary.sentence && primary.sentence !== '-') response += `• **Sentence:** ${primary.sentence} (${primary.stars || 'Wanted'})\n`
-    }
-  }
-  // 4. SPECIFIC INTENT: DUI / Traffic Violations
-  else if (result.intent === 'dui_traffic' || qLower.includes('dui') || qLower.includes('drunk') || qLower.includes('speed')) {
-    response += `According to **§ ${primary.code} (${primary.title})** in the *Traffic Code (2nd Rendition)*:\n\n`
-    if (primary.remarks && primary.remarks !== '-') {
-      response += `• **Prohibition:** ${primary.remarks}\n`
-    }
-    response += `• **Sanctions:** Fine: **${primary.fine || 'N/A'}** | Sentence: **${primary.sentence || 'None'}** ${primary.stars ? `| Stars: ${primary.stars}` : ''}\n`
-  }
-  // 5. GENERAL / EXPLANATION INTENT
-  else {
-    response += `Under **§ ${primary.code} (${primary.title})** [${primary.sourceDocument}]:\n\n`
-    if (primary.remarks && primary.remarks !== '-') {
-      response += `📋 **Legal Requirement & Scope:**\n${primary.remarks}\n\n`
-    }
-    response += `⚖️ **Consequences:**\n`
-    if (primary.fine && primary.fine !== '-') response += `• **Fine:** ${primary.fine}\n`
-    if (primary.sentence && primary.sentence !== '-') response += `• **Sentence:** ${primary.sentence}\n`
-    if (primary.stars && primary.stars !== '-') response += `• **Wanted Level:** ${primary.stars}\n`
-    if (primary.bail && primary.bail !== '-') response += `• **Bail:** ${primary.bail}\n`
+    if (primary.remarks && primary.remarks !== '-') response += `\n**Statutory Elements:**\n${primary.remarks}\n`
+    response += `\n*Source: [§ ${primary.code}]*`
+    return response
   }
 
-  // Related provisions
+  // 4. DEFAULT EXPLANATION
+  let response = `Under **§ ${primary.code} (${primary.title})** [${primary.sourceDocument}]:\n\n`
+  if (primary.remarks && primary.remarks !== '-') {
+    response += `📋 **Statutory Scope & Elements:**\n${primary.remarks}\n\n`
+  }
+  response += `⚖️ **Statutory Consequences:**\n`
+  if (primary.fine && primary.fine !== '-') response += `• **Fine:** ${primary.fine}\n`
+  if (primary.sentence && primary.sentence !== '-') response += `• **Sentence:** ${primary.sentence}\n`
+  if (primary.stars && primary.stars !== '-') response += `• **Wanted Level:** ${primary.stars}\n`
+
   if (result.sources.length > 1) {
-    response += `\n📚 **Supporting / Related Provisions:**\n`
+    response += `\n📚 **Related Provisions:**\n`
     result.sources.slice(1, 3).forEach((sec) => {
-      response += `• **§ ${sec.code}** — ${sec.title} (${sec.fine && sec.fine !== '-' ? `Fine: ${sec.fine}` : ''}${sec.sentence && sec.sentence !== '-' ? `, ${sec.sentence}` : ''})\n`
+      response += `• **§ ${sec.code}** — ${sec.title} (${sec.fine ? `Fine: ${sec.fine}` : ''})\n`
     })
   }
 
