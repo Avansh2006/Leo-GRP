@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ToastProvider'
+import { useProductivity } from '@/contexts/ProductivityContext'
 
 interface Command {
   text: string
@@ -313,6 +314,18 @@ export default function BodycamCommandsPage() {
     },
   ]
 
+  const { recordRecentItem, pinItem, unpinItem, isItemPinned } = useProductivity()
+
+  useEffect(() => {
+    recordRecentItem({
+      type: 'page',
+      targetId: '/bodycam-commands',
+      title: `${selectedOrg} Bodycam Commands`,
+      subtitle: 'Roleplay Macros & Dispatch',
+      url: '/bodycam-commands',
+    })
+  }, [selectedOrg, recordRecentItem])
+
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories((prev) =>
       prev.includes(categoryId)
@@ -321,28 +334,51 @@ export default function BodycamCommandsPage() {
     )
   }
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text: string, label?: string) => {
     navigator.clipboard.writeText(text)
+    recordRecentItem({
+      type: 'command',
+      targetId: text,
+      title: label || text.slice(0, 35),
+      subtitle: text,
+    })
     showToast('Command copied to clipboard!', 'success')
+  }
+
+  const handleTogglePin = (command: Command, categoryName: string) => {
+    const isPinned = isItemPinned('command', command.text)
+    if (isPinned) {
+      unpinItem('command', command.text)
+      showToast('Unpinned command', 'info')
+    } else {
+      pinItem({
+        type: 'command',
+        targetId: command.text,
+        title: command.label ? command.label.split('-')[0].trim() : command.text.slice(0, 30),
+        subtitle: `${selectedOrg} • ${categoryName}`,
+        data: { text: command.text, org: selectedOrg },
+      })
+      showToast('Pinned command to utility panel', 'success')
+    }
   }
 
   return (
     <div className="max-w-5xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-4xl font-bold text-blue-400 mb-2">{selectedOrg} Bodycam Commands</h1>
-          <p className="text-gray-400">
-            Made by Avansh Yadav
+          <h1 className="text-3xl font-bold text-primary mb-1">{selectedOrg} Bodycam Commands</h1>
+          <p className="text-on-surface-variant text-sm">
+            Standard Operating Procedure roleplay commands for {selectedOrg}
           </p>
         </div>
         
         {/* Organization Selector */}
         <div className="flex flex-col items-end">
-          <label className="text-sm text-gray-400 mb-2">Select Organization:</label>
+          <label className="text-xs font-mono uppercase text-on-surface-variant mb-1">Select Organization:</label>
           <select
             value={selectedOrg}
             onChange={(e) => setSelectedOrg(e.target.value)}
-            className="input px-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-white"
+            className="bg-surface-dim border border-outline-variant rounded px-3 py-1.5 text-on-surface text-sm font-mono focus:outline-none focus:border-primary"
           >
             {organizations.map((org) => (
               <option key={org} value={org}>
@@ -355,22 +391,24 @@ export default function BodycamCommandsPage() {
 
       {/* General Commands */}
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-blue-300 mb-4">General Commands</h2>
-        <div className="space-y-4">
+        <h2 className="text-xl font-bold text-on-surface mb-3 flex items-center gap-2">
+          <span>General Commands</span>
+        </h2>
+        <div className="space-y-3">
           {categories.map((category) => {
             const isExpanded = expandedCategories.includes(category.id)
             
             return (
-              <div key={category.id} className="card">
+              <div key={category.id} className="card overflow-hidden">
                 <button
                   onClick={() => toggleCategory(category.id)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+                  className="w-full px-5 py-3.5 flex items-center justify-between bg-surface-container-low hover:bg-surface-container transition-colors"
                 >
-                  <h3 className="text-xl font-semibold text-gray-100">
-                    {category.name}
+                  <h3 className="text-base font-semibold text-on-surface flex items-center gap-2">
+                    <span>{category.name}</span>
                   </h3>
                   <svg
-                    className={`w-6 h-6 text-gray-400 transition-transform ${
+                    className={`w-5 h-5 text-on-surface-variant transition-transform ${
                       isExpanded ? 'transform rotate-180' : ''
                     }`}
                     fill="none"
@@ -387,38 +425,54 @@ export default function BodycamCommandsPage() {
                 </button>
 
                 {isExpanded && (
-                  <div className="px-6 pb-6 space-y-3">
-                    {category.commands.map((command, idx) => (
-                      <div key={idx} className="space-y-2">
-                        {command.label && (
-                          <p className="text-sm font-semibold text-blue-300">{command.label}</p>
-                        )}
-                        <div className="flex items-start gap-2 bg-gray-800 p-3 rounded-md">
-                          <code className="flex-1 text-gray-200 text-sm break-words">
-                            {command.text}
-                          </code>
-                          <button
-                            onClick={() => handleCopy(command.text)}
-                            className="text-blue-400 hover:text-blue-300 transition-colors flex-shrink-0"
-                            title="Copy"
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                              />
-                            </svg>
-                          </button>
+                  <div className="px-5 pb-5 pt-2 space-y-3 bg-surface-container-lowest">
+                    {category.commands.map((command, idx) => {
+                      const isPinned = isItemPinned('command', command.text)
+                      return (
+                        <div key={idx} className="space-y-1.5">
+                          {command.label && (
+                            <p className="text-xs font-semibold text-primary">{command.label}</p>
+                          )}
+                          <div className="flex items-start gap-2 bg-surface-dim border border-outline-variant/60 p-3 rounded hover:border-outline transition-colors group">
+                            <code className="flex-1 text-on-surface text-xs font-mono break-words leading-relaxed">
+                              {command.text}
+                            </code>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                onClick={() => handleTogglePin(command, category.name)}
+                                className={`p-1.5 rounded transition-colors text-xs ${
+                                  isPinned
+                                    ? 'text-primary bg-primary/10'
+                                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                                }`}
+                                title={isPinned ? 'Unpin Command' : 'Pin to Utility Panel'}
+                              >
+                                📌
+                              </button>
+                              <button
+                                onClick={() => handleCopy(command.text, command.label)}
+                                className="p-1.5 text-primary hover:text-primary-container hover:bg-surface-container rounded transition-colors"
+                                title="Copy Command"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -429,22 +483,22 @@ export default function BodycamCommandsPage() {
 
       {/* Department Messages */}
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-blue-300 mb-4">📩 Department Messages</h2>
-        <div className="space-y-4">
+        <h2 className="text-xl font-bold text-on-surface mb-3">📩 Department Messages</h2>
+        <div className="space-y-3">
           {departmentMessages.map((category) => {
             const isExpanded = expandedCategories.includes(category.id)
             
             return (
-              <div key={category.id} className="card">
+              <div key={category.id} className="card overflow-hidden">
                 <button
                   onClick={() => toggleCategory(category.id)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+                  className="w-full px-5 py-3.5 flex items-center justify-between bg-surface-container-low hover:bg-surface-container transition-colors"
                 >
-                  <h3 className="text-xl font-semibold text-gray-100">
+                  <h3 className="text-base font-semibold text-on-surface">
                     {category.name}
                   </h3>
                   <svg
-                    className={`w-6 h-6 text-gray-400 transition-transform ${
+                    className={`w-5 h-5 text-on-surface-variant transition-transform ${
                       isExpanded ? 'transform rotate-180' : ''
                     }`}
                     fill="none"
@@ -461,33 +515,49 @@ export default function BodycamCommandsPage() {
                 </button>
 
                 {isExpanded && (
-                  <div className="px-6 pb-6 space-y-3">
-                    {category.commands.map((command, idx) => (
-                      <div key={idx} className="flex items-start gap-2 bg-gray-800 p-3 rounded-md">
-                        <code className="flex-1 text-gray-200 text-sm break-words">
-                          {command.text}
-                        </code>
-                        <button
-                          onClick={() => handleCopy(command.text)}
-                          className="text-blue-400 hover:text-blue-300 transition-colors flex-shrink-0"
-                          title="Copy"
-                        >
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
+                  <div className="px-5 pb-5 pt-2 space-y-2 bg-surface-container-lowest">
+                    {category.commands.map((command, idx) => {
+                      const isPinned = isItemPinned('command', command.text)
+                      return (
+                        <div key={idx} className="flex items-start gap-2 bg-surface-dim border border-outline-variant/60 p-2.5 rounded hover:border-outline transition-colors group">
+                          <code className="flex-1 text-on-surface text-xs font-mono break-words leading-relaxed">
+                            {command.text}
+                          </code>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => handleTogglePin(command, category.name)}
+                              className={`p-1.5 rounded transition-colors text-xs ${
+                                isPinned
+                                  ? 'text-primary bg-primary/10'
+                                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                              }`}
+                              title={isPinned ? 'Unpin Command' : 'Pin to Utility Panel'}
+                            >
+                              📌
+                            </button>
+                            <button
+                              onClick={() => handleCopy(command.text)}
+                              className="p-1.5 text-primary hover:text-primary-container hover:bg-surface-container rounded transition-colors"
+                              title="Copy Command"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>

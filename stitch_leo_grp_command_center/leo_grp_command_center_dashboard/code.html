@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LEO COMMAND CENTER - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "inverse-surface": "#e5e1e4",
+                      "surface-variant": "#353437",
+                      "on-primary-container": "#00285d",
+                      "error-container": "#93000a",
+                      "tertiary-container": "#df7412",
+                      "background": "#131315",
+                      "on-error": "#690005",
+                      "primary-fixed-dim": "#adc6ff",
+                      "secondary-fixed": "#6ffbbe",
+                      "on-primary": "#002e6a",
+                      "on-tertiary-fixed-variant": "#723600",
+                      "primary-fixed": "#d8e2ff",
+                      "on-error-container": "#ffdad6",
+                      "on-background": "#e5e1e4",
+                      "on-primary-fixed-variant": "#004395",
+                      "on-tertiary-container": "#461f00",
+                      "on-secondary": "#003824",
+                      "on-surface-variant": "#c2c6d6",
+                      "inverse-on-surface": "#313032",
+                      "surface-bright": "#39393b",
+                      "surface-container-low": "#1c1b1d",
+                      "primary": "#adc6ff",
+                      "on-tertiary-fixed": "#311400",
+                      "surface-container-highest": "#353437",
+                      "surface-dim": "#131315",
+                      "primary-container": "#4d8eff",
+                      "tertiary-fixed-dim": "#ffb786",
+                      "outline": "#8c909f",
+                      "error": "#ffb4ab",
+                      "on-secondary-fixed": "#002113",
+                      "on-tertiary": "#502400",
+                      "on-primary-fixed": "#001a42",
+                      "on-secondary-container": "#00311f",
+                      "surface-container": "#201f22",
+                      "secondary": "#4edea3",
+                      "surface": "#131315",
+                      "surface-tint": "#adc6ff",
+                      "surface-container-high": "#2a2a2c",
+                      "tertiary-fixed": "#ffdcc6",
+                      "inverse-primary": "#005ac2",
+                      "secondary-fixed-dim": "#4edea3",
+                      "on-secondary-fixed-variant": "#005236",
+                      "on-surface": "#e5e1e4",
+                      "secondary-container": "#00a572",
+                      "surface-container-lowest": "#0e0e10",
+                      "tertiary": "#ffb786",
+                      "outline-variant": "#424754"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "container-padding": "1.5rem",
+                      "element-gap-tight": "0.5rem",
+                      "element-gap-base": "1rem",
+                      "unit": "4px",
+                      "grid-gutter": "16px",
+                      "max-width": "1280px"
+              },
+              "fontFamily": {
+                      "headline-lg": [
+                              "Geist"
+                      ],
+                      "label-caps": [
+                              "JetBrains Mono"
+                      ],
+                      "body-sm": [
+                              "Geist"
+                      ],
+                      "headline-md": [
+                              "Geist"
+                      ],
+                      "body-lg": [
+                              "Geist"
+                      ],
+                      "mono-data": [
+                              "JetBrains Mono"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-caps": [
+                              "10px",
+                              {
+                                      "lineHeight": "12px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "mono-data": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        /* Custom scrollbar for tactical feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #131315; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #353437; 
+            border: 1px solid #131315;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #424754; 
+        }
+      </style>
+</head>
+<body class="bg-background text-on-surface font-body-lg overflow-hidden flex h-screen">
+<!-- SIDE NAVIGATION -->
+<nav class="fixed left-0 top-0 h-full flex flex-col z-40 bg-background border-r border-outline-variant h-screen w-64 flex-shrink-0">
+<!-- Brand / Header -->
+<div class="px-container-padding py-6 border-b border-outline-variant">
+<h1 class="font-headline-lg text-headline-lg font-bold text-primary tracking-tighter">LEO COMMAND</h1>
+<div class="text-on-surface-variant font-body-sm mt-1">Unit 724</div>
+</div>
+<!-- Main Tabs -->
+<div class="flex-1 py-4 overflow-y-auto">
+<div class="px-4 mb-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Navigation</span>
+</div>
+<ul class="flex flex-col mb-6 space-y-1">
+<!-- Active Tab: Dashboard -->
+<li>
+<a class="flex items-center gap-element-gap-base bg-surface-container-high text-primary border-r-2 border-primary px-4 py-3 opacity-90 transition-opacity" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-headline-md text-headline-md">Dashboard</span>
+</a>
+</li>
+<!-- Inactive Tabs -->
+<li>
+<a class="flex items-center gap-element-gap-base text-on-surface-variant hover:text-on-surface px-4 py-3 hover:bg-surface-variant transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="font-headline-md text-headline-md">Commands</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-element-gap-base text-on-surface-variant hover:text-on-surface px-4 py-3 hover:bg-surface-variant transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="gavel">gavel</span>
+<span class="font-headline-md text-headline-md">Legislation</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-element-gap-base text-on-surface-variant hover:text-on-surface px-4 py-3 hover:bg-surface-variant transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="font-headline-md text-headline-md">Reports</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-element-gap-base text-on-surface-variant hover:text-on-surface px-4 py-3 hover:bg-surface-variant transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-headline-md text-headline-md">Profile</span>
+</a>
+</li>
+</ul>
+<!-- Quick Access Pins -->
+<div class="px-4 mb-2 mt-6 border-t border-outline-variant pt-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Quick Access</span>
+</div>
+<ul class="flex flex-col space-y-1 px-2">
+<li>
+<a class="flex items-center gap-2 text-on-surface-variant hover:text-primary px-2 py-2 hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined text-sm" style="font-size: 16px;">push_pin</span>
+<span class="font-body-sm text-body-sm truncate">Traffic Stop Procedure</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-2 text-on-surface-variant hover:text-primary px-2 py-2 hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined text-sm" style="font-size: 16px;">push_pin</span>
+<span class="font-mono-data text-mono-data truncate">/me shows badge</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-2 text-on-surface-variant hover:text-primary px-2 py-2 hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined text-sm" style="font-size: 16px;">push_pin</span>
+<span class="font-body-sm text-body-sm truncate">Miranda Rights Card</span>
+</a>
+</li>
+</ul>
+</div>
+<!-- Footer / Support -->
+<div class="p-4 border-t border-outline-variant">
+<ul class="flex flex-col space-y-1">
+<li>
+<a class="flex items-center gap-element-gap-base text-on-surface-variant hover:text-on-surface px-2 py-2 hover:bg-surface-variant transition-colors duration-150 rounded" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span class="font-body-sm text-body-sm">Settings</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-element-gap-base text-on-surface-variant hover:text-on-surface px-2 py-2 hover:bg-surface-variant transition-colors duration-150 rounded" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="help">help</span>
+<span class="font-body-sm text-body-sm">Support</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- MAIN CONTENT AREA -->
+<div class="flex-1 flex flex-col ml-64 bg-background">
+<!-- TOP APP BAR -->
+<header class="fixed top-0 right-0 left-64 flex justify-between items-center px-container-padding z-30 bg-background border-b border-outline-variant h-16">
+<div class="flex items-center gap-6">
+<span class="font-headline-md text-headline-md font-bold text-primary">COMMAND CENTER</span>
+<!-- Search Bar Placeholder -->
+<button class="flex items-center gap-2 bg-surface-container-low border border-outline-variant rounded px-3 py-1.5 text-on-surface-variant hover:border-outline transition-colors group">
+<span class="material-symbols-outlined text-[18px]">search</span>
+<span class="font-body-sm text-body-sm">Search or Command Palette</span>
+<span class="font-mono-data text-mono-data bg-surface-variant px-1.5 py-0.5 rounded ml-2 group-hover:bg-outline-variant transition-colors text-[10px]">Ctrl K</span>
+</button>
+</div>
+<div class="flex items-center gap-4">
+<!-- Duty Status -->
+<div class="flex items-center gap-2 bg-surface-container-lowest border border-outline-variant px-3 py-1 rounded">
+<span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(78,222,163,0.5)]"></span>
+<span class="font-label-caps text-label-caps text-secondary tracking-widest">ON DUTY</span>
+<span class="font-mono-data text-mono-data text-on-surface-variant ml-2" id="duty-timer">00:45:12</span>
+</div>
+<!-- Icon Actions -->
+<div class="flex items-center gap-2 border-l border-outline-variant pl-4">
+<button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors" title="Notifications">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors" title="History">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+</button>
+</div>
+<!-- Profile Action -->
+<button class="flex items-center gap-3 pl-4 border-l border-outline-variant hover:bg-surface-container py-1 px-2 rounded transition-colors Scale-down on click 0.98x">
+<div class="text-right hidden md:block">
+<div class="font-body-sm text-body-sm font-semibold text-on-surface">Officer J. Doe</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">Badge #4928</div>
+</div>
+<div class="w-8 h-8 rounded bg-surface-variant border border-outline-variant overflow-hidden">
+<!-- Placeholder for Avatar -->
+<img class="w-full h-full object-cover" data-alt="A highly detailed close-up portrait of a law enforcement officer wearing a dark tactical uniform. The lighting is moody and cinematic, emphasizing professionalism and authority. The background is a blurred dark tactical environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkPBLN0uPpJ_tSKTHHAbL_1_ldQ97RQP4IVg0nU0XtlS6Rd6fKkfN-lyJ-BRjRpDP3CAWOj7p03w-G1zLSrW4eU4oPRpJJ_gJAoPnBSHeSkksmvoVdA7KTcz2wEhFavDBR0O65WrBenKCzb6OZpabQUdCfAQQGvznSOp-kNdn9yZ-_nhhMcOI5BKxYN_z3MQkPwRAEQvlHiiNpLueFA0E3Q8w5tWQ4z_8g7tTpZtt7adgvqqXO1Ebn"/>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</header>
+<!-- MAIN WORKSPACE & RIGHT PANEL -->
+<main class="flex-1 overflow-y-auto mt-16 flex p-container-padding gap-container-padding">
+<!-- Center Canvas -->
+<div class="flex-1 flex flex-col gap-6 max-w-4xl">
+<!-- Welcome Banner -->
+<section class="bg-surface-container-low border border-outline-variant rounded p-6 relative overflow-hidden">
+<div class="relative z-10">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">Welcome back, Officer Yadav.</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-md">Shift started at 08:00 HRS. Ensure all active reports from previous shift are finalized by EOD.</p>
+<div class="mt-6 flex gap-3">
+<button class="bg-primary hover:bg-primary-container text-on-primary font-body-sm text-body-sm font-semibold px-4 py-2 rounded transition-colors">Start Patrol</button>
+<button class="bg-transparent border border-outline hover:border-on-surface text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm px-4 py-2 rounded transition-colors">Review Briefing</button>
+</div>
+</div>
+<!-- Decorative background element for tactical feel -->
+<div class="absolute top-0 right-0 h-full w-1/2 bg-gradient-to-l from-surface-variant to-transparent opacity-20 pointer-events-none"></div>
+</section>
+<!-- Quick Action Grid (Bento Style) -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<a class="bg-surface-container-low border border-outline-variant hover:border-primary p-4 rounded flex flex-col gap-3 group transition-colors" href="#">
+<div class="w-10 h-10 rounded bg-surface-variant flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">add_box</span>
+</div>
+<div>
+<div class="font-headline-md text-headline-md text-on-surface mb-1">Create Report</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Start a new incident or arrest report.</div>
+</div>
+</a>
+<a class="bg-surface-container-low border border-outline-variant hover:border-primary p-4 rounded flex flex-col gap-3 group transition-colors" href="#">
+<div class="w-10 h-10 rounded bg-surface-variant flex items-center justify-center text-secondary group-hover:bg-secondary group-hover:text-on-secondary transition-colors">
+<span class="material-symbols-outlined">edit_note</span>
+</div>
+<div>
+<div class="font-headline-md text-headline-md text-on-surface mb-1">New Note</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Quick entry to personal notebook.</div>
+</div>
+</a>
+<a class="bg-surface-container-low border border-outline-variant hover:border-primary p-4 rounded flex flex-col gap-3 group transition-colors" href="#">
+<div class="w-10 h-10 rounded bg-surface-variant flex items-center justify-center text-tertiary-container group-hover:bg-tertiary-container group-hover:text-on-tertiary-container transition-colors">
+<span class="material-symbols-outlined">menu_book</span>
+</div>
+<div>
+<div class="font-headline-md text-headline-md text-on-surface mb-1">Browse Penal Code</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Search state and local ordinances.</div>
+</div>
+</a>
+</section>
+<!-- Data Density Area -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Recent Reports List -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded flex flex-col">
+<div class="px-4 py-3 border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-on-surface">Recent Reports</h3>
+<button class="text-primary hover:text-primary-container font-body-sm text-body-sm">View All</button>
+</div>
+<div class="flex-1 p-2 flex flex-col gap-1">
+<!-- Report Item -->
+<div class="flex items-center justify-between p-2 hover:bg-surface-variant rounded transition-colors cursor-pointer group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">description</span>
+<div>
+<div class="font-body-sm text-body-sm text-on-surface">INC-2023-0941</div>
+<div class="font-mono-data text-mono-data text-on-surface-variant text-[10px]">Traffic Collision - 10-50</div>
+</div>
+</div>
+<span class="font-label-caps text-label-caps bg-surface-container-high px-2 py-1 rounded text-on-surface-variant">DRAFT</span>
+</div>
+<!-- Report Item -->
+<div class="flex items-center justify-between p-2 hover:bg-surface-variant rounded transition-colors cursor-pointer group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">description</span>
+<div>
+<div class="font-body-sm text-body-sm text-on-surface">ARR-2023-0112</div>
+<div class="font-mono-data text-mono-data text-on-surface-variant text-[10px]">Warrant Execution</div>
+</div>
+</div>
+<span class="font-label-caps text-label-caps bg-surface-container-high px-2 py-1 rounded text-secondary border border-secondary/30">SUBMITTED</span>
+</div>
+<!-- Report Item -->
+<div class="flex items-center justify-between p-2 hover:bg-surface-variant rounded transition-colors cursor-pointer group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">description</span>
+<div>
+<div class="font-body-sm text-body-sm text-on-surface">FIR-2023-0889</div>
+<div class="font-mono-data text-mono-data text-on-surface-variant text-[10px]">Field Interview - Suspicious Person</div>
+</div>
+</div>
+<span class="font-label-caps text-label-caps bg-surface-container-high px-2 py-1 rounded text-secondary border border-secondary/30">SUBMITTED</span>
+</div>
+</div>
+</section>
+<!-- Active Legislation / Fast Search -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded flex flex-col">
+<div class="px-4 py-3 border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-on-surface">Active Legislation</h3>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">gavel</span>
+</div>
+<div class="p-4 flex flex-col gap-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full bg-surface-dim border border-outline-variant text-on-surface font-mono-data text-mono-data rounded pl-9 pr-3 py-2 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Search Title 18..." type="text"/>
+</div>
+<div class="flex flex-col gap-2">
+<div class="font-label-caps text-label-caps text-on-surface-variant uppercase">Commonly Cited Today</div>
+<div class="flex flex-wrap gap-2">
+<button class="bg-surface-variant border border-outline-variant hover:border-on-surface px-2 py-1 rounded font-mono-data text-mono-data text-on-surface text-[10px] transition-colors">18 U.S.C. § 111</button>
+<button class="bg-surface-variant border border-outline-variant hover:border-on-surface px-2 py-1 rounded font-mono-data text-mono-data text-on-surface text-[10px] transition-colors">Veh. Code 23152</button>
+<button class="bg-surface-variant border border-outline-variant hover:border-on-surface px-2 py-1 rounded font-mono-data text-mono-data text-on-surface text-[10px] transition-colors">Penal 459</button>
+<button class="bg-surface-variant border border-outline-variant hover:border-on-surface px-2 py-1 rounded font-mono-data text-mono-data text-on-surface text-[10px] transition-colors">Title 21 § 841</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+<!-- Right Utility Panel -->
+<aside class="w-72 flex-shrink-0 flex flex-col gap-6">
+<!-- Officer Notebook -->
+<div class="bg-surface-container-low border border-outline-variant rounded flex flex-col h-1/2">
+<div class="px-3 py-2 border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Officer Notebook</span>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+<!-- Note Item -->
+<div class="p-2 border border-outline-variant rounded bg-surface-dim hover:border-outline transition-colors group cursor-text">
+<div class="font-mono-data text-mono-data text-on-surface-variant text-[10px] mb-1 flex justify-between">
+<span>10:42 AM</span>
+<span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-primary">edit</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface leading-tight">Suspect vehicle identified as black sedan, partial plate 'XYZ'. Last seen heading north on 5th.</p>
+</div>
+<!-- Note Item -->
+<div class="p-2 border border-outline-variant rounded bg-surface-dim hover:border-outline transition-colors group cursor-text">
+<div class="font-mono-data text-mono-data text-on-surface-variant text-[10px] mb-1 flex justify-between">
+<span>09:15 AM</span>
+<span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-primary">edit</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface leading-tight">Follow up with witness at 422 Elm St regarding noise complaint.</p>
+</div>
+</div>
+</div>
+<!-- Recent Items / Clipboard -->
+<div class="bg-surface-container-low border border-outline-variant rounded flex flex-col flex-1">
+<div class="px-3 py-2 border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Recent Items</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">history</span>
+</div>
+<div class="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
+<div class="flex items-center gap-2 p-2 hover:bg-surface-variant rounded cursor-pointer group transition-colors">
+<span class="material-symbols-outlined text-[16px] text-outline">content_copy</span>
+<div class="truncate">
+<div class="font-body-sm text-body-sm text-on-surface truncate">Article 7.2 Use of Force</div>
+<div class="font-mono-data text-mono-data text-on-surface-variant text-[10px]">Copied 5m ago</div>
+</div>
+</div>
+<div class="flex items-center gap-2 p-2 hover:bg-surface-variant rounded cursor-pointer group transition-colors">
+<span class="material-symbols-outlined text-[16px] text-outline">link</span>
+<div class="truncate">
+<div class="font-body-sm text-body-sm text-on-surface truncate">Dispatch Audio Log #882</div>
+<div class="font-mono-data text-mono-data text-on-surface-variant text-[10px]">Viewed 12m ago</div>
+</div>
+</div>
+<div class="flex items-center gap-2 p-2 hover:bg-surface-variant rounded cursor-pointer group transition-colors">
+<span class="material-symbols-outlined text-[16px] text-outline">person_search</span>
+<div class="truncate">
+<div class="font-body-sm text-body-sm text-on-surface truncate">Query: "Smith, John M."</div>
+<div class="font-mono-data text-mono-data text-on-surface-variant text-[10px]">Searched 1h ago</div>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</main>
+</div>
+<!-- Script for Timer Simulation -->
+<script>
+        // Simple timer logic to demonstrate performance constraint (only this updates)
+        let seconds = 2712; // 00:45:12 starting point in seconds
+        const timerElement = document.getElementById('duty-timer');
+
+        function formatTime(sec) {
+            const h = Math.floor(sec / 3600).toString().padStart(2, '0');
+            const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+            const s = (sec % 60).toString().padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        setInterval(() => {
+            seconds++;
+            if (timerElement) {
+                timerElement.textContent = formatTime(seconds);
+            }
+        }, 1000);
+    </script>
+</body></html>

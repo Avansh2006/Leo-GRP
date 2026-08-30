@@ -16,6 +16,8 @@
 # Misc
 .DS_Store
 *.pem
+Legislation/*.pdf
+/Legislation/
 
 # Debug
 npm-debug.log*

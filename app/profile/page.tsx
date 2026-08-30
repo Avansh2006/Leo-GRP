@@ -5,14 +5,19 @@ import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
 import { useNotifications } from '@/contexts/NotificationContext'
 import { useUserProfile, WeaponLoadout } from '@/contexts/UserProfileContext'
+import { useProductivity } from '@/contexts/ProductivityContext'
 import SimpleBarChart from '@/components/SimpleBarChart'
+import { aiModelProvider, AIModelStatus, RECOMMENDED_LOCAL_MODEL } from '@/utils/aiModelProvider'
 
 export default function ProfilePage() {
   const { dutyLogs } = useDuty()
   const { showToast } = useToast()
   const { achievements, checkAchievements } = useNotifications()
   const { profile, updateProfile, addLoadout, removeLoadout, updateLoadout } = useUserProfile()
+  const { recordRecentItem, setIsBackupModalOpen, openAssistant } = useProductivity()
   
+  const [aiStatus, setAiStatus] = useState<AIModelStatus>(aiModelProvider.getStatus())
+  const [webGPUInfo, setWebGPUInfo] = useState<{ supported: boolean; message: string } | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'returned' | 'lost' | 'broken' | 'used'>('all')
   const [showAchievements, setShowAchievements] = useState(false)
@@ -45,7 +50,21 @@ export default function ProfilePage() {
       rank: profile.rank,
       badgeNumber: profile.badgeNumber,
     })
-  }, [profile])
+    recordRecentItem({
+      type: 'page',
+      targetId: '/profile',
+      title: 'Officer Profile',
+      subtitle: profile.name ? `Officer ${profile.name}` : 'Statistics & Loadouts',
+      url: '/profile',
+    })
+
+    const unsubscribe = aiModelProvider.subscribe((status) => {
+      setAiStatus(status)
+    })
+    aiModelProvider.checkDeviceWebGPUSupport().then(setWebGPUInfo)
+
+    return () => unsubscribe()
+  }, [profile, recordRecentItem])
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString)
@@ -243,11 +262,18 @@ export default function ProfilePage() {
             Manage your profile, loadouts, and view performance statistics.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setIsBackupModalOpen(true)}
+            className="btn bg-surface-container-high border border-outline-variant hover:bg-surface-variant text-on-surface text-xs font-mono"
+            title="Export, Import, and Manage Local Storage"
+          >
+            💾 Data & Backup
+          </button>
           {achievements.filter(a => a.unlocked).length > 0 && (
             <button
               onClick={() => setShowAchievements(!showAchievements)}
-              className="btn bg-yellow-600 text-white hover:bg-yellow-700"
+              className="btn bg-yellow-600 text-white hover:bg-yellow-700 text-xs font-mono"
             >
               🏆 Achievements ({achievements.filter(a => a.unlocked).length}/{achievements.length})
             </button>
@@ -255,7 +281,7 @@ export default function ProfilePage() {
           {dutyLogs.length > 0 && (
             <button
               onClick={clearLogs}
-              className="btn bg-red-600 text-white hover:bg-red-700"
+              className="btn bg-red-600 text-white hover:bg-red-700 text-xs font-mono"
             >
               Clear All Logs
             </button>
@@ -302,6 +328,86 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+        {/* Legislation AI & Local Engine Card */}
+        <div className="card mb-6 border border-outline-variant bg-surface-container-low">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">⚖️</span>
+              <div>
+                <h2 className="text-lg font-bold text-on-surface">Legislation Assistant & Local AI</h2>
+                <p className="text-xs text-on-surface-variant font-mono">
+                  Offline-first legal retrieval & optional WebGPU browser model.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border font-bold ${
+                  aiStatus === 'READY'
+                    ? 'bg-secondary/15 text-secondary border-secondary/30'
+                    : 'bg-surface-container text-on-surface-variant border-outline-variant'
+                }`}
+              >
+                {aiStatus === 'READY' ? '● Local AI Active' : '○ Retrieval Engine (0 MB)'}
+              </span>
+              <button
+                onClick={() => openAssistant()}
+                className="btn bg-primary text-on-primary hover:bg-primary-container text-xs font-mono"
+              >
+                Open Assistant
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+            <div className="p-3 bg-surface-container rounded border border-outline-variant space-y-1">
+              <div className="text-on-surface-variant font-bold">HARDWARE & WEBGPU STATUS:</div>
+              <div className={webGPUInfo?.supported ? 'text-secondary' : 'text-amber-400'}>
+                {webGPUInfo?.message || 'Checking WebGPU...'}
+              </div>
+            </div>
+
+            <div className="p-3 bg-surface-container rounded border border-outline-variant space-y-1">
+              <div className="text-on-surface-variant font-bold">ACTIVE LEGISLATION SOURCE:</div>
+              <div className="text-on-surface">
+                Traffic Code 2nd Rendition (28.07.2025) & Penal Codes
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-outline-variant">
+            <span className="text-[11px] font-mono text-on-surface-variant mr-auto">
+              Model: {RECOMMENDED_LOCAL_MODEL.name} ({RECOMMENDED_LOCAL_MODEL.sizeEstimate})
+            </span>
+
+            {aiStatus === 'READY' && (
+              <>
+                <button
+                  onClick={() => {
+                    aiModelProvider.unloadModel()
+                    showToast('Model unloaded from RAM', 'info')
+                  }}
+                  className="px-2.5 py-1 bg-surface-container-high border border-outline-variant text-on-surface rounded text-xs font-mono hover:bg-surface-variant"
+                  title="Free memory without deleting model"
+                >
+                  Unload AI (Free RAM)
+                </button>
+                <button
+                  onClick={() => {
+                    aiModelProvider.deleteModel()
+                    showToast('Local AI model deleted', 'info')
+                  }}
+                  className="px-2.5 py-1 bg-error/20 border border-error/30 text-error rounded text-xs font-mono hover:bg-error/30"
+                  title="Remove downloaded model files"
+                >
+                  Delete AI Model
+                </button>
+              </>
+            )}
+          </div>
+        </div>
 
       {/* Loadouts Card */}
       <div className="card mb-6">

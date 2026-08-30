@@ -1,19 +1,20 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
+import { Analytics } from '@vercel/analytics/react'
 import './globals.css'
-import Navbar from '@/components/Navbar'
 import { ToastProvider } from '@/components/ToastProvider'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { DutyProvider } from '@/contexts/DutyContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
 import { UserProfileProvider } from '@/contexts/UserProfileContext'
+import { ProductivityProvider } from '@/contexts/ProductivityContext'
+import AppShell from '@/components/shell/AppShell'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Grand RP LEO Toolkit',
-  description: 'Law Enforcement Officer toolkit for Grand RP - Bodycam commands, patrolman\'s guide, and evidence generator',
+  title: 'LEO-GRP — Operations Center',
+  description: 'Law Enforcement Operations Center for Grand RP - Bodycam commands, patrolman guide, evidence generator, and duty tracking',
 }
 
 export default function RootLayout({
@@ -22,18 +23,19 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className="dark">
+      <body className={`${inter.className} bg-background text-on-surface antialiased overflow-hidden`}>
         <ThemeProvider>
           <NotificationProvider>
             <UserProfileProvider>
               <DutyProvider>
-                <ToastProvider>
-                  <Navbar />
-                  <main className="container mx-auto px-4 py-8">
-                    {children}
-                  </main>
-                </ToastProvider>
+                <ProductivityProvider>
+                  <ToastProvider>
+                    <AppShell>
+                      {children}
+                    </AppShell>
+                  </ToastProvider>
+                </ProductivityProvider>
               </DutyProvider>
             </UserProfileProvider>
           </NotificationProvider>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useToast } from '@/components/ToastProvider'
 import { useDuty } from '@/contexts/DutyContext'
 import { useUserProfile } from '@/contexts/UserProfileContext'
+import { useProductivity } from '@/contexts/ProductivityContext'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 import { EVENT_PRESETS } from '@/utils/presets'
 
@@ -51,6 +52,7 @@ export default function ReportsPage() {
     incrementEventCounter,
     removeEventCounter,
   } = useDuty()
+  const { recordRecentItem } = useProductivity()
   
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -79,6 +81,13 @@ export default function ReportsPage() {
 
   useEffect(() => {
     loadCharges()
+    recordRecentItem({
+      type: 'page',
+      targetId: '/reports',
+      title: 'Reports & Duty Logs',
+      subtitle: 'Evidence Generator & Shifts',
+      url: '/reports',
+    })
     
     const handleClickOutside = (event: MouseEvent) => {
       if (weaponDropdownRef.current && !weaponDropdownRef.current.contains(event.target as Node)) {
@@ -88,7 +97,7 @@ export default function ReportsPage() {
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [recordRecentItem])
 
   const loadCharges = async () => {
     try {

@@ -1,22 +1,43 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import CopyButton from '@/components/CopyButton'
+import React, { useState, useEffect, useMemo, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useToast } from '@/components/ToastProvider'
 import { useDuty } from '@/contexts/DutyContext'
+import { useProductivity } from '@/contexts/ProductivityContext'
 import { loadAllLawData, filterLawEntries, LawEntry } from '@/utils/htmlParser'
-import { ChargeTemplate, getCustomChargeTemplates, saveCustomChargeTemplate, deleteCustomChargeTemplate } from '@/utils/presets'
+import {
+  ChargeTemplate,
+  getCustomChargeTemplates,
+  saveCustomChargeTemplate,
+  deleteCustomChargeTemplate,
+} from '@/utils/presets'
 
-export default function PatrolmanGuidePage() {
+function PatrolmanGuideContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { showToast } = useToast()
   const { incrementArrests, addArrestRecord } = useDuty()
+  const {
+    recordRecentItem,
+    pinItem,
+    unpinItem,
+    isItemPinned,
+    createNote,
+    setIsRightPanelOpen,
+    setUtilityTab,
+    openAssistant,
+  } = useProductivity()
+
   const [data, setData] = useState<LawEntry[]>([])
-  const [filteredData, setFilteredData] = useState<LawEntry[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedDocType, setSelectedDocType] = useState<'all' | 'traffic' | 'penal' | 'article7'>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [categories, setCategories] = useState<string[]>([])
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
+  const [activeDetailEntry, setActiveDetailEntry] = useState<LawEntry | null>(null)
+
+  // Charge collector state
   const [selectedCharges, setSelectedCharges] = useState<LawEntry[]>([])
   const [suspectName, setSuspectName] = useState('')
   const [suspectId, setSuspectId] = useState('')
@@ -25,620 +46,891 @@ export default function PatrolmanGuidePage() {
   const [customTemplates, setCustomTemplates] = useState<ChargeTemplate[]>([])
   const [saveTemplateName, setSaveTemplateName] = useState('')
   const [saveTemplateDesc, setSaveTemplateDesc] = useState('')
-  const [allCharges, setAllCharges] = useState<LawEntry[]>([])
-  const itemsPerPage = 20
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 16
+
+  // Load initial data and track visit
   useEffect(() => {
     loadData()
     setCustomTemplates(getCustomChargeTemplates())
-  }, [])
-
-  useEffect(() => {
-    let dataToFilter = data
-    if (selectedCategory !== 'all') {
-      dataToFilter = data.filter(entry => 
-        entry.code.startsWith(selectedCategory === 'penal' ? 'P.C.' : 'T.C.')
-      )
-    }
-    const filtered = filterLawEntries(dataToFilter, searchTerm)
-    setFilteredData(filtered)
-    setCurrentPage(1)
-  }, [searchTerm, data, selectedCategory])
+    recordRecentItem({
+      type: 'page',
+      targetId: '/patrolman-guide',
+      title: 'Patrolman Law Guide',
+      subtitle: 'Traffic Code (2nd Rendition) & Penal Code',
+      url: '/patrolman-guide',
+    })
+  }, [recordRecentItem])
 
   const loadData = async () => {
     setLoading(true)
     try {
       const lawData = await loadAllLawData()
       setData(lawData.allEntries)
-      setFilteredData(lawData.allEntries)
-      setAllCharges(lawData.allEntries)
-      
-      // Extract unique categories
-      const uniqueCategories = Array.from(
-        new Set(lawData.allEntries.map(e => e.category).filter(Boolean))
-      )
-      setCategories(uniqueCategories as string[])
     } catch (error) {
-      console.error('Failed to load data:', error)
-      showToast('Failed to load law codes', 'error')
+      console.error('Failed to load law data:', error)
+      showToast('Failed to load legislation data', 'error')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCopyRow = (entry: LawEntry) => {
-    const text = `${entry.code} ${entry.description}`
+  // Deep link support via URL query (?code=...)
+  useEffect(() => {
+    const codeParam = searchParams.get('code') || searchParams.get('section')
+    if (codeParam && data.length > 0) {
+      const match = data.find(
+        (e) => e.code.toLowerCase() === codeParam.toLowerCase() || e.id === codeParam
+      )
+      if (match) {
+        setActiveDetailEntry(match)
+        recordRecentItem({
+          type: 'legislation',
+          targetId: match.code,
+          title: match.code,
+          subtitle: match.description,
+        })
+      }
+    }
+  }, [searchParams, data, recordRecentItem])
+
+  // Extract unique categories for current document type
+  const availableCategories = useMemo(() => {
+    const subset =
+      selectedDocType === 'all' ? data : data.filter((e) => e.documentType === selectedDocType)
+    const cats = Array.from(new Set(subset.map((e) => e.category).filter(Boolean)))
+    return cats
+  }, [data, selectedDocType])
+
+  // Filtered & Ranked Data
+  const filteredData = useMemo(() => {
+    let result = data
+
+    // Filter by document type
+    if (selectedDocType !== 'all') {
+      result = result.filter((e) => e.documentType === selectedDocType)
+    }
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      result = result.filter((e) => e.category === selectedCategory)
+    }
+
+    // Filter and score by search term
+    if (searchTerm.trim()) {
+      result = filterLawEntries(result, searchTerm)
+    }
+
+    return result
+  }, [data, selectedDocType, selectedCategory, searchTerm])
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    return filteredData.slice(start, start + itemsPerPage)
+  }, [filteredData, currentPage, itemsPerPage])
+
+  // Actions
+  const handleCopyProvision = (entry: LawEntry) => {
+    let text = `§ ${entry.code} — ${entry.description}`
+    if (entry.fine && entry.fine !== '-') text += `\nFine: ${entry.fine}`
+    if (entry.sentence && entry.sentence !== '-') text += `\nSentence: ${entry.sentence}`
+    if (entry.stars && entry.stars !== '-') text += `\nWanted Level: ${entry.stars}`
+    if (entry.bail && entry.bail !== '-') text += `\nBail: ${entry.bail}`
+    if (entry.remarks && entry.remarks !== '-') text += `\nRemarks: ${entry.remarks}`
+
     navigator.clipboard.writeText(text)
-    showToast('Law code copied!', 'success')
+    recordRecentItem({
+      type: 'legislation',
+      targetId: entry.code,
+      title: entry.code,
+      subtitle: entry.description,
+    })
+    showToast(`Copied ${entry.code} to clipboard`, 'success')
+  }
+
+  const handleTogglePinLaw = (entry: LawEntry) => {
+    const isPinned = isItemPinned('legislation', entry.code)
+    if (isPinned) {
+      unpinItem('legislation', entry.code)
+      showToast(`Unpinned ${entry.code}`, 'info')
+    } else {
+      pinItem({
+        type: 'legislation',
+        targetId: entry.code,
+        title: entry.code,
+        subtitle: entry.description.slice(0, 45),
+        data: {
+          code: entry.code,
+          description: entry.description,
+          fine: entry.fine,
+          sentence: entry.sentence,
+          source: entry.sourceDocument,
+        },
+      })
+      showToast(`Pinned ${entry.code} to Utility Panel`, 'success')
+    }
+  }
+
+  const handleCreateNoteFromLaw = (entry: LawEntry) => {
+    const noteContent = `Reference: ${entry.code} — ${entry.description}\nSource: ${entry.sourceDocument}\nFine: ${entry.fine || 'N/A'}\nSentence: ${entry.sentence || 'N/A'}\n\nCase Notes / Incident Context:\n`
+    createNote({
+      title: `${entry.code} - ${entry.description.slice(0, 25)}`,
+      content: noteContent,
+      category: entry.documentType === 'traffic' ? 'Traffic' : 'Procedure',
+    })
+    setIsRightPanelOpen(true)
+    setUtilityTab('notes')
+    showToast(`Created note for ${entry.code}`, 'success')
   }
 
   const handleAddCharge = (entry: LawEntry) => {
-    if (!selectedCharges.find(c => c.code === entry.code)) {
-      setSelectedCharges([...selectedCharges, entry])
-      showToast('Charge added!', 'success')
+    if (!selectedCharges.find((c) => c.code === entry.code)) {
+      setSelectedCharges((prev) => [...prev, entry])
+      recordRecentItem({
+        type: 'legislation',
+        targetId: entry.code,
+        title: entry.code,
+        subtitle: `Selected: ${entry.description}`,
+      })
+      showToast(`Added charge ${entry.code}`, 'success')
     } else {
-      showToast('Charge already added', 'error')
+      showToast('Charge already in collector', 'info')
     }
   }
 
-  const removeCharge = (code: string) => {
-    setSelectedCharges(selectedCharges.filter(c => c.code !== code))
+  const handleRemoveCharge = (code: string) => {
+    setSelectedCharges((prev) => prev.filter((c) => c.code !== code))
   }
 
-  const copyAllCharges = () => {
-    if (selectedCharges.length === 0) {
-      showToast('No charges to copy', 'error')
-      return
-    }
-    setShowArrestModal(true)
+  const handleClearCharges = () => {
+    setSelectedCharges([])
+    showToast('Cleared all selected charges', 'info')
   }
 
-  const finalizeArrest = () => {
-    const text = selectedCharges.map(charge => `- ${charge.code} ${charge.description}`).join('\n')
-    navigator.clipboard.writeText(text)
-    
-    // Calculate total fines
-    const totalFines = selectedCharges.reduce((sum, charge) => {
-      const fineStr = charge.fine?.replace(/[^0-9]/g, '') || '0'
-      return sum + parseInt(fineStr)
-    }, 0)
-    
-    // Add arrest record if on duty
-    if (suspectName.trim()) {
-      addArrestRecord(
-        suspectName,
-        selectedCharges.map(c => `${c.code} ${c.description}`),
-        totalFines,
-        suspectId.trim() || undefined
-      )
-    }
-    
-    incrementArrests()
-    showToast(`${selectedCharges.length} charges copied! Arrest count increased${suspectName ? ` for ${suspectName}` : ''}`, 'success')
-    
-    // Reset
-    setShowArrestModal(false)
-    setSuspectName('')
-    setSuspectId('')
-  }
-
-  const quickCopy = () => {
-    const text = selectedCharges.map(charge => `- ${charge.code} ${charge.description}`).join('\n')
+  const handleCopyAllCharges = () => {
+    if (selectedCharges.length === 0) return
+    const text = selectedCharges.map((c) => `${c.code} ${c.description}`).join('\n')
     navigator.clipboard.writeText(text)
     incrementArrests()
-    showToast(`${selectedCharges.length} charges copied! Arrest count increased`, 'success')
-    setShowArrestModal(false)
+    showToast(`Copied ${selectedCharges.length} charges! Arrest count updated.`, 'success')
   }
 
-  const applyChargeTemplate = (template: ChargeTemplate) => {
-    const matchedCharges = allCharges.filter(charge => 
-      template.chargeCodes.includes(charge.code)
-    )
-    const newCharges = matchedCharges.filter(c => !selectedCharges.find(sc => sc.code === c.code))
-    if (newCharges.length > 0) {
-      setSelectedCharges([...selectedCharges, ...newCharges])
-      showToast(`Added ${newCharges.length} charges from template`, 'success')
-    } else {
-      showToast('All template charges already added', 'info')
-    }
+  const calculateTotals = () => {
+    let totalFine = 0
+    let totalSentenceMonths = 0
+    let maxStars = 0
+    let hasNoBail = false
+
+    selectedCharges.forEach((c) => {
+      // Parse fine
+      const fineMatch = c.fine.match(/\$?([\d,]+)/)
+      if (fineMatch) {
+        totalFine += parseInt(fineMatch[1].replace(/,/g, ''), 10)
+      }
+
+      // Parse sentence
+      const sentenceMatch = c.sentence.match(/(\d+)\s*months/i)
+      if (sentenceMatch) {
+        totalSentenceMonths += parseInt(sentenceMatch[1], 10)
+      }
+
+      // Parse stars
+      const starCount = (c.stars.match(/⭐/g) || []).length
+      if (starCount > maxStars) maxStars = starCount
+
+      // Parse bail
+      if (c.bail && c.bail.toLowerCase().includes('no bail')) {
+        hasNoBail = true
+      }
+    })
+
+    return { totalFine, totalSentenceMonths, maxStars, hasNoBail }
   }
 
-  const saveCurrentAsTemplate = () => {
-    if (!saveTemplateName.trim()) {
-      showToast('Please enter a template name', 'error')
-      return
-    }
-    if (selectedCharges.length === 0) {
-      showToast('Please select charges first', 'error')
-      return
-    }
-
-    const newTemplate: ChargeTemplate = {
-      id: Date.now().toString(),
-      name: saveTemplateName,
-      description: saveTemplateDesc || 'Custom template',
-      chargeCodes: selectedCharges.map(c => c.code),
-    }
-
-    saveCustomChargeTemplate(newTemplate)
-    setCustomTemplates(getCustomChargeTemplates())
-    setSaveTemplateName('')
-    setSaveTemplateDesc('')
-    showToast('Template saved!', 'success')
-  }
-
-  const deleteTemplate = (id: string) => {
-    if (confirm('Delete this template?')) {
-      deleteCustomChargeTemplate(id)
-      setCustomTemplates(getCustomChargeTemplates())
-      showToast('Template deleted', 'success')
-    }
-  }
-
-  // Pagination
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentData = filteredData.slice(startIndex, endIndex)
+  const totals = calculateTotals()
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-4xl font-bold text-blue-400 mb-2">Patrolman's Guide</h1>
-        <p className="text-gray-400">
-          Complete law reference including penal codes, traffic codes, and regulations.
-        </p>
-      </div>
-
-      {/* Filters and Search */}
-      <div className="mb-6 space-y-4">
-        {/* Category Filter */}
-        <div className="card p-4">
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                selectedCategory === 'all'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              All Codes ({data.length})
-            </button>
-            <button
-              onClick={() => setSelectedCategory('penal')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                selectedCategory === 'penal'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              Penal Codes ({data.filter(e => e.code.startsWith('P.C.')).length})
-            </button>
-            <button
-              onClick={() => setSelectedCategory('traffic')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                selectedCategory === 'traffic'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              Traffic Codes ({data.filter(e => e.code.startsWith('T.C.')).length})
-            </button>
+    <div className="space-y-5 max-w-7xl mx-auto">
+      {/* Active Source Tag & Title Banner */}
+      <div className="bg-surface-container-low border border-outline-variant rounded-lg p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+            <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-primary/10 text-primary border border-primary/30">
+              Active Source: Traffic Code 2nd Rendition (28.07.2025)
+            </span>
+            <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-secondary/10 text-secondary border border-secondary/30">
+              Penal Codes of San Andreas
+            </span>
           </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-on-surface flex items-center gap-2">
+            <span>⚖️</span> Legislation 2.0 & Law Reference
+          </h1>
+          <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5 font-sans">
+            Search, reference, pin, and copy penal codes and traffic regulations with charge collector.
+          </p>
         </div>
 
-        {/* Search Bar */}
-        <div className="card p-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                placeholder="Search by code, description, category, or keywords..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input w-full pl-10"
-              />
-              <svg className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Global Stats / View Toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center bg-surface-container rounded border border-outline-variant p-0.5">
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                viewMode === 'cards'
+                  ? 'bg-primary text-on-primary font-semibold'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              📋 Cards
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                viewMode === 'table'
+                  ? 'bg-primary text-on-primary font-semibold'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              📊 Table
+            </button>
+          </div>
+
+          {selectedCharges.length > 0 && (
+            <button
+              onClick={() => setShowArrestModal(true)}
+              className="px-3 py-1.5 bg-secondary hover:bg-secondary-container text-black font-mono text-xs font-semibold rounded flex items-center gap-1.5 shadow"
+            >
+              <span>📑</span> Active Charges ({selectedCharges.length})
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Search & Hierarchy Filter Bar */}
+      <div className="bg-surface-container-low border border-outline-variant rounded-lg p-3 sm:p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
+            <input
+              type="text"
+              placeholder="Search by code (e.g. 2.1.1, T.C. 3.5), law description, or keyword..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="w-full pl-9 pr-8 py-2 bg-surface-container-lowest border border-outline-variant rounded text-on-surface placeholder:text-on-surface-variant font-mono text-xs sm:text-sm focus:outline-none focus:border-primary"
+            />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')} className="btn-secondary">
-                Clear
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-on-surface text-xs font-mono"
+              >
+                ✕
               </button>
             )}
           </div>
-          <div className="mt-2 text-sm text-gray-400">
-            Showing {filteredData.length} of {data.length} codes
+
+          {/* Category Dropdown */}
+          <div className="sm:w-64">
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded text-on-surface font-mono text-xs focus:outline-none focus:border-primary"
+            >
+              <option value="all">All Chapters / Categories</option>
+              {availableCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
           </div>
+        </div>
+
+        {/* Document Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-outline-variant">
+          <span className="text-[11px] font-mono uppercase text-on-surface-variant mr-1">Filter:</span>
+          {[
+            { id: 'all', label: 'All Documents' },
+            { id: 'traffic', label: 'Traffic Code (2nd Rendition)' },
+            { id: 'penal', label: 'Penal Code' },
+            { id: 'article7', label: 'Article 7 (Parking)' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setSelectedDocType(tab.id as any)
+                setSelectedCategory('all')
+                setCurrentPage(1)
+              }}
+              className={`px-2.5 py-1 text-xs font-mono rounded transition-colors ${
+                selectedDocType === tab.id
+                  ? 'bg-primary text-on-primary font-bold'
+                  : 'bg-surface-container text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Charge Templates */}
-      <div className="card p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-blue-400">⚡ My Charge Templates</h3>
+      {/* Charge Collector Sticky Summary (if any selected) */}
+      {selectedCharges.length > 0 && (
+        <div className="p-3 bg-surface-container border border-secondary/40 rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-md">
+          <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+            <span className="font-bold text-secondary flex items-center gap-1.5">
+              <span>⚡</span> {selectedCharges.length} Charges Selected
+            </span>
+            <span className="text-on-surface">
+              Fine: <strong className="text-secondary">${totals.totalFine.toLocaleString()}</strong>
+            </span>
+            <span className="text-on-surface">
+              Sentence: <strong className="text-amber-400">{totals.totalSentenceMonths} months</strong>
+            </span>
+            {totals.maxStars > 0 && (
+              <span className="text-red-400">
+                {'⭐'.repeat(totals.maxStars)}
+              </span>
+            )}
+            {totals.hasNoBail && (
+              <span className="px-1.5 py-0.5 bg-red-900/50 text-red-300 border border-red-700 text-[10px] rounded">
+                NO BAIL
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyAllCharges}
+              className="px-3 py-1 bg-secondary text-black hover:bg-secondary-container text-xs font-mono font-bold rounded flex items-center gap-1"
+            >
+              <span>📋</span> Copy All Charges
+            </button>
+            <button
+              onClick={() => setShowArrestModal(true)}
+              className="px-2.5 py-1 bg-primary text-on-primary hover:bg-primary-container text-xs font-mono rounded"
+            >
+              Log Arrest
+            </button>
+            <button
+              onClick={handleClearCharges}
+              className="px-2 py-1 text-on-surface-variant hover:text-error text-xs font-mono"
+              title="Clear Selected Charges"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Provisions List */}
+      {loading ? (
+        <div className="py-16 text-center text-on-surface-variant font-mono text-sm">
+          <span className="inline-block animate-spin mr-2">⚙️</span> Loading active legislation...
+        </div>
+      ) : filteredData.length === 0 ? (
+        <div className="py-16 text-center bg-surface-container-low border border-outline-variant rounded-lg space-y-2">
+          <div className="text-3xl text-on-surface-variant">🔍</div>
+          <h3 className="text-base font-semibold text-on-surface">No legislation provisions found</h3>
+          <p className="text-xs text-on-surface-variant font-mono">
+            No matches for "{searchTerm}". Try another search term or reset filters.
+          </p>
           <button
-            onClick={() => setShowTemplates(!showTemplates)}
-            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            onClick={() => {
+              setSearchTerm('')
+              setSelectedCategory('all')
+              setSelectedDocType('all')
+            }}
+            className="mt-2 px-3 py-1.5 bg-surface-container-high hover:bg-surface-variant border border-outline-variant text-on-surface text-xs font-mono rounded"
           >
-            {showTemplates ? 'Hide' : 'Show'} Templates
+            Reset Filters
           </button>
         </div>
+      ) : viewMode === 'cards' ? (
+        /* Card Grid View */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {paginatedData.map((entry) => {
+            const isPinned = isItemPinned('legislation', entry.code)
+            const isChargeSelected = selectedCharges.some((c) => c.code === entry.code)
 
-        {showTemplates && (
-          <>
-            {customTemplates.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <svg className="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="font-medium mb-1">No templates yet</p>
-                <p className="text-sm">Select charges below and save them as a template for quick access!</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {customTemplates.map((template) => (
-                  <div key={template.id} className="relative">
-                    <button
-                      onClick={() => applyChargeTemplate(template)}
-                      className="w-full p-4 text-left bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg border-2 border-purple-200 dark:border-purple-800 transition-colors"
-                    >
-                      <div className="flex items-start gap-2 mb-2">
-                        <span className="text-xl">⭐</span>
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900 dark:text-gray-100">{template.name}</div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{template.description}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200 px-2 py-1 rounded-full font-medium">
-                          {template.chargeCodes.length} charges
-                        </span>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => deleteTemplate(template.id)}
-                      className="absolute top-2 right-2 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md transition-colors"
-                      title="Delete template"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Selected Charges Section */}
-      {selectedCharges.length > 0 && (
-        <div className="card p-4 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-blue-400">Selected Charges ({selectedCharges.length})</h3>
-            <div className="flex gap-2">
-              <button onClick={copyAllCharges} className="btn btn-primary text-sm">
-                Copy All Charges
-              </button>
-              <button 
-                onClick={() => setSelectedCharges([])} 
-                className="btn btn-secondary text-sm"
+            return (
+              <div
+                key={entry.id}
+                className={`bg-surface-container-low border rounded-lg p-4 flex flex-col justify-between transition-all ${
+                  isChargeSelected
+                    ? 'border-secondary shadow-md bg-secondary/5'
+                    : 'border-outline-variant hover:border-outline'
+                }`}
               >
-                Clear All
-              </button>
-            </div>
-          </div>
-
-          {/* Save as Template */}
-          <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border-2 border-purple-200 dark:border-purple-800">
-            <div className="flex items-center gap-2 mb-3">
-              <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-              </svg>
-              <p className="font-semibold text-purple-800 dark:text-purple-300">Save Current Selection as Template</p>
-            </div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-              Create a reusable template with your selected charges for future use
-            </p>
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={saveTemplateName}
-                onChange={(e) => setSaveTemplateName(e.target.value)}
-                placeholder="Template name (e.g., 'Armed Robbery', 'DUI Stop')..."
-                className="input w-full"
-              />
-              <textarea
-                value={saveTemplateDesc}
-                onChange={(e) => setSaveTemplateDesc(e.target.value)}
-                placeholder="Description (optional - e.g., 'Common charges for armed store robbery')..."
-                className="input w-full resize-none"
-                rows={2}
-              />
-              <button
-                onClick={saveCurrentAsTemplate}
-                className="btn w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 font-medium"
-                disabled={!saveTemplateName.trim()}
-              >
-                <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Save as Template
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {selectedCharges.map((charge) => (
-              <div key={charge.code} className="bg-gray-800 p-3 rounded-md flex items-start justify-between">
-                <div className="flex-1 grid grid-cols-6 gap-4 items-center">
-                  <div className="col-span-2">
-                    <div className="font-mono text-blue-300 text-sm font-semibold">{charge.code}</div>
-                    <div className="text-gray-300 text-sm">{charge.description}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500">Fine</div>
-                    <div className="text-green-400 text-sm">{charge.fine || '-'}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500">Sentence</div>
-                    <div className="text-yellow-400 text-sm">{charge.sentence || '-'}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500">Stars</div>
-                    <div className="text-red-400 text-sm">{charge.stars || '-'}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500">Bail</div>
-                    <div className="text-purple-400 text-sm">{charge.bail || '-'}</div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => removeCharge(charge.code)}
-                  className="text-red-400 hover:text-red-300 ml-4"
-                  title="Remove"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {loading && (
-        <div className="card p-12 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <p className="text-gray-400 mt-4">Loading law codes...</p>
-        </div>
-      )}
-
-      {/* Table */}
-      {!loading && (
-        <>
-          <div className="card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="table-header sticky top-0">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Code</th>
-                    <th className="px-4 py-3 text-left">Category</th>
-                    <th className="px-4 py-3 text-left">Description</th>
-                    <th className="px-4 py-3 text-left">Fine</th>
-                    <th className="px-4 py-3 text-left">Sentence</th>
-                    <th className="px-4 py-3 text-left">Stars</th>
-                    <th className="px-4 py-3 text-left">Bail</th>
-                    <th className="px-4 py-3 text-left">Remarks</th>
-                    <th className="px-4 py-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentData.map((entry, index) => (
-                    <tr key={index} className="table-row">
-                      <td className="px-4 py-3 font-mono text-blue-300 whitespace-nowrap font-semibold">
+                <div>
+                  {/* Top Bar: Code, Category, Actions */}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-primary/15 text-primary font-mono text-xs font-bold rounded border border-primary/30">
                         {entry.code}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500 uppercase">
-                        {entry.category ? (
-                          <span className="bg-gray-700 px-2 py-1 rounded">{entry.category.slice(0, 20)}</span>
-                        ) : '-'}
-                      </td>
-                      <td className="px-4 py-3">{entry.description}</td>
-                      <td className="px-4 py-3 text-green-400">{entry.fine || '-'}</td>
-                      <td className="px-4 py-3 text-yellow-400">{entry.sentence || '-'}</td>
-                      <td className="px-4 py-3 text-red-400">{entry.stars || '-'}</td>
-                      <td className="px-4 py-3 text-purple-400">{entry.bail || '-'}</td>
-                      <td className="px-4 py-3 text-gray-400 text-sm max-w-xs truncate" title={entry.remarks}>
-                        {entry.remarks || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            onClick={() => handleCopyRow(entry)}
-                            className="text-blue-400 hover:text-blue-300 transition-colors"
-                            title="Copy to Clipboard"
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleAddCharge(entry)}
-                            className="text-green-400 hover:text-green-300 transition-colors"
-                            title="Add to Charges"
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 4v16m8-8H4"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                      </span>
+                      <span className="text-[10px] font-mono uppercase text-on-surface-variant truncate max-w-[150px]">
+                        {entry.category}
+                      </span>
+                    </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-between">
-              <div className="text-gray-400 text-sm">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of{' '}
-                {filteredData.length} entries
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <div className="flex items-center gap-2">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum
-                    if (totalPages <= 5) {
-                      pageNum = i + 1
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i
-                    } else {
-                      pageNum = currentPage - 2 + i
-                    }
-                    
-                    return (
+                    <div className="flex items-center gap-1">
                       <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1 rounded ${
-                          currentPage === pageNum
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
+                        onClick={() => openAssistant(`Explain § ${entry.code} — ${entry.description}`)}
+                        className="p-1 rounded text-xs text-on-surface-variant hover:text-primary transition-colors"
+                        title="Ask Legislation Assistant"
                       >
-                        {pageNum}
+                        ⚖️
                       </button>
-                    )
-                  })}
+                      <button
+                        onClick={() => handleTogglePinLaw(entry)}
+                        className={`p-1 rounded text-xs transition-colors ${
+                          isPinned ? 'text-primary bg-primary/10' : 'text-on-surface-variant hover:text-on-surface'
+                        }`}
+                        title={isPinned ? 'Unpin Provision' : 'Pin to Utility Panel'}
+                      >
+                        📌
+                      </button>
+                      <button
+                        onClick={() => handleCreateNoteFromLaw(entry)}
+                        className="p-1 rounded text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+                        title="Create Note from Provision"
+                      >
+                        📝
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Title / Description */}
+                  <h3
+                    onClick={() => setActiveDetailEntry(entry)}
+                    className="text-sm sm:text-base font-semibold text-on-surface leading-snug cursor-pointer hover:text-primary transition-colors"
+                  >
+                    {entry.description}
+                  </h3>
+
+                  {/* Remarks / Details */}
+                  {entry.remarks && entry.remarks !== '-' && (
+                    <div className="mt-2 text-xs text-on-surface-variant font-sans bg-surface-container-lowest p-2 rounded border border-outline-variant/60">
+                      {entry.remarks}
+                    </div>
+                  )}
+
+                  {/* Tags: Fine, Sentence, Stars, Bail */}
+                  <div className="flex flex-wrap gap-2 mt-3 text-xs font-mono">
+                    {entry.fine && entry.fine !== '-' && (
+                      <span className="px-2 py-0.5 rounded bg-surface-container text-secondary border border-secondary/20">
+                        Fine: {entry.fine}
+                      </span>
+                    )}
+                    {entry.sentence && entry.sentence !== '-' && (
+                      <span className="px-2 py-0.5 rounded bg-surface-container text-amber-300 border border-amber-500/20">
+                        {entry.sentence}
+                      </span>
+                    )}
+                    {entry.stars && entry.stars !== '-' && (
+                      <span className="px-2 py-0.5 rounded bg-surface-container text-red-400 border border-red-500/20">
+                        {entry.stars}
+                      </span>
+                    )}
+                    {entry.bail && entry.bail !== '-' && (
+                      <span className="px-2 py-0.5 rounded bg-surface-container text-purple-300 border border-purple-500/20">
+                        Bail: {entry.bail}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
+
+                {/* Card Action Buttons */}
+                <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-outline-variant">
+                  <span className="text-[10px] font-mono text-on-surface-variant truncate">
+                    {entry.sourceDocument.includes('Traffic') ? 'Traffic Code 2nd Rend.' : 'Penal Code'}
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopyProvision(entry)}
+                      className="px-2.5 py-1 bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-mono rounded flex items-center gap-1 border border-outline-variant transition-colors"
+                      title="Copy full legal provision"
+                    >
+                      <span>📋</span> Copy
+                    </button>
+                    <button
+                      onClick={() =>
+                        isChargeSelected ? handleRemoveCharge(entry.code) : handleAddCharge(entry)
+                      }
+                      className={`px-2.5 py-1 text-xs font-mono rounded flex items-center gap-1 transition-colors ${
+                        isChargeSelected
+                          ? 'bg-error/20 text-error border border-error/30 hover:bg-error/30'
+                          : 'bg-primary text-on-primary hover:bg-primary-container font-semibold'
+                      }`}
+                    >
+                      <span>{isChargeSelected ? '✕' : '+'}</span>
+                      {isChargeSelected ? 'Remove' : 'Add Charge'}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-        </>
+            )
+          })}
+        </div>
+      ) : (
+        /* Table View */
+        <div className="bg-surface-container-low border border-outline-variant rounded-lg overflow-x-auto">
+          <table className="w-full text-left text-xs font-sans">
+            <thead className="bg-surface-container-lowest border-b border-outline-variant text-[11px] font-mono uppercase text-on-surface-variant">
+              <tr>
+                <th className="px-3 py-2.5">Code</th>
+                <th className="px-3 py-2.5">Category</th>
+                <th className="px-3 py-2.5">Description</th>
+                <th className="px-3 py-2.5">Fine</th>
+                <th className="px-3 py-2.5">Sentence</th>
+                <th className="px-3 py-2.5">Stars</th>
+                <th className="px-3 py-2.5">Bail</th>
+                <th className="px-3 py-2.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant">
+              {paginatedData.map((entry) => {
+                const isPinned = isItemPinned('legislation', entry.code)
+                const isChargeSelected = selectedCharges.some((c) => c.code === entry.code)
+
+                return (
+                  <tr
+                    key={entry.id}
+                    className={`hover:bg-surface-container transition-colors ${
+                      isChargeSelected ? 'bg-secondary/5' : ''
+                    }`}
+                  >
+                    <td className="px-3 py-2.5 font-mono text-primary font-bold whitespace-nowrap">
+                      {entry.code}
+                    </td>
+                    <td className="px-3 py-2.5 text-on-surface-variant uppercase text-[10px] font-mono max-w-[120px] truncate">
+                      {entry.category}
+                    </td>
+                    <td
+                      onClick={() => setActiveDetailEntry(entry)}
+                      className="px-3 py-2.5 font-medium text-on-surface cursor-pointer hover:text-primary max-w-sm truncate"
+                    >
+                      {entry.description}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-secondary whitespace-nowrap">
+                      {entry.fine || '-'}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-amber-300 whitespace-nowrap">
+                      {entry.sentence || '-'}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-red-400 whitespace-nowrap">
+                      {entry.stars || '-'}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-purple-300 whitespace-nowrap">
+                      {entry.bail || '-'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleTogglePinLaw(entry)}
+                          className={`p-1 rounded ${isPinned ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+                          title="Pin"
+                        >
+                          📌
+                        </button>
+                        <button
+                          onClick={() => handleCopyProvision(entry)}
+                          className="p-1 rounded text-on-surface-variant hover:text-on-surface"
+                          title="Copy"
+                        >
+                          📋
+                        </button>
+                        <button
+                          onClick={() =>
+                            isChargeSelected ? handleRemoveCharge(entry.code) : handleAddCharge(entry)
+                          }
+                          className={`px-2 py-0.5 rounded font-mono text-[11px] ${
+                            isChargeSelected
+                              ? 'bg-error/20 text-error'
+                              : 'bg-primary text-on-primary'
+                          }`}
+                        >
+                          {isChargeSelected ? 'Remove' : '+ Charge'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {/* Arrest Modal */}
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between p-3 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface-variant">
+          <div>
+            Showing {(currentPage - 1) * itemsPerPage + 1}–
+            {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} provisions
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 bg-surface-container rounded border border-outline-variant text-on-surface disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span className="px-2">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 bg-surface-container rounded border border-outline-variant text-on-surface disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal for Selected Provision */}
+      {activeDetailEntry && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-brightness-75 animate-fadeIn"
+          onClick={() => setActiveDetailEntry(null)}
+        >
+          <div
+            className="w-full max-w-lg bg-surface-container-low border border-outline-variant rounded-lg shadow-2xl overflow-hidden text-on-surface"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant bg-surface-container-lowest">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-primary/20 text-primary font-mono text-xs font-bold rounded border border-primary/40">
+                  {activeDetailEntry.code}
+                </span>
+                <span className="text-xs font-mono text-on-surface-variant uppercase">
+                  {activeDetailEntry.category}
+                </span>
+              </div>
+              <button
+                onClick={() => setActiveDetailEntry(null)}
+                className="text-on-surface-variant hover:text-on-surface p-1 rounded"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div className="text-xs font-mono text-on-surface-variant">
+                Source Document: <span className="text-secondary">{activeDetailEntry.sourceDocument}</span>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-on-surface">
+                  {activeDetailEntry.description}
+                </h3>
+              </div>
+
+              {activeDetailEntry.remarks && (
+                <div className="p-3 bg-surface-container border border-outline-variant rounded text-xs text-on-surface leading-relaxed">
+                  <div className="font-mono text-[10px] uppercase text-on-surface-variant mb-1 font-bold">
+                    Legal Text / Provisions:
+                  </div>
+                  {activeDetailEntry.remarks}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                <div className="p-2 bg-surface-container rounded border border-outline-variant">
+                  <div className="text-[10px] text-on-surface-variant">FINE</div>
+                  <div className="font-bold text-secondary mt-0.5">{activeDetailEntry.fine || '-'}</div>
+                </div>
+                <div className="p-2 bg-surface-container rounded border border-outline-variant">
+                  <div className="text-[10px] text-on-surface-variant">SENTENCE</div>
+                  <div className="font-bold text-amber-300 mt-0.5">{activeDetailEntry.sentence || '-'}</div>
+                </div>
+                <div className="p-2 bg-surface-container rounded border border-outline-variant">
+                  <div className="text-[10px] text-on-surface-variant">WANTED STARS</div>
+                  <div className="font-bold text-red-400 mt-0.5">{activeDetailEntry.stars || '-'}</div>
+                </div>
+                <div className="p-2 bg-surface-container rounded border border-outline-variant">
+                  <div className="text-[10px] text-on-surface-variant">BAIL</div>
+                  <div className="font-bold text-purple-300 mt-0.5">{activeDetailEntry.bail || '-'}</div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-outline-variant">
+                <button
+                  onClick={() => {
+                    openAssistant(`Explain § ${activeDetailEntry.code} — ${activeDetailEntry.description}`)
+                    setActiveDetailEntry(null)
+                  }}
+                  className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-mono font-semibold rounded flex items-center gap-1.5"
+                >
+                  <span>⚖️</span> Ask Assistant
+                </button>
+                <button
+                  onClick={() => handleCopyProvision(activeDetailEntry)}
+                  className="px-3 py-1.5 bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-mono font-semibold rounded border border-outline-variant flex items-center gap-1.5"
+                >
+                  <span>📋</span> Copy Provision
+                </button>
+                <button
+                  onClick={() => handleTogglePinLaw(activeDetailEntry)}
+                  className="px-3 py-1.5 bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-mono font-semibold rounded border border-outline-variant flex items-center gap-1.5"
+                >
+                  <span>📌</span> {isItemPinned('legislation', activeDetailEntry.code) ? 'Unpin' : 'Pin'}
+                </button>
+                <button
+                  onClick={() => handleCreateNoteFromLaw(activeDetailEntry)}
+                  className="px-3 py-1.5 bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-mono font-semibold rounded border border-outline-variant flex items-center gap-1.5"
+                >
+                  <span>📝</span> Add Note
+                </button>
+                <button
+                  onClick={() => {
+                    handleAddCharge(activeDetailEntry)
+                    setActiveDetailEntry(null)
+                  }}
+                  className="px-3 py-1.5 bg-primary text-on-primary hover:bg-primary-container text-xs font-mono font-semibold rounded flex items-center gap-1.5 ml-auto"
+                >
+                  <span>⚡</span> Add to Charges
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Arrest / Charge Logging Modal */}
       {showArrestModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-lg max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold text-blue-400 mb-4">Record Arrest</h2>
-            <p className="text-gray-400 mb-4">
-              Enter the suspect's details to log this arrest (optional).
-            </p>
-            
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Suspect Name (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={suspectName}
-                  onChange={(e) => setSuspectName(e.target.value)}
-                  placeholder="e.g., John Doe"
-                  className="input w-full"
-                  autoFocus
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Suspect ID (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={suspectId}
-                  onChange={(e) => setSuspectId(e.target.value)}
-                  placeholder="e.g., 12345"
-                  className="input w-full"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Can be searched later to find this 10-15
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-gray-800 p-4 rounded-md mb-4">
-              <p className="text-sm text-gray-400 mb-2">Charges to copy:</p>
-              <div className="text-sm text-gray-300">
-                {selectedCharges.slice(0, 3).map(c => (
-                  <div key={c.code}>• {c.code}</div>
-                ))}
-                {selectedCharges.length > 3 && (
-                  <div className="text-gray-500">... and {selectedCharges.length - 3} more</div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-brightness-75 animate-fadeIn"
+          onClick={() => setShowArrestModal(false)}
+        >
+          <div
+            className="w-full max-w-lg bg-surface-container-low border border-outline-variant rounded-lg shadow-2xl p-5 text-on-surface space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-outline-variant pb-3">
+              <h3 className="text-base font-bold text-on-surface flex items-center gap-2">
+                <span>📑</span> Complete Arrest Record
+              </h3>
               <button
                 onClick={() => setShowArrestModal(false)}
-                className="flex-1 btn bg-gray-700 text-white hover:bg-gray-600"
+                className="text-on-surface-variant hover:text-on-surface"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-mono text-on-surface-variant mb-1">
+                  Suspect Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. John Doe"
+                  value={suspectName}
+                  onChange={(e) => setSuspectName(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded text-on-surface font-mono text-xs focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-on-surface-variant mb-1">
+                  Suspect ID / Passport
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 12345"
+                  value={suspectId}
+                  onChange={(e) => setSuspectId(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded text-on-surface font-mono text-xs focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="p-3 bg-surface-container rounded border border-outline-variant space-y-1.5 text-xs font-mono">
+                <div className="font-bold text-on-surface">Selected Charges ({selectedCharges.length}):</div>
+                <div className="max-h-32 overflow-y-auto space-y-1 text-on-surface-variant">
+                  {selectedCharges.map((c) => (
+                    <div key={c.code} className="flex justify-between items-center text-[11px]">
+                      <span>{c.code} {c.description}</span>
+                      <button
+                        onClick={() => handleRemoveCharge(c.code)}
+                        className="text-error ml-2 hover:underline"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
+              <button
+                onClick={() => setShowArrestModal(false)}
+                className="px-3 py-1.5 text-xs font-mono text-on-surface-variant hover:text-on-surface"
               >
                 Cancel
               </button>
               <button
-                onClick={quickCopy}
-                className="flex-1 btn bg-gray-600 text-white hover:bg-gray-500"
+                onClick={() => {
+                  if (!suspectName.trim()) {
+                    showToast('Please enter a suspect name', 'warning')
+                    return
+                  }
+                  addArrestRecord(
+                    suspectName,
+                    selectedCharges.map((c) => c.code),
+                    totals.totalFine,
+                    suspectId
+                  )
+                  incrementArrests()
+                  showToast('Arrest record logged successfully!', 'success')
+                  setSelectedCharges([])
+                  setSuspectName('')
+                  setSuspectId('')
+                  setShowArrestModal(false)
+                }}
+                className="px-4 py-1.5 bg-primary text-on-primary font-mono text-xs font-semibold rounded hover:bg-primary-container"
               >
-                Skip & Copy
-              </button>
-              <button
-                onClick={finalizeArrest}
-                className="flex-1 btn btn-primary"
-              >
-                {suspectName ? 'Log & Copy' : 'Copy'}
+                Save & Log Arrest
               </button>
             </div>
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+export default function PatrolmanGuidePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-16 text-center text-on-surface-variant font-mono text-sm">
+          <span className="inline-block animate-spin mr-2">⚙️</span> Loading Legislation 2.0...
+        </div>
+      }
+    >
+      <PatrolmanGuideContent />
+    </Suspense>
   )
 }

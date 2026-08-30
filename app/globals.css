@@ -13,68 +13,76 @@
   }
 
   .dark {
-    --bg-primary: 17 24 39;
-    --bg-secondary: 31 41 55;
-    --bg-tertiary: 55 65 81;
-    --text-primary: 243 244 246;
-    --text-secondary: 156 163 175;
-    --border: 55 65 81;
+    --bg-primary: 19 19 21;
+    --bg-secondary: 32 31 34;
+    --bg-tertiary: 42 42 44;
+    --text-primary: 229 225 228;
+    --text-secondary: 194 198 214;
+    --border: 66 71 84;
   }
 
   body {
-    @apply bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors;
+    @apply bg-background text-on-surface min-h-screen transition-colors antialiased;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg;
+    @apply bg-surface-container-low border border-outline-variant rounded-md shadow-sm;
   }
   
   .btn {
-    @apply px-4 py-2 rounded-md font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply px-3.5 py-1.5 rounded font-medium transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-primary;
   }
   
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500;
+    @apply bg-primary hover:bg-primary-container text-on-primary font-semibold;
   }
   
   .btn-secondary {
-    @apply bg-gray-700 hover:bg-gray-600 text-gray-200;
+    @apply bg-surface-container-high hover:bg-surface-variant text-on-surface border border-outline-variant;
   }
   
   .input {
-    @apply bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500;
+    @apply bg-surface-dim border border-outline-variant text-on-surface rounded px-3 py-1.5 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm;
   }
   
   .table-header {
-    @apply bg-gray-800 text-gray-300 font-semibold text-sm uppercase tracking-wider;
+    @apply bg-surface-container-lowest text-on-surface-variant font-semibold text-xs uppercase tracking-wider font-mono;
   }
   
   .table-row {
-    @apply border-b border-gray-700 hover:bg-gray-800 transition-colors;
+    @apply border-b border-outline-variant hover:bg-surface-container transition-colors;
   }
   
   .code-block {
-    @apply bg-gray-900 border border-gray-700 rounded-md p-4 font-mono text-sm overflow-x-auto;
+    @apply bg-surface-container-lowest border border-outline-variant rounded p-3 font-mono text-xs overflow-x-auto;
+  }
+
+  .font-label-caps {
+    @apply font-mono text-[10px] font-bold tracking-wider uppercase;
+  }
+
+  .font-mono-data {
+    @apply font-mono text-xs;
   }
 }
 
-/* Scrollbar styling */
+/* Tactical Precision custom scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: #131315;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 5px;
+  background: #353437;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #424754;
 }
