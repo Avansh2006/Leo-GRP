@@ -99,6 +99,17 @@ export interface ActiveDetention {
   checklist: DetentionChecklistState
   notes?: string
   status: 'ACTIVE' | 'FINALIZED' | 'ABANDONED'
+
+  // 25-Minute Processing Timer & Lawyer Request State
+  timerTotalSeconds?: number // 1500 (25 mins)
+  timerStartedAt?: string // ISO timestamp
+  isTimerPaused?: boolean
+  timerPausedAt?: string // ISO timestamp
+  timerRemainingAtPause?: number // seconds remaining when paused
+  totalPausedDurationSeconds?: number // accumulated paused duration
+  lawyerRequested?: boolean
+  lawyerRequestedAt?: string // ISO timestamp
+  lawyerResumedAt?: string // ISO timestamp
 }
 
 export interface ArrestChargeItem {
@@ -134,6 +145,15 @@ export interface ShiftArrestRecord {
   checklist?: DetentionChecklistState
   notes?: string
   docStatementIncluded?: boolean
+
+  // Timer & Lawyer Audit Fields
+  initialTimerFormatted?: string // e.g. "25:00"
+  finalTimerRemainingSeconds?: number
+  finalTimerRemainingFormatted?: string // e.g. "18:42" or "EXPIRED"
+  lawyerRequested?: boolean
+  lawyerRequestedAt?: string
+  lawyerResumedAt?: string
+  timerPausedAtFormatted?: string // e.g. "18:42"
 }
 
 export interface ShiftRecord {

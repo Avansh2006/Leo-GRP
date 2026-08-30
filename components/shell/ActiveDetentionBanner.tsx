@@ -1,59 +1,79 @@
 /**
  * Active Detention Banner for LEO-GRP
  * Persistent tactical header banner visible across the application whenever a suspect is in active detention.
+ * Displays 25-minute arrest countdown, lawyer status, active charges, and quick resume workstation button.
  */
 
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useDuty } from '@/contexts/DutyContext'
+import {
+  useDuty,
+  calculateRemainingArrestTimerSeconds,
+  formatTimerDisplay,
+} from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
 
 export default function ActiveDetentionBanner() {
   const { activeDetention, setIsArrestCommandCenterOpen, abandonDetention, includeSuspectName } = useDuty()
   const { showToast } = useToast()
 
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [remainingSec, setRemainingSec] = useState<number>(() =>
+    calculateRemainingArrestTimerSeconds(activeDetention)
+  )
 
   useEffect(() => {
     if (!activeDetention) {
-      setElapsedSeconds(0)
+      setRemainingSec(1500)
       return
     }
 
-    const start = new Date(activeDetention.startTime).getTime()
     const update = () => {
-      const now = Date.now()
-      const diff = Math.max(0, Math.floor((now - start) / 1000))
-      setElapsedSeconds(diff)
+      setRemainingSec(calculateRemainingArrestTimerSeconds(activeDetention))
     }
 
     update()
+    if (activeDetention.isTimerPaused) return
+
     const timer = setInterval(update, 1000)
     return () => clearInterval(timer)
-  }, [activeDetention])
+  }, [
+    activeDetention?.id,
+    activeDetention?.timerStartedAt,
+    activeDetention?.startTime,
+    activeDetention?.isTimerPaused,
+    activeDetention?.timerRemainingAtPause,
+    activeDetention?.totalPausedDurationSeconds,
+  ])
 
   if (!activeDetention || activeDetention.status !== 'ACTIVE') return null
-
-  const formatTimer = (sec: number) => {
-    const hrs = Math.floor(sec / 3600)
-    const mins = Math.floor((sec % 3600) / 60)
-    const s = sec % 60
-    if (hrs > 0) {
-      return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    }
-    return `${String(mins).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  }
 
   const issuedFinesCount = activeDetention.charges.filter((c) => c.fineStatus === 'ISSUED').length
   const totalFinesCount = activeDetention.charges.filter((c) => c.fineAmount > 0).length
   const unissuedFinesCount = activeDetention.charges.filter((c) => c.fineStatus === 'NOT_ISSUED').length
 
   const handleAbandon = () => {
-    if (confirm(`Are you sure you want to abandon active detention for Passport #${activeDetention.passportNumber}? Any issued fines remain recorded in your shift history.`)) {
+    if (
+      confirm(
+        `Are you sure you want to abandon active detention for Passport #${activeDetention.passportNumber}? Any issued fines remain recorded in your shift history.`
+      )
+    ) {
       abandonDetention()
       showToast('Active detention discarded', 'info')
     }
+  }
+
+  const isPaused = activeDetention.isTimerPaused
+  const isLawyer = activeDetention.lawyerRequested
+  const isExpired = remainingSec === 0
+
+  let timerColor = 'text-emerald-400'
+  if (isExpired) {
+    timerColor = 'text-rose-500 font-bold'
+  } else if (remainingSec <= 300) {
+    timerColor = 'text-rose-400 font-bold'
+  } else if (remainingSec <= 600) {
+    timerColor = 'text-amber-400 font-bold'
   }
 
   return (
@@ -78,10 +98,19 @@ export default function ActiveDetentionBanner() {
           Org: <span className="text-secondary font-bold">{activeDetention.organization}</span>
         </span>
 
-        <span className="text-on-surface-variant flex items-center gap-1">
-          <span>⏱️</span>
-          <span className="text-amber-400 font-bold">{formatTimer(elapsedSeconds)}</span>
-        </span>
+        {/* 25-Min Timer / Lawyer Status */}
+        {isPaused ? (
+          <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 font-bold rounded border border-amber-500/40 text-[11px] flex items-center gap-1">
+            <span>⏸</span> {isLawyer ? 'LAWYER PAUSED' : 'TIMER PAUSED'} ({formatTimerDisplay(remainingSec)})
+          </span>
+        ) : (
+          <span className="flex items-center gap-1">
+            <span>⏱️</span>
+            <span className={timerColor}>
+              {isExpired ? 'EXPIRED' : `${formatTimerDisplay(remainingSec)} remaining`}
+            </span>
+          </span>
+        )}
 
         <span className="text-on-surface-variant hidden sm:inline">
           Charges: <span className="text-on-surface font-bold">{activeDetention.charges.length}</span>

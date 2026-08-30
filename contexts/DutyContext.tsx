@@ -52,9 +52,27 @@ export const DEFAULT_DOC_STATEMENT =
 export const DEFAULT_MIRANDA_RIGHTS = `You have the right to remain silent.
 Anything you say can and will be used against you in a court of law.
 You have the right to an attorney.
-If you cannot afford an attorney, one will be appointed to you by the state if available.
+If you cannot afford an attorney, one will be appointed to you by the state if available.`
 
-Do you understand the rights I just read to you?`
+export const calculateRemainingArrestTimerSeconds = (detention?: ActiveDetention | null): number => {
+  if (!detention) return 1500
+  const total = detention.timerTotalSeconds || 1500
+  if (detention.isTimerPaused && typeof detention.timerRemainingAtPause === 'number') {
+    return Math.max(0, detention.timerRemainingAtPause)
+  }
+  const started = new Date(detention.timerStartedAt || detention.startTime).getTime()
+  const now = Date.now()
+  const elapsedRaw = Math.floor((now - started) / 1000)
+  const pausedAccum = detention.totalPausedDurationSeconds || 0
+  const effectiveElapsed = Math.max(0, elapsedRaw - pausedAccum)
+  return Math.max(0, total - effectiveElapsed)
+}
+
+export const formatTimerDisplay = (totalSec: number): string => {
+  const mins = Math.floor(totalSec / 60)
+  const secs = totalSec % 60
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
 
 interface DutyContextType {
   // Duty State
@@ -87,6 +105,9 @@ interface DutyContextType {
   removeChargeFromDetention: (chargeIdOrCode: string) => void
   issueFineForDetentionCharge: (chargeId: string) => Promise<FineRecord | null>
   finalizeActiveDetention: (options?: { notes?: string }) => Promise<ShiftArrestRecord | null>
+  requestLawyer: () => void
+  resumeArrestTimer: () => void
+  pauseArrestTimer: () => void
 
   // Configurable Script Templates
   docStatementTemplate: string
@@ -335,10 +356,11 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       }
 
       const caseNum = Math.floor(1000 + Math.random() * 9000)
+      const nowIso = new Date().toISOString()
       const newDetention: ActiveDetention = {
         id: generateId('detention'),
         caseId: `CASE-${caseNum}`,
-        startTime: new Date().toISOString(),
+        startTime: nowIso,
         officerName: officer || 'Officer',
         organization: currentOrganization,
         passportNumber: data.passportNumber.trim(),
@@ -356,6 +378,13 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         },
         notes: data.notes?.trim() || undefined,
         status: 'ACTIVE',
+
+        // 25-Minute Timer & Lawyer State
+        timerTotalSeconds: 1500, // 25:00
+        timerStartedAt: nowIso,
+        isTimerPaused: false,
+        totalPausedDurationSeconds: 0,
+        lawyerRequested: false,
       }
 
       setActiveDetention(newDetention)
@@ -383,6 +412,55 @@ export function DutyProvider({ children }: { children: ReactNode }) {
     setActiveDetention(null)
     setIsArrestCommandCenterOpen(false)
     dbClearActiveDetention()
+  }, [])
+
+  const pauseArrestTimer = useCallback(() => {
+    setActiveDetention((prev) => {
+      if (!prev || prev.isTimerPaused) return prev
+      const remaining = calculateRemainingArrestTimerSeconds(prev)
+      return {
+        ...prev,
+        isTimerPaused: true,
+        timerPausedAt: new Date().toISOString(),
+        timerRemainingAtPause: remaining,
+      }
+    })
+  }, [])
+
+  const requestLawyer = useCallback(() => {
+    setActiveDetention((prev) => {
+      if (!prev) return null
+      const remaining = calculateRemainingArrestTimerSeconds(prev)
+      const nowIso = new Date().toISOString()
+      return {
+        ...prev,
+        isTimerPaused: true,
+        timerPausedAt: nowIso,
+        timerRemainingAtPause: remaining,
+        lawyerRequested: true,
+        lawyerRequestedAt: prev.lawyerRequestedAt || nowIso,
+      }
+    })
+  }, [])
+
+  const resumeArrestTimer = useCallback(() => {
+    setActiveDetention((prev) => {
+      if (!prev || !prev.isTimerPaused) return prev
+      const now = Date.now()
+      let extraPaused = 0
+      if (prev.timerPausedAt) {
+        const pausedStart = new Date(prev.timerPausedAt).getTime()
+        extraPaused = Math.max(0, Math.floor((now - pausedStart) / 1000))
+      }
+      return {
+        ...prev,
+        isTimerPaused: false,
+        timerPausedAt: undefined,
+        timerRemainingAtPause: undefined,
+        totalPausedDurationSeconds: (prev.totalPausedDurationSeconds || 0) + extraPaused,
+        lawyerResumedAt: prev.lawyerRequested ? new Date().toISOString() : prev.lawyerResumedAt,
+      }
+    })
   }, [])
 
   const addChargeToDetention = useCallback(
@@ -594,6 +672,13 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       checklist?: DetentionChecklistState
       notes?: string
       officerName?: string
+      initialTimerFormatted?: string
+      finalTimerRemainingSeconds?: number
+      finalTimerRemainingFormatted?: string
+      lawyerRequested?: boolean
+      lawyerRequestedAt?: string
+      lawyerResumedAt?: string
+      timerPausedAtFormatted?: string
     }): Promise<ShiftArrestRecord> => {
       const arrestRecord: ShiftArrestRecord = {
         id: generateId('arrest'),
@@ -614,6 +699,15 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         checklist: data.checklist,
         notes: data.notes,
         docStatementIncluded: true,
+
+        // Timer & Lawyer Audit Fields
+        initialTimerFormatted: data.initialTimerFormatted || '25:00',
+        finalTimerRemainingSeconds: data.finalTimerRemainingSeconds,
+        finalTimerRemainingFormatted: data.finalTimerRemainingFormatted,
+        lawyerRequested: data.lawyerRequested,
+        lawyerRequestedAt: data.lawyerRequestedAt,
+        lawyerResumedAt: data.lawyerResumedAt,
+        timerPausedAtFormatted: data.timerPausedAtFormatted,
       }
 
       // Persist to IndexedDB
@@ -659,6 +753,14 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
       const bailStatus = hasNoBail ? 'NO BAIL' : hasBail ? 'Bail Eligible' : '-'
 
+      // Final timer calculation
+      const remainingSec = calculateRemainingArrestTimerSeconds(activeDetention)
+      const timerFormatted = remainingSec === 0 ? 'EXPIRED' : formatTimerDisplay(remainingSec)
+      const lawyerPausedFormatted =
+        activeDetention.lawyerRequested && typeof activeDetention.timerRemainingAtPause === 'number'
+          ? formatTimerDisplay(activeDetention.timerRemainingAtPause)
+          : undefined
+
       const arrestRecord = await issueArrest({
         caseId: activeDetention.caseId,
         charges: activeDetention.charges.map((c) => ({
@@ -685,6 +787,15 @@ export function DutyProvider({ children }: { children: ReactNode }) {
           arrestFinalized: true,
         },
         notes: options?.notes || activeDetention.notes,
+
+        // Timer & Lawyer Fields
+        initialTimerFormatted: '25:00',
+        finalTimerRemainingSeconds: remainingSec,
+        finalTimerRemainingFormatted: timerFormatted,
+        lawyerRequested: activeDetention.lawyerRequested || false,
+        lawyerRequestedAt: activeDetention.lawyerRequestedAt,
+        lawyerResumedAt: activeDetention.lawyerResumedAt,
+        timerPausedAtFormatted: lawyerPausedFormatted,
       })
 
       // Clear active detention
@@ -701,12 +812,10 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   // -------------------------------------------------------------
 
   const formatSingleChargeText = useCallback((charge: DetentionChargeItem | ArrestChargeItem): string => {
-    let text = `§ ${charge.code} — ${charge.title}`
-    const parts: string[] = []
-    if (charge.fine && charge.fine !== '-') parts.push(`Fine: ${charge.fine}`)
-    if (charge.sentence && charge.sentence !== '-') parts.push(`Sentence: ${charge.sentence}`)
-    if (parts.length > 0) text += ` — ${parts.join(' | ')}`
-    return text
+    let text = `§ ${charge.code} — ${charge.title}\n`
+    if (charge.fine && charge.fine !== '-') text += `Fine: ${charge.fine}\n`
+    if (charge.sentence && charge.sentence !== '-') text += `Sentence: ${charge.sentence}\n`
+    return text.trim()
   }, [])
 
   const formatAllChargesText = useCallback(
@@ -714,14 +823,11 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       const list = charges || activeDetention?.charges || []
       if (list.length === 0) return 'No charges selected.'
 
-      let text = `Current Charges:\n`
+      let text = `Current Charges:\n\n`
       list.forEach((c, idx) => {
-        text += `${idx + 1}. § ${c.code} — ${c.title}`
-        const parts: string[] = []
-        if (c.fine && c.fine !== '-') parts.push(`Fine: ${c.fine}`)
-        if (c.sentence && c.sentence !== '-') parts.push(`Sentence: ${c.sentence}`)
-        if (parts.length > 0) text += ` (${parts.join(' | ')})`
-        text += `\n`
+        text += `${idx + 1}. § ${c.code} — ${c.title}\n`
+        if (c.fine && c.fine !== '-') text += `   Fine: ${c.fine}\n`
+        if (c.sentence && c.sentence !== '-') text += `   Sentence: ${c.sentence}\n`
       })
       return text.trim()
     },
@@ -737,7 +843,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       if (issued.length === 0) return 'No fines have been issued yet.'
 
       let total = 0
-      let text = `Fines Issued:\n`
+      let text = `Fines Issued:\n\n`
       issued.forEach((c, idx) => {
         text += `${idx + 1}. § ${c.code} — ${c.title} — ${c.fine || `$${c.fineAmount.toLocaleString()}`}\n`
         total += c.fineAmount
@@ -753,10 +859,19 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       const d = detention || activeDetention
       if (!d) return 'No active arrest to generate script for.'
 
-      const officer = d.officerName || 'Officer'
+      // Prevent duplicate "Officer Officer" prefix
+      const rawOfficer = d.officerName?.trim() || ''
+      const cleanOfficer = rawOfficer.replace(/^Officer\s+/i, '').trim()
+      const officerTitle = cleanOfficer ? `Officer ${cleanOfficer}` : 'an Officer'
       const org = d.organization || currentOrganization || 'LSPD'
-      const passport = d.passportNumber ? `Passport ${d.passportNumber}` : 'Subject'
-      const namePart = includeSuspectName && d.suspectName ? `${d.suspectName}, ${passport}, ` : `${passport}, `
+      const passport = d.passportNumber ? `Passport ${d.passportNumber}` : 'Passport N/A'
+      
+      let suspectReference = ''
+      if (includeSuspectName && d.suspectName?.trim()) {
+        suspectReference = `${d.suspectName.trim()}, ${passport}`
+      } else {
+        suspectReference = passport
+      }
 
       let chargesBlock = ''
       if (d.charges.length === 0) {
@@ -769,11 +884,16 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         })
       }
 
-      let script = `I am Officer ${officer} with the ${org}.\n\n`
-      script += `${namePart}you are being placed under arrest for the following current charges:\n\n`
+      let rightsBlock = rightsScriptTemplate.trim()
+      if (!rightsBlock.toLowerCase().includes('do you understand the rights')) {
+        rightsBlock += '\n\nDo you understand the rights I just read to you?'
+      }
+
+      let script = `I am ${officerTitle} with the ${org}.\n\n`
+      script += `${suspectReference}, you are being placed under arrest for the following current charges:\n\n`
       script += `${chargesBlock.trim()}\n\n`
       script += `You are being informed of your required rights:\n\n`
-      script += `${rightsScriptTemplate.trim()}\n\n`
+      script += `${rightsBlock}\n\n`
       script += `${docStatementTemplate.trim()}`
 
       return script
@@ -787,9 +907,10 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       if (!r) return 'No arrest record.'
 
       const isDetention = 'charges' in r && r.charges.length > 0 && 'fineStatus' in r.charges[0]
-      const officer = ('officerName' in r ? r.officerName : 'Officer') || 'Officer'
+      const rawOfficer = ('officerName' in r ? r.officerName : '') || ''
+      const cleanOfficer = rawOfficer.replace(/^Officer\s+/i, '').trim()
+      const officerTitle = cleanOfficer || 'Officer'
       const org = r.organization || currentOrganization || 'LSPD'
-      const caseId = ('caseId' in r ? r.caseId : undefined) || 'CASE'
       const passport = r.passportNumber || 'N/A'
       const name = includeSuspectName && r.suspectName ? r.suspectName : undefined
 
@@ -797,7 +918,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         try {
           const d = new Date(iso)
           return (
-            d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) +
+            d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
             ' ' +
             d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
           )
@@ -808,35 +929,26 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
       let totalFine = 0
       let totalSentence = 0
-      let stars = ''
-      let bail = '-'
 
       if (isDetention) {
         const det = r as ActiveDetention
         det.charges.forEach((c) => {
           totalFine += c.fineAmount || 0
           totalSentence += c.sentenceMonths || 0
-          if (c.stars && c.stars.length > stars.length) stars = c.stars
-          if (c.bail) bail = c.bail
         })
       } else {
         const arr = r as ShiftArrestRecord
         totalFine = arr.totalFineAmount || 0
         totalSentence = arr.totalSentenceMonths || 0
-        stars = arr.stars || ''
-        bail = arr.bailStatus || '-'
       }
 
-      let text = `ARREST RECORD\n`
-      text += `────────────────────────\n`
-      text += `Officer: ${officer}\n`
-      text += `Organization: ${org}\n`
-      if (caseId) text += `Case ID: ${caseId}\n`
-      text += `\n`
+      let text = `ARREST\n\n`
+      text += `Officer: ${officerTitle}\n`
+      text += `Organization: ${org}\n\n`
       if (name) text += `Suspect: ${name}\n`
       text += `Passport: ${passport}\n\n`
 
-      text += `Current Charges:\n`
+      text += `Current Charges:\n\n`
       r.charges.forEach((c: any, idx: number) => {
         text += `${idx + 1}. § ${c.code} — ${c.title || c.description}\n`
         if (c.fine && c.fine !== '-') text += `   Fine: ${c.fine}\n`
@@ -845,22 +957,27 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       text += `\n`
 
       text += `Total Fine: $${totalFine.toLocaleString()}\n`
-      if (totalSentence > 0) text += `Total Sentence: ${totalSentence} months\n`
-      if (stars) text += `Wanted Level: ${stars}\n`
-      if (bail && bail !== '-') text += `Bail: ${bail}\n`
-      text += `\n`
+      text += `Total Sentence: ${totalSentence} months\n\n`
 
-      text += `Rights:\n`
-      text += `${rightsScriptTemplate.trim()}\n\n`
+      const lawyerReq = 'lawyerRequested' in r && r.lawyerRequested
+      if (lawyerReq) {
+        text += `Lawyer Requested: Yes\n`
+        if ('timerPausedAtFormatted' in r && r.timerPausedAtFormatted) {
+          text += `Timer Paused: ${r.timerPausedAtFormatted}\n`
+        } else if (isDetention) {
+          const remaining = calculateRemainingArrestTimerSeconds(r as ActiveDetention)
+          text += `Timer Paused: ${formatTimerDisplay(remaining)}\n`
+        }
+        text += `\n`
+      }
 
-      text += `DOC NOTICE:\n`
       text += `${docStatementTemplate.trim()}\n\n`
 
-      text += `Arrest Completed: ${formatTime(isDetention ? (r as ActiveDetention).startTime : (r as ShiftArrestRecord).timestamp)}\n`
+      text += `Arrest completed:\n${formatTime(isDetention ? (r as ActiveDetention).startTime : (r as ShiftArrestRecord).timestamp)}`
 
       return text
     },
-    [activeDetention, currentOrganization, includeSuspectName, rightsScriptTemplate, docStatementTemplate]
+    [activeDetention, currentOrganization, includeSuspectName, docStatementTemplate]
   )
 
   // -------------------------------------------------------------
@@ -1044,6 +1161,9 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         removeChargeFromDetention,
         issueFineForDetentionCharge,
         finalizeActiveDetention,
+        requestLawyer,
+        resumeArrestTimer,
+        pauseArrestTimer,
 
         docStatementTemplate,
         setDocStatementTemplate,

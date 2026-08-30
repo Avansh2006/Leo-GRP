@@ -1,21 +1,124 @@
 /**
  * Arrest Command Center Workstation for LEO-GRP
  * Professional 3-column Tactical Precision workstation implementing the Fine-First Arrest Workflow,
- * live legislation search, explicit fine issuing, interactive checklist, and dynamic DOC-aware arrest scripts.
+ * 25-minute isolated arrest timer with lawyer pause/resume, combined Copy & Issue Fine action,
+ * interactive checklist, and redesigned Speaking Script Viewer with zoom controls.
  */
 
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { useDuty } from '@/contexts/DutyContext'
+import React, { useState, useEffect, useMemo } from 'react'
+import {
+  useDuty,
+  calculateRemainingArrestTimerSeconds,
+  formatTimerDisplay,
+} from '@/contexts/DutyContext'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
-import { ShiftArrestRecord, getAllArrests, DetentionChecklistState } from '@/utils/db'
+import { ShiftArrestRecord, getAllArrests, DetentionChecklistState, DetentionChargeItem } from '@/utils/db'
 
 interface ArrestCommandCenterModalProps {
   isOpen: boolean
   onClose: () => void
+}
+
+/**
+ * Isolated 25-Minute Processing Timer Component
+ * Self-contained ticker that updates its own timer without causing the parent modal to re-render every second.
+ */
+function ArrestProcessingTimer({
+  detention,
+  onRequestLawyer,
+  onResumeTimer,
+}: {
+  detention: any
+  onRequestLawyer: () => void
+  onResumeTimer: () => void
+}) {
+  const [remainingSec, setRemainingSec] = useState<number>(() =>
+    calculateRemainingArrestTimerSeconds(detention)
+  )
+
+  useEffect(() => {
+    if (!detention) {
+      setRemainingSec(1500)
+      return
+    }
+
+    const update = () => {
+      setRemainingSec(calculateRemainingArrestTimerSeconds(detention))
+    }
+
+    update()
+    if (detention.isTimerPaused) return
+
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [
+    detention?.id,
+    detention?.timerStartedAt,
+    detention?.startTime,
+    detention?.isTimerPaused,
+    detention?.timerRemainingAtPause,
+    detention?.totalPausedDurationSeconds,
+  ])
+
+  if (!detention) return null
+
+  const isPaused = detention.isTimerPaused
+  const isLawyer = detention.lawyerRequested
+  const isExpired = remainingSec === 0
+
+  let colorClasses = 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+  if (isExpired) {
+    colorClasses = 'text-rose-400 border-rose-500/60 bg-rose-500/20'
+  } else if (remainingSec <= 300) {
+    colorClasses = 'text-rose-400 border-rose-500/40 bg-rose-500/10'
+  } else if (remainingSec <= 600) {
+    colorClasses = 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+  }
+
+  return (
+    <div className="flex items-center gap-2 font-mono">
+      {/* Lawyer Button / State */}
+      {isPaused ? (
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded text-xs font-bold flex items-center gap-1.5 animate-pulse">
+            <span>⏸</span> {isLawyer ? 'LAWYER REQUESTED' : 'TIMER PAUSED'}
+          </span>
+          <button
+            onClick={onResumeTimer}
+            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+          >
+            <span>▶</span> RESUME TIMER
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={onRequestLawyer}
+          className="px-3 py-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/40 rounded text-xs font-bold transition-colors flex items-center gap-1.5"
+          title="Pause timer when suspect requests a lawyer"
+        >
+          <span>⚖</span> ASKED FOR LAWYER
+        </button>
+      )}
+
+      {/* Timer Countdown Badge */}
+      <div
+        className={`px-3 py-1 rounded border font-bold text-xs flex items-center gap-1.5 transition-colors ${colorClasses}`}
+      >
+        <span>⏱</span>
+        <span>
+          {isExpired ? (
+            <span className="text-rose-400 font-bold">🔴 ARREST TIMER EXPIRED (00:00)</span>
+          ) : (
+            formatTimerDisplay(remainingSec)
+          )}
+        </span>
+      </div>
+    </div>
+  )
 }
 
 export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestCommandCenterModalProps) {
@@ -27,6 +130,8 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
     removeChargeFromDetention,
     issueFineForDetentionCharge,
     finalizeActiveDetention,
+    requestLawyer,
+    resumeArrestTimer,
     generateArrestScript,
     formatSingleChargeText,
     formatAllChargesText,
@@ -34,11 +139,6 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
     formatCompleteArrestRecord,
     currentOrganization,
     includeSuspectName,
-    currentShiftFines,
-    currentShiftFinesAmount,
-    currentShiftArrests,
-    docStatementTemplate,
-    rightsScriptTemplate,
   } = useDuty()
 
   const { profile } = useUserProfile()
@@ -50,16 +150,16 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
   // Legislation Database & Search
   const [allLaws, setAllLaws] = useState<LawEntry[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [isSearching, setIsSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<LawEntry[]>([])
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all')
-
-  // Timer
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   // Finalizing loading state
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [activeNotes, setActiveNotes] = useState('')
+
+  // Script Zoom Levels: 75% to 150%
+  const ZOOM_LEVELS = [75, 80, 90, 100, 110, 120, 130, 140, 150]
+  const [scriptZoom, setScriptZoom] = useState<number>(100)
 
   // History inspection modal
   const [historicalArrests, setHistoricalArrests] = useState<ShiftArrestRecord[]>([])
@@ -78,25 +178,6 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
       getAllArrests().then(setHistoricalArrests).catch(console.error)
     }
   }, [activeTab])
-
-  // Stopwatch for active detention
-  useEffect(() => {
-    if (!activeDetention) {
-      setElapsedSeconds(0)
-      return
-    }
-
-    const start = new Date(activeDetention.startTime).getTime()
-    const update = () => {
-      const now = Date.now()
-      const diff = Math.max(0, Math.floor((now - start) / 1000))
-      setElapsedSeconds(diff)
-    }
-
-    update()
-    const timer = setInterval(update, 1000)
-    return () => clearInterval(timer)
-  }, [activeDetention])
 
   // Sync notes from active detention
   useEffect(() => {
@@ -198,22 +279,30 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
 
   if (!isOpen) return null
 
-  const formatTimer = (sec: number) => {
-    const hrs = Math.floor(sec / 3600)
-    const mins = Math.floor((sec % 3600) / 60)
-    const s = sec % 60
-    if (hrs > 0) {
-      return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    }
-    return `${String(mins).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  }
+  // Combined Copy & Issue Fine Action
+  const handleCopyAndIssueFine = async (charge: DetentionChargeItem) => {
+    if (charge.fineStatus === 'ISSUED') return
 
-  // Issue fine action
-  const handleIssueFine = async (chargeId: string, provisionCode: string) => {
+    const chargeText = formatSingleChargeText(charge)
+    let copySucceeded = false
+
     try {
-      const fine = await issueFineForDetentionCharge(chargeId)
-      if (fine) {
-        showToast(`Fine issued for § ${provisionCode} (${fine.fineFormatted})`, 'success')
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(chargeText)
+        copySucceeded = true
+      }
+    } catch (err) {
+      console.error('Clipboard write error:', err)
+    }
+
+    try {
+      const fineRecord = await issueFineForDetentionCharge(charge.id)
+      if (fineRecord) {
+        if (copySucceeded) {
+          showToast(`Fine issued for § ${charge.code} (${fineRecord.fineFormatted}) & copied!`, 'success')
+        } else {
+          showToast('Fine issued, but copying to clipboard failed.', 'info')
+        }
       }
     } catch (e: any) {
       showToast(e?.message || 'Failed to issue fine', 'error')
@@ -284,13 +373,28 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
     showToast(`${label} copied to clipboard`, 'success')
   }
 
+  // Zoom handlers
+  const handleZoomIn = () => {
+    const next = ZOOM_LEVELS.find((lvl) => lvl > scriptZoom)
+    if (next) setScriptZoom(next)
+  }
+
+  const handleZoomOut = () => {
+    const prev = [...ZOOM_LEVELS].reverse().find((lvl) => lvl < scriptZoom)
+    if (prev) setScriptZoom(prev)
+  }
+
+  const handleResetZoom = () => {
+    setScriptZoom(100)
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-7xl h-[92vh] max-h-[900px] bg-surface-container-low border border-outline-variant rounded-xl shadow-2xl flex flex-col overflow-hidden text-on-surface"
+        className="w-full max-w-7xl h-[94vh] max-h-[950px] bg-surface-container-low border border-outline-variant rounded-xl shadow-2xl flex flex-col overflow-hidden text-on-surface"
         onClick={(e) => e.stopPropagation()}
       >
         {/* TOP TACTICAL WORKSTATION HEADER */}
@@ -299,7 +403,7 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
             <div className="flex items-center gap-2">
               <span className="text-xl">🚨</span>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-bold text-sm font-mono uppercase tracking-wider text-on-surface">
                     Arrest Command Center
                   </h2>
@@ -321,13 +425,14 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Stopwatch & Tabs */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* 25-Minute Isolated Arrest Timer & Lawyer State */}
             {activeDetention && (
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-surface-container-low border border-outline-variant rounded font-mono text-xs text-amber-400 font-bold">
-                <span>⏱️</span>
-                <span>{formatTimer(elapsedSeconds)}</span>
-              </div>
+              <ArrestProcessingTimer
+                detention={activeDetention}
+                onRequestLawyer={requestLawyer}
+                onResumeTimer={resumeArrestTimer}
+              />
             )}
 
             <div className="flex bg-surface-container-high border border-outline-variant rounded p-0.5 text-xs font-mono">
@@ -451,31 +556,36 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <span className="font-mono font-bold text-xs text-primary mr-1.5">
-                                § {entry.code}
-                              </span>
-                              <span className="text-xs font-semibold text-on-surface">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-xs font-bold text-primary">§ {entry.code}</span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-surface-container text-on-surface-variant rounded">
+                                  {entry.documentType === 'traffic' ? 'T.C.' : 'P.C.'}
+                                </span>
+                              </div>
+                              <h4 className="text-xs text-on-surface font-medium line-clamp-2 mt-0.5">
                                 {entry.description}
-                              </span>
+                              </h4>
                             </div>
+
                             <button
                               onClick={() => {
                                 addChargeToDetention(entry)
-                                showToast(`Added § ${entry.code}`, 'success')
+                                showToast(`Added charge § ${entry.code}`, 'success')
                               }}
-                              className={`px-2 py-1 text-[11px] font-mono font-bold rounded transition-colors flex-shrink-0 ${
+                              disabled={isAlreadyAdded}
+                              className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-colors whitespace-nowrap ${
                                 isAlreadyAdded
-                                  ? 'bg-secondary/20 text-secondary border border-secondary/40'
-                                  : 'bg-primary hover:bg-primary-container text-on-primary'
+                                  ? 'bg-surface-container-high text-on-surface-variant/50 cursor-not-allowed'
+                                  : 'bg-primary hover:bg-primary-container text-on-primary shadow-sm'
                               }`}
                             >
-                              {isAlreadyAdded ? '+ Add Again' : '+ Add Charge'}
+                              {isAlreadyAdded ? 'Added' : '+ Charge'}
                             </button>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono text-on-surface-variant">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-mono text-on-surface-variant">
                             {entry.fine && entry.fine !== '-' && (
-                              <span className="text-amber-400 font-semibold">Fine: {entry.fine}</span>
+                              <span className="text-amber-400 font-bold">Fine: {entry.fine}</span>
                             )}
                             {entry.sentence && entry.sentence !== '-' && (
                               <span className="text-blue-400">Sentence: {entry.sentence}</span>
@@ -490,13 +600,13 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                 </div>
               </div>
 
-              {/* CENTER COLUMN: Selected Current Charges & Fine Issuance (5 cols) */}
+              {/* CENTER COLUMN: Current Charges & Fine Issuance (5 cols) */}
               <div className="lg:col-span-5 border-r border-outline-variant flex flex-col bg-surface-container-low overflow-hidden">
-                <div className="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-lowest">
+                <div className="p-4 border-b border-outline-variant bg-surface-container-lowest flex items-center justify-between">
                   <div>
-                    <span className="font-mono text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
-                      <span>📑</span> Current Charges ({activeDetention.charges.length})
-                    </span>
+                    <h3 className="font-mono text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                      <span>⚖️</span> CURRENT CHARGES ({activeDetention.charges.length})
+                    </h3>
                     <p className="text-[10px] font-mono text-on-surface-variant mt-0.5">
                       Additional charges may be added later during DOC processing.
                     </p>
@@ -548,7 +658,7 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-xs font-mono font-bold text-primary">
                                   #{idx + 1} § {charge.code}
                                 </span>
@@ -594,32 +704,24 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                             {charge.bail && charge.bail !== '-' && <span>Bail: {charge.bail}</span>}
                           </div>
 
-                          {/* Fine & Copy Action Buttons */}
+                          {/* COMBINED COPY & ISSUE FINE BUTTON */}
                           <div className="flex items-center justify-between gap-2 pt-1">
                             <div className="flex items-center gap-2">
                               {hasFine && (
                                 isFineIssued ? (
-                                  <span className="px-2.5 py-1 bg-green-500/20 text-green-400 font-mono text-xs font-bold rounded border border-green-500/40 flex items-center gap-1">
-                                    <span>✓</span> Fine Issued
+                                  <span className="px-3 py-1 bg-green-500/20 text-green-400 font-mono text-xs font-bold rounded border border-green-500/40 flex items-center gap-1 cursor-default">
+                                    <span>✓</span> FINE ISSUED
                                   </span>
                                 ) : (
                                   <button
-                                    onClick={() => handleIssueFine(charge.id, charge.code)}
-                                    className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-black font-mono text-xs font-bold rounded flex items-center gap-1 transition-colors shadow-sm animate-pulse"
+                                    onClick={() => handleCopyAndIssueFine(charge)}
+                                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-mono text-xs font-bold rounded flex items-center gap-1.5 transition-colors shadow-sm"
+                                    title="Issue fine to shift logs and copy charge text"
                                   >
-                                    <span>⚡</span> Issue Fine ({charge.fine || `$${charge.fineAmount.toLocaleString()}`})
+                                    <span>📋</span> COPY & ISSUE FINE — {charge.fine || `$${charge.fineAmount.toLocaleString()}`}
                                   </button>
                                 )
                               )}
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => copyWithFeedback(formatSingleChargeText(charge), 'Charge')}
-                                className="px-2 py-1 text-[11px] font-mono text-on-surface-variant hover:text-on-surface bg-surface-container-high rounded transition-colors"
-                              >
-                                📋 Copy
-                              </button>
                             </div>
                           </div>
                         </div>
@@ -671,7 +773,7 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                 </div>
 
                 {/* Checklist Items */}
-                <div className="p-4 space-y-2 overflow-y-auto text-xs font-mono flex-1">
+                <div className="p-3 space-y-1.5 overflow-y-auto text-xs font-mono max-h-48 border-b border-outline-variant">
                   <label className="flex items-start gap-2 p-1.5 bg-surface-container-lowest rounded border border-outline-variant/60 cursor-pointer hover:border-outline">
                     <input
                       type="checkbox"
@@ -764,21 +866,58 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                       <p className="text-[10px] text-on-surface-variant">Informed of possible additional charges</p>
                     </div>
                   </label>
+                </div>
 
-                  {/* Speaking Script Preview */}
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-bold text-on-surface-variant uppercase">
-                        Speaking Script
-                      </span>
+                {/* REDESIGNED SCRIPT VIEWER & ZOOM CONTROLS */}
+                <div className="p-3 flex flex-col flex-1 min-h-0 bg-surface-container-low">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2">
+                    <span className="text-[11px] font-bold text-on-surface uppercase tracking-wider flex items-center gap-1 font-mono">
+                      <span>🗣️</span> Speaking Script
+                    </span>
+
+                    <div className="flex items-center gap-1.5">
+                      {/* Zoom Controls */}
+                      <div className="flex items-center bg-surface-container-high border border-outline-variant rounded text-[10px] font-mono">
+                        <button
+                          onClick={handleZoomOut}
+                          disabled={scriptZoom <= 75}
+                          className="px-1.5 py-0.5 text-on-surface-variant hover:text-on-surface disabled:opacity-30 transition-colors font-bold"
+                          title="Zoom out"
+                        >
+                          −
+                        </button>
+                        <span className="px-1.5 py-0.5 font-bold text-on-surface border-x border-outline-variant/60 min-w-[42px] text-center">
+                          {scriptZoom}%
+                        </span>
+                        <button
+                          onClick={handleZoomIn}
+                          disabled={scriptZoom >= 150}
+                          className="px-1.5 py-0.5 text-on-surface-variant hover:text-on-surface disabled:opacity-30 transition-colors font-bold"
+                          title="Zoom in"
+                        >
+                          +
+                        </button>
+                        <button
+                          onClick={handleResetZoom}
+                          className="px-1.5 py-0.5 text-on-surface-variant hover:text-primary border-l border-outline-variant/60 transition-colors"
+                          title="Reset zoom to 100%"
+                        >
+                          Reset
+                        </button>
+                      </div>
+
                       <button
-                        onClick={() => copyWithFeedback(generateArrestScript(), 'Arrest Script')}
-                        className="text-[10px] font-bold text-primary hover:underline"
+                        onClick={() => copyWithFeedback(generateArrestScript(), 'Arrest script')}
+                        className="px-2.5 py-1 bg-primary hover:bg-primary-container text-on-primary text-[10px] font-mono font-bold rounded flex items-center gap-1 transition-colors shadow-sm"
                       >
-                        📋 Copy Script
+                        <span>📋</span> Copy Script
                       </button>
                     </div>
-                    <div className="p-2 bg-surface-container-lowest border border-outline-variant rounded text-[11px] font-mono text-on-surface-variant max-h-32 overflow-y-auto leading-relaxed whitespace-pre-wrap">
+                  </div>
+
+                  {/* Spacious Natural-Wrapping Script Content Container */}
+                  <div className="flex-1 p-3 bg-surface-container-lowest border border-outline-variant rounded-lg font-mono text-on-surface-variant leading-relaxed whitespace-pre-wrap overflow-y-auto select-text shadow-inner">
+                    <div style={{ fontSize: `${(scriptZoom / 100) * 0.75}rem`, lineHeight: 1.6 }}>
                       {generateArrestScript()}
                     </div>
                   </div>
