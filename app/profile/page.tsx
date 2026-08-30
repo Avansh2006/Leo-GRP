@@ -26,7 +26,15 @@ export default function ProfilePage() {
   } = useDuty()
   const { showToast } = useToast()
   const { achievements, checkAchievements } = useNotifications()
-  const { profile, updateProfile, addLoadout, removeLoadout, updateLoadout } = useUserProfile()
+  const {
+    profile,
+    updateProfile,
+    resetProfile,
+    setIsProfileEditModalOpen,
+    addLoadout,
+    removeLoadout,
+    updateLoadout,
+  } = useUserProfile()
   const { recordRecentItem, setIsBackupModalOpen, openAssistant } = useProductivity()
   
   const [aiStatus, setAiStatus] = useState<AIModelStatus>(aiModelProvider.getStatus())
@@ -34,17 +42,9 @@ export default function ProfilePage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'returned' | 'lost' | 'broken' | 'used'>('all')
   const [showAchievements, setShowAchievements] = useState(false)
-  const [showProfileEdit, setShowProfileEdit] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showLoadoutModal, setShowLoadoutModal] = useState(false)
   const [editingLoadout, setEditingLoadout] = useState<WeaponLoadout | null>(null)
-
-  // Form states
-  const [profileForm, setProfileForm] = useState({
-    name: profile.name,
-    id: profile.id,
-    rank: profile.rank,
-    badgeNumber: profile.badgeNumber,
-  })
 
   const [loadoutForm, setLoadoutForm] = useState<WeaponLoadout>({
     id: '',
@@ -57,12 +57,6 @@ export default function ProfilePage() {
   const [newWeapon, setNewWeapon] = useState({ weapon: '', ammo: '' })
 
   useEffect(() => {
-    setProfileForm({
-      name: profile.name,
-      id: profile.id,
-      rank: profile.rank,
-      badgeNumber: profile.badgeNumber,
-    })
     recordRecentItem({
       type: 'page',
       targetId: '/profile',
@@ -189,11 +183,7 @@ export default function ProfilePage() {
     }
   }
 
-  const handleProfileSave = () => {
-    updateProfile(profileForm)
-    setShowProfileEdit(false)
-    showToast('Profile updated successfully', 'success')
-  }
+
 
   const handleLoadoutSave = () => {
     if (!loadoutForm.name.trim()) {
@@ -310,44 +300,128 @@ export default function ProfilePage() {
       </div>
 
       {/* User Profile Card */}
-      <div className="card mb-6">
-        <div className="flex items-start justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">👤 Officer Information</h2>
-          <button
-            onClick={() => setShowProfileEdit(true)}
-            className="btn bg-blue-600 text-white hover:bg-blue-700"
-          >
-            ✏️ Edit Profile
-          </button>
+      <div className="card mb-6 border border-outline-variant bg-surface-container-low">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">👤</span>
+            <div>
+              <h2 className="text-xl font-bold text-on-surface">Officer Identity & Credentials</h2>
+              <p className="text-xs text-on-surface-variant font-mono">
+                Persistent local profile for macro commands, statements, and duty logs
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsProfileEditModalOpen(true)}
+              className="btn bg-primary text-on-primary hover:bg-primary/90 text-xs font-mono font-bold flex items-center gap-1.5"
+            >
+              <span>✏️</span>
+              <span>Edit Profile</span>
+            </button>
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="btn bg-surface-container border border-outline-variant text-on-surface-variant hover:text-error hover:border-error/40 text-xs font-mono transition-colors"
+            >
+              🔄 Reset Local Profile
+            </button>
+          </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Name</p>
-            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {profile.name || 'Not set'}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 font-mono">
+          <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/60">
+            <p className="text-[10px] text-on-surface-variant uppercase font-semibold">Officer Name</p>
+            <p className="text-sm font-bold text-on-surface mt-0.5 truncate">
+              {profile.name || 'Not configured'}
             </p>
           </div>
-          <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">ID</p>
-            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {profile.id || 'Not set'}
+          <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/60">
+            <p className="text-[10px] text-on-surface-variant uppercase font-semibold">Department</p>
+            <p className="text-sm font-bold text-primary mt-0.5">
+              {profile.organization || currentOrganization || 'LSPD'}
             </p>
           </div>
-          <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Rank</p>
-            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {profile.rank || 'Not set'}
+          <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/60">
+            <p className="text-[10px] text-on-surface-variant uppercase font-semibold">Passport ID</p>
+            <p className="text-sm font-bold text-on-surface mt-0.5">
+              {profile.passportNumber || profile.id || 'N/A'}
             </p>
           </div>
-          <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Badge Number</p>
-            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {profile.badgeNumber || 'Not set'}
+          <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/60">
+            <p className="text-[10px] text-on-surface-variant uppercase font-semibold">Badge #</p>
+            <p className="text-sm font-bold text-on-surface mt-0.5">
+              {profile.badgeNumber || 'N/A'}
+            </p>
+          </div>
+          <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/60">
+            <p className="text-[10px] text-on-surface-variant uppercase font-semibold">Rank</p>
+            <p className="text-sm font-bold text-on-surface mt-0.5 truncate">
+              {profile.rank || 'N/A'}
+            </p>
+          </div>
+          <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/60">
+            <p className="text-[10px] text-on-surface-variant uppercase font-semibold">Callsign</p>
+            <p className="text-sm font-bold text-on-surface mt-0.5 truncate">
+              {profile.callsign || 'N/A'}
             </p>
           </div>
         </div>
       </div>
+
+      {/* Reset Profile Confirmation Modal */}
+      {showResetConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setShowResetConfirm(false)}
+        >
+          <div
+            className="w-full max-w-md bg-surface-container-low border border-outline-variant rounded-xl shadow-2xl overflow-hidden text-on-surface p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-error/10 border border-error/20 flex items-center justify-center text-error text-xl">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-on-surface uppercase font-mono">
+                  Reset Local Officer Profile?
+                </h3>
+                <p className="text-xs text-on-surface-variant font-mono">
+                  Safe profile initialization reset
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-on-surface-variant leading-relaxed">
+              This will clear your saved officer name, department affiliation, and passport credentials from this browser and open the first-time setup wizard.
+            </p>
+            <div className="p-2.5 bg-surface-container-lowest border border-outline-variant/50 rounded text-[11px] text-on-surface-variant font-mono">
+              ✅ Your notes, pinned shortcuts, fine history, and past shift records will <strong className="text-on-surface">NOT</strong> be wiped.
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/60">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="px-3.5 py-1.5 text-xs font-mono text-on-surface-variant hover:text-on-surface"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await resetProfile()
+                  setShowResetConfirm(false)
+                  showToast('Officer profile reset. Please configure your identity.', 'info')
+                }}
+                className="px-4 py-1.5 bg-error text-on-error font-mono font-bold text-xs uppercase rounded hover:bg-error/90 transition-colors"
+              >
+                Confirm Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Operational & Privacy Preferences Card */}
       <div className="card mb-6 border border-outline-variant bg-surface-container-low">
@@ -368,7 +442,7 @@ export default function ProfilePage() {
               Active Organization / Agency:
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {['LSPD', 'SAHP', 'FIB', 'GOV', 'NG', 'EMS'].map((org) => (
+              {['LSPD', 'BCSO', 'SAHP', 'FIB', 'GOV', 'NG', 'EMS'].map((org) => (
                 <button
                   key={org}
                   onClick={() => {
@@ -624,85 +698,7 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* Profile Edit Modal */}
-      {showProfileEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Edit Profile</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    placeholder="John Doe"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    ID
-                  </label>
-                  <input
-                    type="text"
-                    value={profileForm.id}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, id: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    placeholder="12345"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Rank
-                  </label>
-                  <input
-                    type="text"
-                    value={profileForm.rank}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, rank: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    placeholder="Officer"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Badge Number
-                  </label>
-                  <input
-                    type="text"
-                    value={profileForm.badgeNumber}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, badgeNumber: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    placeholder="B-1234"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-2 mt-6">
-                <button
-                  onClick={handleProfileSave}
-                  className="flex-1 btn bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => setShowProfileEdit(false)}
-                  className="flex-1 btn bg-gray-500 text-white hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Loadout Modal */}
       {showLoadoutModal && (

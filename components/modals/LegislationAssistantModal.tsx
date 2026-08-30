@@ -16,6 +16,8 @@ import {
 } from '@/utils/legislationRetriever'
 import { useToast } from '@/components/ToastProvider'
 import { useProductivity } from '@/contexts/ProductivityContext'
+import { useDuty } from '@/contexts/DutyContext'
+import { getCanonicalProvision } from '@/utils/legislationStore'
 
 interface LegislationAssistantModalProps {
   isOpen: boolean
@@ -28,6 +30,7 @@ interface ChatMessage {
   sender: 'user' | 'assistant'
   text: string
   sources?: RetrievedSource[]
+  clarificationQuestions?: string[]
   timestamp: string
   debugTrace?: AIDebugTrace | null
 }
@@ -40,6 +43,7 @@ export default function LegislationAssistantModal({
   const router = useRouter()
   const { showToast } = useToast()
   const { createNote, setIsRightPanelOpen, setUtilityTab, recordRecentItem } = useProductivity()
+  const { currentOrganization, addChargeToDetention, setIsArrestCommandCenterOpen, activeDetention } = useDuty()
 
   const [inputQuery, setInputQuery] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -86,9 +90,8 @@ export default function LegislationAssistantModal({
 
   if (!isOpen) return null
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    const query = inputQuery.trim()
+  const handleSendMessage = async (customQuery?: string) => {
+    const query = (customQuery || inputQuery).trim()
     if (!query || isProcessing) return
 
     const userMsgId = `msg-${Date.now()}`
@@ -106,7 +109,7 @@ export default function LegislationAssistantModal({
     }))
 
     setMessages((prev) => [...prev, userMsg])
-    setInputQuery('')
+    if (!customQuery) setInputQuery('')
     setIsProcessing(true)
 
     recordRecentItem({
@@ -117,7 +120,7 @@ export default function LegislationAssistantModal({
     })
 
     try {
-      // 1. Retrieve authoritative legislation context with question awareness & history
+      // 1. Retrieve authoritative legislation context with Hybrid RAG & history
       const retrieval = await retrieveLegislationContext(query, 4, conversationTurns)
 
       // 2. Generate answer
@@ -133,6 +136,7 @@ export default function LegislationAssistantModal({
             sender: 'assistant',
             text: 'Analyzing legislation...',
             sources: retrieval.sources,
+            clarificationQuestions: retrieval.clarificationQuestions,
             timestamp: new Date().toISOString(),
           },
         ])
@@ -157,39 +161,28 @@ export default function LegislationAssistantModal({
           }
         )
       } else {
-        // Fast Instant Retrieval-Only Mode (Deterministic & Question-Aware)
-        await new Promise((res) => setTimeout(res, 150))
-        const explanation = generateQuestionAwareResponse(query, retrieval, conversationTurns)
-        const finalPrompt = aiModelProvider.buildPrompt(query, retrieval)
+        // Fast Instant Retrieval-Only Mode (Deterministic, Verified & Question-Aware)
+        await new Promise((res) => setTimeout(res, 80))
+        const explanation = await generateQuestionAwareResponse(retrieval, query, conversationTurns)
 
         const debugTrace: AIDebugTrace = {
           userQuery: query,
           normalizedQuery: retrieval.normalizedQuery,
-          detectedConcepts: {
-            actions: retrieval.concepts.actions,
-            negatedActions: retrieval.concepts.negatedActions,
-            objects: retrieval.concepts.objects,
-            locations: retrieval.concepts.locations,
-            actor: retrieval.concepts.actor,
-            primaryTopic: retrieval.concepts.primaryTopic,
-          },
-          detectedSection: retrieval.detectedSection,
+          primaryTopic: retrieval.primaryTopic,
+          intent: retrieval.intent,
           retrievedSources: retrieval.sources.map((s) => ({
             code: s.code,
             title: s.title,
-            score: s.relevanceScore,
+            relevanceScore: s.relevanceScore,
+            semanticScore: s.semanticScore,
+            lexicalScore: s.lexicalScore,
             fine: s.fine,
             sentence: s.sentence,
             matchType: s.matchType,
-            conditionText: s.conditionText,
           })),
-          rejectedSources: retrieval.rejectedSources.map((r) => ({
-            code: r.code,
-            title: r.title,
-            topic: r.topic,
-            reason: r.reason,
-          })),
-          finalPrompt,
+          rejectedSources: retrieval.rejectedSources,
+          toolCallsExecuted: [],
+          finalPrompt: `QUERY: ${query}\nCONTEXT:\n${retrieval.contextText}`,
           generatedResponse: explanation,
           timestamp: new Date().toISOString(),
         }
@@ -203,6 +196,7 @@ export default function LegislationAssistantModal({
             sender: 'assistant',
             text: explanation,
             sources: retrieval.sources,
+            clarificationQuestions: retrieval.clarificationQuestions,
             timestamp: new Date().toISOString(),
             debugTrace,
           },
@@ -245,6 +239,32 @@ export default function LegislationAssistantModal({
     showToast('Explanation saved to Officer Notes', 'success')
   }
 
+  const handleAddChargeFromAssistant = async (source: RetrievedSource) => {
+    const prov = await getCanonicalProvision(source.code)
+    if (!prov) {
+      showToast(`Provision ${source.code} not found in database`, 'error')
+      return
+    }
+
+    addChargeToDetention({
+      code: prov.code,
+      description: prov.title,
+      fine: prov.fine,
+      sentence: prov.sentence,
+      stars: prov.stars,
+      bail: prov.bail,
+      sourceDocument: prov.sourceDocument,
+    })
+
+    showToast(`Added charge: § ${prov.code} — ${prov.title}`, 'success')
+  }
+
+  const handleCopyChargeText = (source: RetrievedSource) => {
+    const text = `§ ${source.code} — ${source.title}${source.fine && source.fine !== '-' ? ` | Fine: ${source.fine}` : ''}${source.sentence && source.sentence !== '-' ? ` | Sentence: ${source.sentence}` : ''}`
+    navigator.clipboard.writeText(text)
+    showToast(`Copied: § ${source.code}`, 'info')
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-brightness-75 animate-fadeIn"
@@ -256,15 +276,18 @@ export default function LegislationAssistantModal({
       >
         {/* Header Bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant bg-surface-container-lowest flex-shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span className="text-xl">⚖️</span>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-sm sm:text-base text-on-surface leading-tight">
-                  Legislation Assistant
+                <h3 className="font-bold text-sm sm:text-base text-on-surface leading-tight tracking-wide">
+                  LEGAL ASSISTANT 2.0
                 </h3>
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/30">
+                  {currentOrganization}
+                </span>
                 <span
-                  className={`text-[9px] font-mono uppercase px-1.5 py-0.2 rounded border ${
+                  className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border ${
                     aiStatus === 'READY'
                       ? 'bg-secondary/15 text-secondary border-secondary/30'
                       : aiStatus === 'DOWNLOADING'
@@ -276,11 +299,11 @@ export default function LegislationAssistantModal({
                     ? '● Local AI Active'
                     : aiStatus === 'DOWNLOADING'
                     ? '⏳ Downloading'
-                    : '○ Retrieval Engine'}
+                    : '○ Hybrid RAG'}
                 </span>
               </div>
               <p className="text-[11px] text-on-surface-variant font-mono">
-                Active Source: Traffic Code 2nd Rendition (28.07.2025) & Penal Codes
+                Authoritative Grounding: Traffic Code (2nd Rendition — 28.07.2025) & Penal Codes
               </p>
             </div>
           </div>
@@ -293,14 +316,14 @@ export default function LegislationAssistantModal({
                   ? 'bg-primary text-on-primary border-primary'
                   : 'bg-surface-container-high text-on-surface-variant border-outline-variant hover:text-on-surface'
               }`}
-              title="Toggle Developer Debug / Retrieval Trace"
+              title="Toggle Developer RAG Trace"
             >
-              🐞 Debug
+              🐞 Trace
             </button>
             <button
               onClick={() => setShowSettings(!showSettings)}
               className="p-1.5 text-on-surface-variant hover:text-on-surface rounded text-xs font-mono"
-              title="Assistant Settings & Model Management"
+              title="Model Management & Settings"
             >
               ⚙️
             </button>
@@ -328,34 +351,28 @@ export default function LegislationAssistantModal({
         {showDebugTrace && currentDebugTrace && (
           <div className="p-3 bg-black/95 border-b border-amber-500/40 text-xs font-mono space-y-2 animate-fadeIn flex-shrink-0 max-h-60 overflow-y-auto">
             <div className="flex items-center justify-between text-amber-400 font-bold border-b border-amber-500/20 pb-1">
-              <span>🐞 Developer Debug Trace</span>
+              <span>🐞 Developer Hybrid RAG Trace</span>
               <span className="text-[10px] text-amber-300/80">
-                Topic: {currentDebugTrace.detectedConcepts?.primaryTopic || 'GENERAL'}
+                Topic: {currentDebugTrace.primaryTopic} | Intent: {currentDebugTrace.intent}
               </span>
             </div>
 
-            {/* Concepts and Exclusions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] bg-surface-container-lowest/60 p-2 rounded border border-outline-variant/40">
               <div>
                 <strong className="text-on-surface">Normalized Query:</strong>
                 <div className="text-on-surface-variant truncate">{currentDebugTrace.normalizedQuery || currentDebugTrace.userQuery}</div>
                 <div className="text-[10px] text-primary mt-1">
-                  Actions: {currentDebugTrace.detectedConcepts?.actions?.join(', ') || 'None'} | Objects: {currentDebugTrace.detectedConcepts?.objects?.join(', ') || 'None'}
+                  Topic: {currentDebugTrace.primaryTopic}
                 </div>
-                {currentDebugTrace.detectedConcepts?.negatedActions?.length > 0 && (
-                  <div className="text-[10px] text-rose-400 font-bold">
-                    ⛔ Excluded / Negated: {currentDebugTrace.detectedConcepts.negatedActions.join(', ')}
-                  </div>
-                )}
               </div>
 
               <div>
-                <strong className="text-on-surface">Retrieved Provisions ({currentDebugTrace.retrievedSources.length}):</strong>
+                <strong className="text-on-surface">Ranked Provisions ({currentDebugTrace.retrievedSources.length}):</strong>
                 <ul className="text-[10px] text-on-surface-variant space-y-0.5 mt-0.5">
                   {currentDebugTrace.retrievedSources.length === 0 && <li className="text-amber-400/80">No provisions passed confidence threshold</li>}
                   {currentDebugTrace.retrievedSources.map((s, idx) => (
                     <li key={idx} className="truncate text-secondary">
-                      #{idx + 1} § {s.code} (Score: {s.score}) — {s.title}
+                      #{idx + 1} § {s.code} (Score: {Math.round(s.relevanceScore)} | Sem: {Math.round(s.semanticScore)}% | Lex: {s.lexicalScore}) — {s.title}
                     </li>
                   ))}
                 </ul>
@@ -365,7 +382,7 @@ export default function LegislationAssistantModal({
             {/* Rejected / Suppressed provisions */}
             {currentDebugTrace.rejectedSources?.length > 0 && (
               <div className="text-[10px] text-on-surface-variant/80 border-t border-outline-variant/30 pt-1">
-                <span className="text-rose-400 font-semibold">Excluded Candidates ({currentDebugTrace.rejectedSources.length}):</span>
+                <span className="text-rose-400 font-semibold">Suppressed / Excluded Candidates ({currentDebugTrace.rejectedSources.length}):</span>
                 <ul className="space-y-0.5 mt-0.5">
                   {currentDebugTrace.rejectedSources.slice(0, 3).map((r, idx) => (
                     <li key={idx} className="truncate">
@@ -390,7 +407,7 @@ export default function LegislationAssistantModal({
               <div>
                 <strong>Device Status:</strong>{' '}
                 <span className={webGPUInfo?.supported ? 'text-secondary' : 'text-amber-400'}>
-                  {webGPUInfo?.message || 'Checking...'}
+                  {webGPUInfo?.message || 'Checking WebGPU acceleration...'}
                 </span>
               </div>
               <div>
@@ -458,33 +475,33 @@ export default function LegislationAssistantModal({
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans">
           {messages.length === 0 ? (
-            <div className="py-10 text-center flex flex-col items-center justify-center space-y-3">
+            <div className="py-8 text-center flex flex-col items-center justify-center space-y-3">
               <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-2xl">
                 ⚖️
               </div>
               <div className="space-y-1 max-w-md">
-                <h4 className="font-semibold text-base text-on-surface">
-                  Question-Aware Legislation Assistant
+                <h4 className="font-bold text-base text-on-surface">
+                  LEO Legislation & Procedure Assistant
                 </h4>
                 <p className="text-xs text-on-surface-variant font-mono leading-relaxed">
-                  Answers your specific legal and procedural questions based directly on the active Traffic Code (2nd Rendition) and Penal Codes.
+                  Fast, grounded statutory answers based directly on the active Traffic Code (2nd Rendition) and Penal Codes.
                 </p>
               </div>
 
               {/* Sample Prompts */}
               <div className="flex flex-wrap justify-center gap-2 max-w-xl pt-2">
                 {[
-                  'What is the DUI provision?',
-                  'What happens when someone refuses to identify themselves?',
-                  'Explain § 3.5.',
-                  'Can I arrest someone for this?',
-                  'What is the penalty for reckless driving?',
-                  'How do I handle a suspect requesting a lawyer?',
+                  'What charges can I add if someone parked car on the road?',
+                  'vehicle parked over road markings',
+                  'stolen vehicle',
+                  'small quantity cocaine',
+                  'how do i handle a suspect requesting a lawyer?',
+                  'explain 6.2.f',
                 ].map((prompt) => (
                   <button
                     key={prompt}
                     onClick={() => {
-                      setInputQuery(prompt)
+                      handleSendMessage(prompt)
                     }}
                     className="px-3 py-1.5 text-xs font-mono bg-surface-container hover:bg-surface-container-high border border-outline-variant rounded text-on-surface text-left transition-colors"
                   >
@@ -502,33 +519,104 @@ export default function LegislationAssistantModal({
                 }`}
               >
                 <div
-                  className={`max-w-[92%] sm:max-w-[85%] rounded-lg p-3.5 text-xs sm:text-sm leading-relaxed ${
+                  className={`max-w-[95%] sm:max-w-[88%] rounded-lg p-4 text-xs sm:text-sm leading-relaxed ${
                     msg.sender === 'user'
                       ? 'bg-primary text-on-primary font-mono'
                       : 'bg-surface-container border border-outline-variant text-on-surface'
                   }`}
                 >
-                  <div className="whitespace-pre-wrap">{msg.text}</div>
+                  <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
 
-                  {/* Sources Used Citation Box */}
-                  {msg.sources && msg.sources.length > 0 && (
+                  {/* Clarification Questions Chips */}
+                  {msg.clarificationQuestions && msg.clarificationQuestions.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-outline-variant/60 space-y-1.5">
-                      <div className="text-[10px] font-mono font-bold uppercase text-on-surface-variant flex items-center gap-1">
-                        <span>📚</span> Cited Provisions:
+                      <div className="text-[10px] font-mono font-bold uppercase text-primary flex items-center gap-1">
+                        <span>💬</span> Refine Scenario:
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {msg.sources.map((s) => (
+                        {msg.clarificationQuestions.map((q, idx) => (
                           <button
-                            key={s.code}
-                            onClick={() => {
-                              router.push(`/patrolman-guide?code=${encodeURIComponent(s.code)}`)
-                              onClose()
-                            }}
-                            className="px-2 py-0.5 bg-surface-container-highest hover:bg-primary/20 border border-outline-variant hover:border-primary/40 rounded text-[11px] font-mono text-primary flex items-center gap-1 transition-colors"
-                            title={`Open § ${s.code} in Legislation Guide`}
+                            key={idx}
+                            onClick={() => handleSendMessage(q)}
+                            className="px-2.5 py-1 bg-surface-container-highest hover:bg-primary/20 border border-primary/30 rounded text-[11px] font-mono text-on-surface transition-colors text-left"
                           >
-                            <span>§</span> {s.code} ({s.title.slice(0, 24)}...)
+                            👉 {q}
                           </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Structured Actionable Provision Cards */}
+                  {msg.sources && msg.sources.length > 0 && (
+                    <div className="mt-3.5 pt-3 border-t border-outline-variant space-y-2">
+                      <div className="text-[10px] font-mono font-bold uppercase text-on-surface-variant flex items-center justify-between">
+                        <span>📋 Provision Actions ({msg.sources.length}):</span>
+                        {activeDetention && (
+                          <span className="text-secondary font-semibold">
+                            Active Case #{activeDetention.caseId.slice(-4)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2">
+                        {msg.sources.map((s) => (
+                          <div
+                            key={s.code}
+                            className="p-2.5 bg-surface-container-lowest rounded border border-outline-variant/70 hover:border-primary/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                          >
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono font-bold text-primary text-xs">
+                                  § {s.code}
+                                </span>
+                                <span className="text-xs font-semibold text-on-surface">
+                                  {s.title}
+                                </span>
+                              </div>
+                              <div className="text-[10px] font-mono text-on-surface-variant flex flex-wrap gap-2 mt-0.5">
+                                {s.fine && s.fine !== '-' && (
+                                  <span className="text-amber-400 font-bold">Fine: {s.fine}</span>
+                                )}
+                                {s.sentence && s.sentence !== '-' && (
+                                  <span className="text-rose-400">Jail: {s.sentence}</span>
+                                )}
+                                {s.stars && s.stars !== '-' && (
+                                  <span className="text-yellow-400">Stars: {s.stars}</span>
+                                )}
+                                {s.towing && (
+                                  <span className="text-orange-400">🚨 Towing Auth</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 flex-shrink-0 pt-1 sm:pt-0">
+                              <button
+                                onClick={() => handleAddChargeFromAssistant(s)}
+                                className="px-2 py-1 bg-secondary/15 hover:bg-secondary/25 text-secondary border border-secondary/30 rounded text-[10px] font-mono font-bold transition-colors flex items-center gap-1"
+                                title="Add directly to Active Arrest / Case"
+                              >
+                                <span>➕</span> Add Charge
+                              </button>
+                              <button
+                                onClick={() => handleCopyChargeText(s)}
+                                className="px-2 py-1 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant rounded text-[10px] font-mono text-on-surface transition-colors flex items-center gap-1"
+                                title="Copy charge details"
+                              >
+                                <span>📋</span> Copy
+                              </button>
+                              <button
+                                onClick={() => {
+                                  router.push(`/patrolman-guide?code=${encodeURIComponent(s.code)}`)
+                                  onClose()
+                                }}
+                                className="px-2 py-1 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant rounded text-[10px] font-mono text-primary transition-colors flex items-center gap-1"
+                                title="View in Legislation Guide"
+                              >
+                                <span>🔍</span> View
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -543,6 +631,17 @@ export default function LegislationAssistantModal({
                     >
                       <span>📝</span> Save to Notes
                     </button>
+                    {activeDetention && (
+                      <button
+                        onClick={() => {
+                          setIsArrestCommandCenterOpen(true)
+                          onClose()
+                        }}
+                        className="text-[10px] font-mono text-secondary hover:underline transition-colors flex items-center gap-1"
+                      >
+                        <span>🚨</span> Open Arrest Center
+                      </button>
+                    )}
                     {msg.debugTrace && (
                       <button
                         onClick={() => {
@@ -551,7 +650,7 @@ export default function LegislationAssistantModal({
                         }}
                         className="text-[10px] font-mono text-amber-400/80 hover:text-amber-400 transition-colors flex items-center gap-1"
                       >
-                        <span>🐞</span> View Trace
+                        <span>🐞</span> View RAG Trace
                       </button>
                     )}
                   </div>
@@ -563,7 +662,7 @@ export default function LegislationAssistantModal({
           {isProcessing && (
             <div className="flex items-center gap-2 text-xs font-mono text-on-surface-variant py-2">
               <span className="animate-spin">⚙️</span>
-              <span>Retrieving authoritative legislation and analyzing query...</span>
+              <span>Retrieving authoritative legislation and verifying citations...</span>
             </div>
           )}
 
@@ -572,13 +671,16 @@ export default function LegislationAssistantModal({
 
         {/* Input Bar */}
         <form
-          onSubmit={handleSendMessage}
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSendMessage()
+          }}
           className="p-3 border-t border-outline-variant bg-surface-container-lowest flex items-center gap-2 flex-shrink-0"
         >
           <input
             ref={inputRef}
             type="text"
-            placeholder="Ask about DUI, refusal to identify, arrest authority, penalties, or procedures..."
+            placeholder="Ask about parking, DUI, refusal to identify, arrest procedures, or enter § code..."
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
             className="flex-1 px-3.5 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface placeholder:text-on-surface-variant font-mono text-xs sm:text-sm focus:outline-none focus:border-primary"
@@ -587,7 +689,7 @@ export default function LegislationAssistantModal({
           {isProcessing ? (
             <button
               type="button"
-              onClick={() => aiModelProvider.stopGeneration()}
+              onClick={() => aiModelProvider.abortGeneration()}
               className="px-3.5 py-2 bg-error/20 hover:bg-error/30 text-error border border-error/40 font-mono text-xs font-semibold rounded flex items-center gap-1"
             >
               <span>⏹</span> Stop

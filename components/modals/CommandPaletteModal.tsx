@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useDuty } from '@/contexts/DutyContext'
+import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 
@@ -23,10 +24,12 @@ export default function CommandPaletteModal() {
   const router = useRouter()
   const { showToast } = useToast()
   const { toggleTheme } = useTheme()
+  const { profile, setIsProfileEditModalOpen } = useUserProfile()
   const {
     activeDetention,
     setIsArrestCommandCenterOpen,
     currentOrganization,
+    setCurrentOrganization,
   } = useDuty()
   const {
     isCommandPaletteOpen,
@@ -474,6 +477,101 @@ export default function CommandPaletteModal() {
           },
         },
         {
+          id: 'action-edit-profile',
+          title: 'Edit Officer Profile',
+          subtitle: `Name: Officer ${profile.name || 'N/A'} • Dept: ${profile.organization || currentOrganization} • Passport: #${profile.passportNumber || 'N/A'}`,
+          category: 'Actions',
+          icon: '🎖️',
+          keywords: ['profile', 'edit', 'name', 'passport', 'badge', 'rank', 'callsign', 'department', 'organization', 'credentials'],
+          action: () => {
+            setIsProfileEditModalOpen(true)
+          },
+        },
+        {
+          id: 'action-switch-org-lspd',
+          title: 'Switch Department: LSPD',
+          subtitle: 'Active department → Los Santos Police Department',
+          category: 'Actions',
+          icon: '👮‍♂️',
+          keywords: ['switch', 'organization', 'department', 'lspd', 'police', 'org'],
+          action: () => {
+            setCurrentOrganization('LSPD')
+            showToast('Active department set to LSPD', 'success')
+          },
+        },
+        {
+          id: 'action-switch-org-bcso',
+          title: 'Switch Department: BCSO',
+          subtitle: 'Active department → Blaine County Sheriff\'s Office',
+          category: 'Actions',
+          icon: '🤠',
+          keywords: ['switch', 'organization', 'department', 'bcso', 'sheriff', 'org'],
+          action: () => {
+            setCurrentOrganization('BCSO')
+            showToast('Active department set to BCSO', 'success')
+          },
+        },
+        {
+          id: 'action-switch-org-sahp',
+          title: 'Switch Department: SAHP',
+          subtitle: 'Active department → San Andreas Highway Patrol',
+          category: 'Actions',
+          icon: '🚓',
+          keywords: ['switch', 'organization', 'department', 'sahp', 'highway', 'patrol', 'org'],
+          action: () => {
+            setCurrentOrganization('SAHP')
+            showToast('Active department set to SAHP', 'success')
+          },
+        },
+        {
+          id: 'action-switch-org-fib',
+          title: 'Switch Department: FIB',
+          subtitle: 'Active department → Federal Investigation Bureau',
+          category: 'Actions',
+          icon: '🕵️‍♂️',
+          keywords: ['switch', 'organization', 'department', 'fib', 'federal', 'bureau', 'org'],
+          action: () => {
+            setCurrentOrganization('FIB')
+            showToast('Active department set to FIB', 'success')
+          },
+        },
+        {
+          id: 'action-switch-org-gov',
+          title: 'Switch Department: GOV',
+          subtitle: 'Active department → Government of San Andreas',
+          category: 'Actions',
+          icon: '🏛️',
+          keywords: ['switch', 'organization', 'department', 'gov', 'government', 'usss', 'org'],
+          action: () => {
+            setCurrentOrganization('GOV')
+            showToast('Active department set to GOV', 'success')
+          },
+        },
+        {
+          id: 'action-switch-org-ng',
+          title: 'Switch Department: NG',
+          subtitle: 'Active department → National Guard / Military',
+          category: 'Actions',
+          icon: '🪖',
+          keywords: ['switch', 'organization', 'department', 'ng', 'national', 'guard', 'military', 'org'],
+          action: () => {
+            setCurrentOrganization('NG')
+            showToast('Active department set to NG', 'success')
+          },
+        },
+        {
+          id: 'action-switch-org-ems',
+          title: 'Switch Department: EMS',
+          subtitle: 'Active department → Emergency Medical Services',
+          category: 'Actions',
+          icon: '🚑',
+          keywords: ['switch', 'organization', 'department', 'ems', 'medical', 'hospital', 'org'],
+          action: () => {
+            setCurrentOrganization('EMS')
+            showToast('Active department set to EMS', 'success')
+          },
+        },
+        {
           id: 'action-backup',
           title: 'Backup & Storage Manager',
           subtitle: 'Export JSON backup, import backup, or manage local data',
@@ -525,7 +623,26 @@ export default function CommandPaletteModal() {
 
       return items
     },
-    [activeDetention, createNote, isRightPanelOpen, openAssistant, setIsAddShortcutOpen, setIsArrestCommandCenterOpen, setIsBackupModalOpen, setIsRightPanelOpen, setUtilityTab, showToast, toggleRightPanel, toggleTheme]
+    [
+      activeDetention,
+      createNote,
+      currentOrganization,
+      isRightPanelOpen,
+      openAssistant,
+      profile.name,
+      profile.organization,
+      profile.passportNumber,
+      setCurrentOrganization,
+      setIsAddShortcutOpen,
+      setIsArrestCommandCenterOpen,
+      setIsBackupModalOpen,
+      setIsProfileEditModalOpen,
+      setIsRightPanelOpen,
+      setUtilityTab,
+      showToast,
+      toggleRightPanel,
+      toggleTheme,
+    ]
   )
 
   // Notes Items

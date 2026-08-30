@@ -7,6 +7,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { useUserProfile } from '@/contexts/UserProfileContext'
 import {
   FineRecord,
   ShiftArrestRecord,
@@ -182,12 +183,20 @@ const DOC_STATEMENT_KEY = 'leogrp_doc_statement_template'
 const RIGHTS_SCRIPT_KEY = 'leogrp_rights_script_template'
 
 export function DutyProvider({ children }: { children: ReactNode }) {
+  const { profile, updateProfile } = useUserProfile()
   const [isOnDuty, setIsOnDuty] = useState(false)
   const [currentShiftId, setCurrentShiftId] = useState<string | null>(null)
   const [currentDutyStart, setCurrentDutyStart] = useState<string | null>(null)
-  const [currentOrganization, setCurrentOrgState] = useState('LSPD')
+  const [currentOrganization, setCurrentOrgState] = useState(profile?.organization || 'LSPD')
   const [includeSuspectName, setIncludeSuspectNameState] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
+
+  // Reactively sync organization from profile
+  useEffect(() => {
+    if (profile?.organization && profile.organization !== currentOrganization) {
+      setCurrentOrgState(profile.organization)
+    }
+  }, [profile?.organization, currentOrganization])
 
   // Active Detention & Workstation Modal State
   const [activeDetention, setActiveDetention] = useState<ActiveDetention | null>(null)
@@ -324,22 +333,29 @@ export function DutyProvider({ children }: { children: ReactNode }) {
     currentEventCounters,
   ])
 
-  const setCurrentOrganization = useCallback((org: string) => {
-    setCurrentOrgState(org)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(CURRENT_ORG_KEY, org)
-      localStorage.setItem('leogrp_selected_org', org)
-      localStorage.setItem('user_org', org)
-      localStorage.setItem('organization', org)
-    }
-    setActiveDetention((prev) => {
-      if (!prev || prev.status !== 'ACTIVE') return prev
-      return {
-        ...prev,
-        organization: org,
+  const setCurrentOrganization = useCallback(
+    (org: string) => {
+      setCurrentOrgState(org)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(CURRENT_ORG_KEY, org)
+        localStorage.setItem('leogrp_selected_org', org)
+        localStorage.setItem('user_org', org)
+        localStorage.setItem('organization', org)
+        window.dispatchEvent(new CustomEvent('leogrp:org-changed', { detail: org }))
       }
-    })
-  }, [])
+      if (profile?.organization !== org) {
+        updateProfile({ organization: org })
+      }
+      setActiveDetention((prev) => {
+        if (!prev || prev.status !== 'ACTIVE') return prev
+        return {
+          ...prev,
+          organization: org,
+        }
+      })
+    },
+    [profile?.organization, updateProfile]
+  )
 
   const setIncludeSuspectName = useCallback((val: boolean) => {
     setIncludeSuspectNameState(val)
@@ -368,7 +384,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
   const startDetention = useCallback(
     (data: { passportNumber: string; suspectName?: string; officerName?: string; notes?: string }): ActiveDetention => {
-      let officer = data.officerName?.trim()
+      let officer = data.officerName?.trim() || profile?.name?.trim()
       if (!officer && typeof window !== 'undefined') {
         officer = localStorage.getItem('officer_name') || localStorage.getItem('user_name') || 'Officer'
       }
@@ -380,7 +396,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         caseId: `CASE-${caseNum}`,
         startTime: nowIso,
         officerName: officer || 'Officer',
-        organization: currentOrganization,
+        organization: currentOrganization || profile?.organization || 'LSPD',
         passportNumber: data.passportNumber.trim(),
         suspectName: data.suspectName?.trim() || undefined,
         charges: [],
@@ -409,7 +425,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       setIsArrestCommandCenterOpen(true)
       return newDetention
     },
-    [currentOrganization]
+    [currentOrganization, profile?.name, profile?.organization]
   )
 
   const updateActiveDetention = useCallback((updater: (prev: ActiveDetention | null) => ActiveDetention | null) => {
@@ -878,10 +894,10 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       if (!d) return 'No active arrest to generate script for.'
 
       // Prevent duplicate "Officer Officer" prefix
-      const rawOfficer = d.officerName?.trim() || ''
+      const rawOfficer = d.officerName?.trim() || profile?.name?.trim() || ''
       const cleanOfficer = rawOfficer.replace(/^Officer\s+/i, '').trim()
       const officerTitle = cleanOfficer ? `Officer ${cleanOfficer}` : 'an Officer'
-      const org = d.organization || currentOrganization || 'LSPD'
+      const org = d.organization || profile?.organization || currentOrganization || 'LSPD'
       const passport = d.passportNumber ? `Passport ${d.passportNumber}` : 'Passport N/A'
       
       let suspectReference = ''
@@ -916,7 +932,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
       return script
     },
-    [activeDetention, currentOrganization, includeSuspectName, rightsScriptTemplate, docStatementTemplate]
+    [activeDetention, currentOrganization, profile?.name, profile?.organization, includeSuspectName, rightsScriptTemplate, docStatementTemplate]
   )
 
   const formatCompleteArrestRecord = useCallback(

@@ -10,6 +10,8 @@ import AddShortcutModal from '@/components/modals/AddShortcutModal'
 import DataBackupModal from '@/components/modals/DataBackupModal'
 import LegislationAssistantModal from '@/components/modals/LegislationAssistantModal'
 import ArrestCommandCenterModal from '@/components/modals/ArrestCommandCenterModal'
+import OnboardingModal from '@/components/modals/OnboardingModal'
+import ProfileEditModal from '@/components/modals/ProfileEditModal'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useDuty } from '@/contexts/DutyContext'
 
@@ -51,6 +53,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Global Modals */}
+      <OnboardingModal />
+      <ProfileEditModal />
       <CommandPaletteModal />
       <AddShortcutModal />
       <DataBackupModal

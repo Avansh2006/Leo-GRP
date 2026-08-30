@@ -13,6 +13,19 @@ export interface Note {
   updatedAt: string
 }
 
+export interface OfficerProfile {
+  id: string
+  name: string
+  organization: string
+  passportNumber: string
+  badgeNumber?: string
+  rank?: string
+  callsign?: string
+  createdAt: number
+  updatedAt: number
+  onboardingCompleted: boolean
+}
+
 export interface QuickAccessItem {
   id: string
   title: string
@@ -21,6 +34,7 @@ export interface QuickAccessItem {
   icon?: string
   snippet?: string
   position: number
+  organization?: string
   createdAt: string
 }
 
@@ -185,12 +199,13 @@ export interface AppBackup {
     fines?: FineRecord[]
     arrests?: ShiftArrestRecord[]
     shifts?: ShiftRecord[]
+    profile?: OfficerProfile | null
     settings?: Record<string, any>
   }
 }
 
 const DB_NAME = 'leogrp_productivity_db'
-const DB_VERSION = 2
+const DB_VERSION = 4
 
 const STORES = {
   NOTES: 'notes',
@@ -201,6 +216,8 @@ const STORES = {
   FINES: 'fines',
   ARRESTS: 'arrests',
   SHIFTS: 'shifts',
+  AI_EMBEDDINGS: 'ai_embeddings',
+  PROFILE: 'profile',
 } as const
 
 export function generateId(prefix = 'id'): string {
@@ -289,6 +306,17 @@ export function isValidShiftRecord(obj: any): obj is ShiftRecord {
   )
 }
 
+export function isValidOfficerProfile(obj: any): obj is OfficerProfile {
+  return Boolean(
+    obj &&
+    typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
+    typeof obj.name === 'string' &&
+    typeof obj.organization === 'string' &&
+    typeof obj.passportNumber === 'string'
+  )
+}
+
 // In-memory fallback if IndexedDB is unavailable
 const memoryFallback: {
   notes: Record<string, Note>
@@ -299,6 +327,7 @@ const memoryFallback: {
   fines: Record<string, FineRecord>
   arrests: Record<string, ShiftArrestRecord>
   shifts: Record<string, ShiftRecord>
+  profile: OfficerProfile | null
 } = {
   notes: {},
   quickAccess: {},
@@ -308,6 +337,7 @@ const memoryFallback: {
   fines: {},
   arrests: {},
   shifts: {},
+  profile: null,
 }
 
 function isIndexedDBSupported(): boolean {
@@ -379,6 +409,16 @@ export function openDB(): Promise<IDBDatabase> {
           const shiftsStore = db.createObjectStore(STORES.SHIFTS, { keyPath: 'id' })
           shiftsStore.createIndex('onDutyTime', 'onDutyTime', { unique: false })
           shiftsStore.createIndex('organization', 'organization', { unique: false })
+        }
+
+        // Version 3: Local AI Vector Embeddings Store
+        if (!db.objectStoreNames.contains(STORES.AI_EMBEDDINGS)) {
+          db.createObjectStore(STORES.AI_EMBEDDINGS, { keyPath: 'key' })
+        }
+
+        // Version 4: Local Officer Profile Store
+        if (!db.objectStoreNames.contains(STORES.PROFILE)) {
+          db.createObjectStore(STORES.PROFILE, { keyPath: 'id' })
         }
       }
 
@@ -501,7 +541,7 @@ const DEFAULT_QUICK_ACCESS: QuickAccessItem[] = [
 
 const QA_INITIALIZED_KEY = 'leogrp_qa_initialized'
 
-export async function getQuickAccessItems(): Promise<QuickAccessItem[]> {
+export async function getQuickAccessItems(organization?: string): Promise<QuickAccessItem[]> {
   try {
     const db = await openDB()
     return new Promise((resolve, reject) => {
@@ -510,7 +550,7 @@ export async function getQuickAccessItems(): Promise<QuickAccessItem[]> {
       const request = store.getAll()
       request.onsuccess = () => {
         const raw = (request.result as any[]) || []
-        const items = raw.filter(isValidQuickAccessItem)
+        let items = raw.filter(isValidQuickAccessItem)
         const isInitialized = typeof window !== 'undefined' ? localStorage.getItem(QA_INITIALIZED_KEY) === 'true' : false
 
         if (!isInitialized && items.length === 0) {
@@ -519,9 +559,16 @@ export async function getQuickAccessItems(): Promise<QuickAccessItem[]> {
           if (typeof window !== 'undefined') {
             localStorage.setItem(QA_INITIALIZED_KEY, 'true')
           }
-          resolve(DEFAULT_QUICK_ACCESS)
+          items = DEFAULT_QUICK_ACCESS
+        }
+
+        if (organization) {
+          const orgFiltered = items.filter(
+            (i) => !i.organization || i.organization === organization || i.organization === 'ALL'
+          )
+          orgFiltered.sort((a, b) => a.position - b.position)
+          resolve(orgFiltered)
         } else {
-          // User data exists (even if empty array []) -> source of truth
           items.sort((a, b) => a.position - b.position)
           resolve(items)
         }
@@ -532,41 +579,75 @@ export async function getQuickAccessItems(): Promise<QuickAccessItem[]> {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_qa_fallback') : null
     const isInitialized = typeof window !== 'undefined' ? localStorage.getItem(QA_INITIALIZED_KEY) === 'true' : false
 
+    let fallbackItems: QuickAccessItem[] = DEFAULT_QUICK_ACCESS
+
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed)) {
-          return parsed.filter(isValidQuickAccessItem)
+          fallbackItems = parsed.filter(isValidQuickAccessItem)
         }
       } catch {}
+    } else if (Object.values(memoryFallback.quickAccess).length > 0) {
+      fallbackItems = Object.values(memoryFallback.quickAccess)
     }
 
-    if (!isInitialized) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(QA_INITIALIZED_KEY, 'true')
-        localStorage.setItem('leogrp_qa_fallback', JSON.stringify(DEFAULT_QUICK_ACCESS))
-      }
-      return DEFAULT_QUICK_ACCESS
+    if (!isInitialized && typeof window !== 'undefined') {
+      localStorage.setItem(QA_INITIALIZED_KEY, 'true')
+      localStorage.setItem('leogrp_qa_fallback', JSON.stringify(DEFAULT_QUICK_ACCESS))
     }
 
-    return Object.values(memoryFallback.quickAccess)
+    if (organization) {
+      return fallbackItems.filter(
+        (i) => !i.organization || i.organization === organization || i.organization === 'ALL'
+      )
+    }
+
+    return fallbackItems
   }
 }
 
-export async function saveQuickAccessList(items: QuickAccessItem[]): Promise<void> {
+export async function saveQuickAccessList(items: QuickAccessItem[], organization?: string): Promise<void> {
   const validItems = items.filter(isValidQuickAccessItem)
   if (typeof window !== 'undefined') {
     localStorage.setItem(QA_INITIALIZED_KEY, 'true')
-    localStorage.setItem('leogrp_qa_fallback', JSON.stringify(validItems))
   }
 
   try {
     const db = await openDB()
+    const allExisting: QuickAccessItem[] = await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.QUICK_ACCESS, 'readonly')
+      const store = tx.objectStore(STORES.QUICK_ACCESS)
+      const req = store.getAll()
+      req.onsuccess = () => resolve((req.result as QuickAccessItem[]) || [])
+      req.onerror = () => reject(req.error)
+    })
+
+    let merged: QuickAccessItem[]
+    if (organization) {
+      // Retain items from other orgs, replace items for this org
+      const otherOrgsItems = allExisting.filter(
+        (i) => i.organization && i.organization !== organization && i.organization !== 'ALL'
+      )
+      const tagged = validItems.map((item, index) => ({
+        ...item,
+        organization: item.organization || organization,
+        position: index,
+      }))
+      merged = [...otherOrgsItems, ...tagged]
+    } else {
+      merged = validItems.map((item, index) => ({ ...item, position: index }))
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('leogrp_qa_fallback', JSON.stringify(merged))
+    }
+
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.QUICK_ACCESS, 'readwrite')
       const store = tx.objectStore(STORES.QUICK_ACCESS)
       store.clear()
-      validItems.forEach((item, index) => {
+      merged.forEach((item, index) => {
         store.put({ ...item, position: index })
       })
       tx.oncomplete = () => resolve()
@@ -947,11 +1028,151 @@ export async function getDutyStatistics(): Promise<{
 }
 
 // -------------------------------------------------------------
+// OFFICER PROFILE API
+// -------------------------------------------------------------
+
+export const PROFILE_RECORD_ID = 'local-user-profile'
+
+export async function getOfficerProfile(): Promise<OfficerProfile | null> {
+  try {
+    const db = await openDB()
+    const fromDB: OfficerProfile | null = await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.PROFILE, 'readonly')
+      const store = tx.objectStore(STORES.PROFILE)
+      const request = store.get(PROFILE_RECORD_ID)
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+
+    if (fromDB && isValidOfficerProfile(fromDB)) {
+      return fromDB
+    }
+
+    // Check localStorage fallback / existing user profile migration
+    if (typeof window !== 'undefined') {
+      const savedUser = localStorage.getItem('userProfile') || localStorage.getItem('user_profile')
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser)
+          if (parsed && (parsed.name || parsed.id)) {
+            const org =
+              localStorage.getItem('selectedOrg') ||
+              localStorage.getItem('leogrp_selected_org') ||
+              localStorage.getItem('user_org') ||
+              'LSPD'
+            const migrated: OfficerProfile = {
+              id: PROFILE_RECORD_ID,
+              name: parsed.name || '',
+              organization: org,
+              passportNumber: parsed.id || '',
+              badgeNumber: parsed.badgeNumber || '',
+              rank: parsed.rank || '',
+              callsign: parsed.callsign || '',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              onboardingCompleted: !!(parsed.name && (parsed.id || org)),
+            }
+            if (migrated.onboardingCompleted) {
+              await saveOfficerProfile(migrated)
+            }
+            return migrated
+          }
+        } catch {}
+      }
+    }
+
+    return memoryFallback.profile
+  } catch (e) {
+    if (typeof window !== 'undefined') {
+      const fallback = localStorage.getItem('leogrp_profile_fallback')
+      if (fallback) {
+        try {
+          const parsed = JSON.parse(fallback)
+          if (isValidOfficerProfile(parsed)) return parsed
+        } catch {}
+      }
+    }
+    return memoryFallback.profile
+  }
+}
+
+export async function saveOfficerProfile(profile: OfficerProfile): Promise<void> {
+  const record: OfficerProfile = {
+    ...profile,
+    id: PROFILE_RECORD_ID,
+    name: profile.name.trim(),
+    organization: profile.organization.trim(),
+    passportNumber: profile.passportNumber.trim(),
+    badgeNumber: profile.badgeNumber?.trim() || undefined,
+    rank: profile.rank?.trim() || undefined,
+    callsign: profile.callsign?.trim() || undefined,
+    updatedAt: Date.now(),
+    onboardingCompleted: true,
+  }
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('leogrp_profile_fallback', JSON.stringify(record))
+    localStorage.setItem('officer_name', record.name)
+    localStorage.setItem('user_name', record.name)
+    localStorage.setItem(
+      'userProfile',
+      JSON.stringify({
+        name: record.name,
+        id: record.passportNumber,
+        rank: record.rank || '',
+        badgeNumber: record.badgeNumber || '',
+        callsign: record.callsign || '',
+        loadouts: [],
+      })
+    )
+    localStorage.setItem('selectedOrg', record.organization)
+    localStorage.setItem('leogrp_selected_org', record.organization)
+    localStorage.setItem('user_org', record.organization)
+    localStorage.setItem('organization', record.organization)
+  }
+
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.PROFILE, 'readwrite')
+      const store = tx.objectStore(STORES.PROFILE)
+      const request = store.put(record)
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    memoryFallback.profile = record
+  }
+}
+
+export async function deleteOfficerProfile(): Promise<void> {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('leogrp_profile_fallback')
+    localStorage.removeItem('officer_name')
+    localStorage.removeItem('user_name')
+    localStorage.removeItem('userProfile')
+  }
+
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.PROFILE, 'readwrite')
+      const store = tx.objectStore(STORES.PROFILE)
+      const request = store.delete(PROFILE_RECORD_ID)
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    memoryFallback.profile = null
+  }
+}
+
+// -------------------------------------------------------------
 // BACKUP & RESTORE UTILITY
 // -------------------------------------------------------------
 
 export async function exportDatabaseBackup(): Promise<AppBackup> {
-  const [notes, quickAccess, pinned, recent, fines, arrests, shifts] = await Promise.all([
+  const [notes, quickAccess, pinned, recent, fines, arrests, shifts, profile] = await Promise.all([
     getAllNotes(),
     getQuickAccessItems(),
     getAllPinnedItems(),
@@ -959,6 +1180,7 @@ export async function exportDatabaseBackup(): Promise<AppBackup> {
     getAllFines(),
     getAllArrests(),
     getAllShifts(),
+    getOfficerProfile(),
   ])
 
   return {
@@ -973,6 +1195,7 @@ export async function exportDatabaseBackup(): Promise<AppBackup> {
       fines,
       arrests,
       shifts,
+      profile: profile || null,
       settings: {
         includeSuspectName: typeof window !== 'undefined' ? localStorage.getItem('leogrp_include_suspect_name') !== 'false' : true,
       },
@@ -991,6 +1214,7 @@ export async function importDatabaseBackup(
   finesCount: number
   arrestsCount: number
   shiftsCount: number
+  profileRestored: boolean
 }> {
   if (!backupData || typeof backupData !== 'object' || backupData.format !== 'leo-grp-backup') {
     throw new Error('Invalid backup file format. Expected a valid LEO-GRP JSON backup.')
@@ -1004,6 +1228,7 @@ export async function importDatabaseBackup(
   const validFines = (raw.fines || []).filter(isValidFineRecord)
   const validArrests = (raw.arrests || []).filter(isValidShiftArrestRecord)
   const validShifts = (raw.shifts || []).filter(isValidShiftRecord)
+  const validProfile = raw.profile && isValidOfficerProfile(raw.profile) ? raw.profile : null
 
   try {
     const db = await openDB()
@@ -1017,6 +1242,7 @@ export async function importDatabaseBackup(
           STORES.FINES,
           STORES.ARRESTS,
           STORES.SHIFTS,
+          STORES.PROFILE,
         ],
         'readwrite'
       )
@@ -1056,9 +1282,21 @@ export async function importDatabaseBackup(
       if (mode === 'replace') shiftsStore.clear()
       validShifts.forEach((s: ShiftRecord) => shiftsStore.put(s))
 
+      // Profile
+      if (validProfile) {
+        const profileStore = tx.objectStore(STORES.PROFILE)
+        if (mode === 'replace' || !memoryFallback.profile) {
+          profileStore.put(validProfile)
+        }
+      }
+
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
+
+    if (validProfile && (mode === 'replace' || typeof window !== 'undefined')) {
+      await saveOfficerProfile(validProfile)
+    }
 
     if (raw.settings?.includeSuspectName !== undefined && typeof window !== 'undefined') {
       localStorage.setItem('leogrp_include_suspect_name', String(raw.settings.includeSuspectName))
@@ -1072,6 +1310,7 @@ export async function importDatabaseBackup(
     validFines.forEach((f: FineRecord) => (memoryFallback.fines[f.id] = f))
     validArrests.forEach((a: ShiftArrestRecord) => (memoryFallback.arrests[a.id] = a))
     validShifts.forEach((s: ShiftRecord) => (memoryFallback.shifts[s.id] = s))
+    if (validProfile) memoryFallback.profile = validProfile
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('leogrp_notes_fallback', JSON.stringify(validNotes))
@@ -1090,6 +1329,7 @@ export async function importDatabaseBackup(
     finesCount: validFines.length,
     arrestsCount: validArrests.length,
     shiftsCount: validShifts.length,
+    profileRestored: Boolean(validProfile),
   }
 }
 
@@ -1139,6 +1379,77 @@ export async function clearAllLocalProductivityData(): Promise<void> {
     memoryFallback.fines = {}
     memoryFallback.arrests = {}
     memoryFallback.shifts = {}
+  }
+}
+
+// -------------------------------------------------------------
+// AI VECTOR EMBEDDINGS CACHE API
+// -------------------------------------------------------------
+
+export interface CachedEmbeddingRecord {
+  key: string
+  corpusHash: string
+  embeddings: Array<{ id: string; code: string; vector: number[] }>
+  generatedAt: string
+}
+
+export async function saveEmbeddingCache(record: CachedEmbeddingRecord): Promise<void> {
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.AI_EMBEDDINGS, 'readwrite')
+      const store = tx.objectStore(STORES.AI_EMBEDDINGS)
+      store.put(record)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  } catch (e) {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`leogrp_emb_${record.key}`, JSON.stringify(record))
+      } catch {}
+    }
+  }
+}
+
+export async function getEmbeddingCache(key: string): Promise<CachedEmbeddingRecord | null> {
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.AI_EMBEDDINGS, 'readonly')
+      const store = tx.objectStore(STORES.AI_EMBEDDINGS)
+      const request = store.get(key)
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    if (typeof window !== 'undefined') {
+      const fallback = localStorage.getItem(`leogrp_emb_${key}`)
+      if (fallback) {
+        try {
+          return JSON.parse(fallback)
+        } catch {}
+      }
+    }
+    return null
+  }
+}
+
+export async function clearEmbeddingCache(): Promise<void> {
+  try {
+    const db = await openDB()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORES.AI_EMBEDDINGS, 'readwrite')
+      tx.objectStore(STORES.AI_EMBEDDINGS).clear()
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  } catch (e) {
+    if (typeof window !== 'undefined') {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('leogrp_emb_'))
+        .forEach((k) => localStorage.removeItem(k))
+    }
   }
 }
 

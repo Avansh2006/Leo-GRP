@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react'
 import { useProductivity } from '@/contexts/ProductivityContext'
+import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
 import {
   exportAllData,
@@ -18,6 +19,7 @@ interface DataBackupModalProps {
 export default function DataBackupModal({ isOpen, onClose }: DataBackupModalProps) {
   const { showToast } = useToast()
   const { notes, pinnedItems, quickAccessItems } = useProductivity()
+  const { profile } = useUserProfile()
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge')
   const [isConfirmingClear, setIsConfirmingClear] = useState(false)
@@ -29,7 +31,18 @@ export default function DataBackupModal({ isOpen, onClose }: DataBackupModalProp
 
   const handleExport = async () => {
     try {
-      await exportAllData()
+      const backup = await exportAllData()
+      const jsonString = JSON.stringify(backup, null, 2)
+      const blob = new Blob([jsonString], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const downloadAnchor = document.createElement('a')
+      const dateStr = new Date().toISOString().split('T')[0]
+      downloadAnchor.href = url
+      downloadAnchor.download = `leo-grp-backup-${dateStr}.json`
+      document.body.appendChild(downloadAnchor)
+      downloadAnchor.click()
+      downloadAnchor.remove()
+      URL.revokeObjectURL(url)
       showToast('Backup JSON exported successfully!', 'success')
     } catch (e) {
       showToast('Failed to export data backup', 'error')
@@ -126,7 +139,7 @@ export default function DataBackupModal({ isOpen, onClose }: DataBackupModalProp
                 <span>Local-First Storage</span>
               </div>
               <p className="text-[11px] text-on-surface-variant mt-0.5 font-mono">
-                {notes.length} Notes • {quickAccessItems.length} Shortcuts • {pinnedItems.length} Pinned
+                {notes.length} Notes • {quickAccessItems.length} Shortcuts • {pinnedItems.length} Pinned • Profile: {profile.name ? `Officer ${profile.name} (${profile.organization || 'LSPD'})` : 'Default'}
               </p>
             </div>
             <span className="text-[10px] font-mono uppercase bg-secondary/10 text-secondary px-2 py-0.5 rounded border border-secondary/30">

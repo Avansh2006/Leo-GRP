@@ -30,7 +30,7 @@ export default function BodycamCommandsPage() {
 
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['saving_grandpro', 'attaching'])
 
-  const organizations = ['LSPD', 'SAHP', 'FIB', 'GOV', 'NG', 'EMS']
+  const organizations = ['LSPD', 'BCSO', 'SAHP', 'FIB', 'GOV', 'NG', 'EMS']
 
   const handleOrgChange = (newOrg: string) => {
     setCurrentOrganization(newOrg)
@@ -262,6 +262,26 @@ export default function BodycamCommandsPage() {
           { text: `${currentOrganization} to LSPD: We're currently enroute!` },
           { text: `${currentOrganization} to LSPD: 10-4, much appreciated!` },
           { text: `${currentOrganization} to LSPD: Permission Granted!` },
+        ]
+      })
+    }
+
+    if (currentOrganization !== 'BCSO') {
+      list.push({
+        id: 'bcso',
+        name: '🤠 BCSO Related',
+        icon: '🤠',
+        commands: [
+          { text: `${currentOrganization} to BCSO: How copy?` },
+          { text: `${currentOrganization} to BCSO: Good copy, send traffic!` },
+          { text: `${currentOrganization} to BCSO: Bad copy!` },
+          { text: `${currentOrganization} to BCSO: Bad copy, we're currently in a situation!` },
+          { text: `${currentOrganization} to BCSO: Can we have a quick meeting at Sandy Shores station?` },
+          { text: `${currentOrganization} to BCSO: Requesting permission to land at your helipad.` },
+          { text: `${currentOrganization} to BCSO: We have one of your deputies in custody, could you 10-17 to DOC?` },
+          { text: `${currentOrganization} to BCSO: Deputies enroute!` },
+          { text: `${currentOrganization} to BCSO: 10-4, much appreciated!` },
+          { text: `${currentOrganization} to BCSO: Permission Granted!` },
         ]
       })
     }

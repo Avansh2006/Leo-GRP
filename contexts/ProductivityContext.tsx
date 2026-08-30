@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
+import { useUserProfile } from '@/contexts/UserProfileContext'
 import {
   Note,
   QuickAccessItem,
@@ -71,6 +72,9 @@ interface ProductivityContextType {
 const ProductivityContext = createContext<ProductivityContextType | undefined>(undefined)
 
 export function ProductivityProvider({ children }: { children: ReactNode }) {
+  const { profile } = useUserProfile()
+  const activeOrg = profile?.organization || 'LSPD'
+
   const [notes, setNotes] = useState<Note[]>([])
   const [activeNote, setActiveNote] = useState<Note | null>(null)
   const [quickAccessItems, setQuickAccessItems] = useState<QuickAccessItem[]>([])
@@ -115,10 +119,14 @@ export function ProductivityProvider({ children }: { children: ReactNode }) {
 
     // Load data from IndexedDB
     getAllNotes().then(setNotes).catch(console.error)
-    getQuickAccessItems().then(setQuickAccessItems).catch(console.error)
     getAllPinnedItems().then(setPinnedItems).catch(console.error)
     getRecentItems().then(setRecentItems).catch(console.error)
   }, [])
+
+  // Reload organization-aware Quick Access when active organization changes
+  useEffect(() => {
+    getQuickAccessItems(activeOrg).then(setQuickAccessItems).catch(console.error)
+  }, [activeOrg])
 
   const setUtilityTab = (tab: 'notes' | 'pinned' | 'recent') => {
     setUtilityTabState(tab)
@@ -279,44 +287,51 @@ export function ProductivityProvider({ children }: { children: ReactNode }) {
       const newItem: QuickAccessItem = {
         ...item,
         id: `qa-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        organization: item.organization || activeOrg,
         position: quickAccessItems.length,
         createdAt: new Date().toISOString(),
       }
 
       const updated = [...quickAccessItems, newItem]
       setQuickAccessItems(updated)
-      await dbSaveQAList(updated)
+      await dbSaveQAList(updated, activeOrg)
     },
-    [quickAccessItems]
+    [quickAccessItems, activeOrg]
   )
 
-  const removeQuickAccessItem = useCallback(async (id: string) => {
-    setQuickAccessItems((prev) => {
-      const filtered = prev.filter((item) => item.id !== id)
-      const reindexed = filtered.map((item, index) => ({ ...item, position: index }))
-      dbSaveQAList(reindexed).catch(console.error)
-      return reindexed
-    })
-    await dbDeleteQAItem(id)
-  }, [])
+  const removeQuickAccessItem = useCallback(
+    async (id: string) => {
+      setQuickAccessItems((prev) => {
+        const filtered = prev.filter((item) => item.id !== id)
+        const reindexed = filtered.map((item, index) => ({ ...item, position: index }))
+        dbSaveQAList(reindexed, activeOrg).catch(console.error)
+        return reindexed
+      })
+      await dbDeleteQAItem(id)
+    },
+    [activeOrg]
+  )
 
-  const reorderQuickAccess = useCallback(async (id: string, direction: 'up' | 'down') => {
-    setQuickAccessItems((prev) => {
-      const index = prev.findIndex((i) => i.id === id)
-      if (index === -1) return prev
+  const reorderQuickAccess = useCallback(
+    async (id: string, direction: 'up' | 'down') => {
+      setQuickAccessItems((prev) => {
+        const index = prev.findIndex((i) => i.id === id)
+        if (index === -1) return prev
 
-      const targetIndex = direction === 'up' ? index - 1 : index + 1
-      if (targetIndex < 0 || targetIndex >= prev.length) return prev
+        const targetIndex = direction === 'up' ? index - 1 : index + 1
+        if (targetIndex < 0 || targetIndex >= prev.length) return prev
 
-      const items = [...prev]
-      const [moved] = items.splice(index, 1)
-      items.splice(targetIndex, 0, moved)
+        const items = [...prev]
+        const [moved] = items.splice(index, 1)
+        items.splice(targetIndex, 0, moved)
 
-      const reindexed = items.map((item, idx) => ({ ...item, position: idx }))
-      dbSaveQAList(reindexed).catch(console.error)
-      return reindexed
-    })
-  }, [])
+        const reindexed = items.map((item, idx) => ({ ...item, position: idx }))
+        dbSaveQAList(reindexed, activeOrg).catch(console.error)
+        return reindexed
+      })
+    },
+    [activeOrg]
+  )
 
   // -------------------------------------------------------------
   // PINNED ITEMS LOGIC
