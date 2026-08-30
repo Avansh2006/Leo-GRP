@@ -19,6 +19,10 @@ export default function ProfilePage() {
     setIncludeSuspectName,
     currentOrganization,
     setCurrentOrganization,
+    docStatementTemplate,
+    setDocStatementTemplate,
+    rightsScriptTemplate,
+    setRightsScriptTemplate,
   } = useDuty()
   const { showToast } = useToast()
   const { achievements, checkAchievements } = useNotifications()
@@ -413,6 +417,58 @@ export default function ProfilePage() {
             <p className="text-[10px] text-on-surface-variant leading-relaxed">
               When <strong>ON</strong>, suspect names are prompted and recorded in fines & arrests. When <strong>OFF</strong>, logs strictly use Passport / Citizen ID numbers without recording names.
             </p>
+          </div>
+
+          {/* DOC Notice & Rights Script Customization */}
+          <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2 md:col-span-2">
+            <div className="flex items-center justify-between">
+              <span className="text-on-surface-variant font-bold uppercase text-[11px]">
+                DOC Transfer Statement (Additional Charges Notice):
+              </span>
+              <button
+                onClick={() => {
+                  const defaultDoc = 'Please be advised that these are the charges currently being applied to you. Additional charges may be added during processing at DOC if further violations are discovered. You will also be searched and processed at DOC in accordance with applicable procedure.'
+                  setDocStatementTemplate(defaultDoc)
+                  showToast('DOC statement reset to default', 'info')
+                }}
+                className="text-[10px] text-primary hover:underline"
+              >
+                Reset Default
+              </button>
+            </div>
+            <textarea
+              rows={2}
+              value={docStatementTemplate}
+              onChange={(e) => setDocStatementTemplate(e.target.value)}
+              className="w-full px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded text-xs font-mono text-on-surface focus:outline-none focus:border-primary resize-none"
+            />
+            <p className="text-[10px] text-on-surface-variant">
+              Communicates that current charges are not final and additional charges may be added during DOC processing.
+            </p>
+          </div>
+
+          <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2 md:col-span-2">
+            <div className="flex items-center justify-between">
+              <span className="text-on-surface-variant font-bold uppercase text-[11px]">
+                Miranda Rights Script Template:
+              </span>
+              <button
+                onClick={() => {
+                  const defaultRights = `You have the right to remain silent.\nAnything you say can and will be used against you in a court of law.\nYou have the right to an attorney.\nIf you cannot afford an attorney, one will be appointed to you by the state if available.\n\nDo you understand the rights I just read to you?`
+                  setRightsScriptTemplate(defaultRights)
+                  showToast('Rights script reset to default', 'info')
+                }}
+                className="text-[10px] text-primary hover:underline"
+              >
+                Reset Default
+              </button>
+            </div>
+            <textarea
+              rows={3}
+              value={rightsScriptTemplate}
+              onChange={(e) => setRightsScriptTemplate(e.target.value)}
+              className="w-full px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded text-xs font-mono text-on-surface focus:outline-none focus:border-primary resize-none"
+            />
           </div>
         </div>
       </div>

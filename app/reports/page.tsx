@@ -9,6 +9,7 @@ import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 import { EVENT_PRESETS } from '@/utils/presets'
 import { ShiftRecord } from '@/utils/db'
 import ShiftSummaryModal from '@/components/modals/ShiftSummaryModal'
+import StartDetentionModal from '@/components/modals/StartDetentionModal'
 
 const VESTS = [
   'Vest Level 1',
@@ -53,6 +54,8 @@ export default function ReportsPage() {
     lastEndedShiftReport,
     isShiftSummaryOpen,
     setIsShiftSummaryOpen,
+    activeDetention,
+    setIsArrestCommandCenterOpen,
     startDuty, 
     endDuty, 
     addEventCounter,
@@ -62,6 +65,7 @@ export default function ReportsPage() {
   const { recordRecentItem } = useProductivity()
   
   const [selectedHistoricalShift, setSelectedHistoricalShift] = useState<ShiftRecord | null>(null)
+  const [isStartDetentionOpen, setIsStartDetentionOpen] = useState(false)
   
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -351,6 +355,33 @@ ${weaponsReturnedSection}
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
+      {/* Tactical Arrest Operations Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-container-low border border-outline-variant rounded-lg p-4 shadow-sm">
+        <div>
+          <h2 className="text-sm font-bold font-mono text-on-surface uppercase tracking-wider flex items-center gap-2">
+            <span>🚨</span> Tactical Custody & Arrest Operations
+          </h2>
+          <p className="text-xs text-on-surface-variant font-mono mt-0.5">
+            Initiate active detention, issue structured fines, and generate dynamic arrest records.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setIsStartDetentionOpen(true)}
+            className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-mono text-xs font-bold rounded flex items-center gap-1.5 shadow-sm transition-colors"
+          >
+            <span>🚨</span> + Detain Person
+          </button>
+          <button
+            onClick={() => setIsArrestCommandCenterOpen(true)}
+            className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded flex items-center gap-1.5 shadow-sm transition-colors"
+          >
+            <span>⚡</span> Arrest Command Center
+          </button>
+        </div>
+      </div>
+
       <div>
         <div className="mb-6">
           <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">Evidence Generator</h1>
@@ -868,6 +899,12 @@ ${weaponsReturnedSection}
           setSelectedHistoricalShift(null)
         }}
         shift={selectedHistoricalShift || lastEndedShiftReport}
+      />
+
+      {/* Start Active Detention Modal */}
+      <StartDetentionModal
+        isOpen={isStartDetentionOpen}
+        onClose={() => setIsStartDetentionOpen(false)}
       />
 
       <footer className="text-center py-6 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700">

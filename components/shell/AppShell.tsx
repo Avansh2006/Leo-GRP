@@ -4,11 +4,14 @@ import React, { useState } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import UtilityPanel from './UtilityPanel'
+import ActiveDetentionBanner from './ActiveDetentionBanner'
 import CommandPaletteModal from '@/components/modals/CommandPaletteModal'
 import AddShortcutModal from '@/components/modals/AddShortcutModal'
 import DataBackupModal from '@/components/modals/DataBackupModal'
 import LegislationAssistantModal from '@/components/modals/LegislationAssistantModal'
+import ArrestCommandCenterModal from '@/components/modals/ArrestCommandCenterModal'
 import { useProductivity } from '@/contexts/ProductivityContext'
+import { useDuty } from '@/contexts/DutyContext'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -20,6 +23,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     assistantInitialQuery,
   } = useProductivity()
 
+  const { isArrestCommandCenterOpen, setIsArrestCommandCenterOpen } = useDuty()
+
   return (
     <div className="flex h-screen w-full bg-background text-on-surface overflow-hidden font-sans">
       {/* Left Navigation Sidebar */}
@@ -29,6 +34,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
         {/* Top Header */}
         <Header onToggleMobileSidebar={() => setMobileSidebarOpen((prev) => !prev)} />
+
+        {/* Global Active Detention Banner */}
+        <ActiveDetentionBanner />
 
         {/* Content Workspace + Right Utility Panel */}
         <div className="flex-1 flex min-h-0 overflow-hidden relative">
@@ -53,6 +61,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         isOpen={isAssistantOpen}
         onClose={() => setIsAssistantOpen(false)}
         initialQuery={assistantInitialQuery}
+      />
+      <ArrestCommandCenterModal
+        isOpen={isArrestCommandCenterOpen}
+        onClose={() => setIsArrestCommandCenterOpen(false)}
       />
     </div>
   )

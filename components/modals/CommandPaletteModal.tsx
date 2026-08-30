@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 
@@ -22,6 +23,10 @@ export default function CommandPaletteModal() {
   const router = useRouter()
   const { showToast } = useToast()
   const { toggleTheme } = useTheme()
+  const {
+    activeDetention,
+    setIsArrestCommandCenterOpen,
+  } = useDuty()
   const {
     isCommandPaletteOpen,
     setIsCommandPaletteOpen,
@@ -326,78 +331,107 @@ export default function CommandPaletteModal() {
 
   // Quick Actions
   const actionItems: PaletteItem[] = useMemo(
-    () => [
-      {
-        id: 'action-assistant',
-        title: 'Open Legislation Assistant',
-        subtitle: 'Ask questions about Traffic Code (2nd Rendition) and Penal Codes',
-        category: 'Actions',
-        icon: '⚖️',
-        keywords: ['assistant', 'ai', 'legislation', 'help', 'explain', 'law'],
-        action: () => {
-          openAssistant()
+    () => {
+      const items: PaletteItem[] = [
+        {
+          id: 'action-arrest-center',
+          title: 'Open Arrest Command Center',
+          subtitle: 'Tactical arrest workstation, fine-first processing & checklist',
+          category: 'Actions',
+          icon: '🚨',
+          keywords: ['arrest', 'detain', 'custody', 'fine', 'charges', 'command', 'center'],
+          action: () => {
+            setIsArrestCommandCenterOpen(true)
+          },
         },
-      },
-      {
-        id: 'action-new-note',
-        title: 'Create New Note',
-        subtitle: 'Open officer notebook and start typing immediately',
-        category: 'Actions',
-        icon: '⚡',
-        keywords: ['new', 'note', 'create', 'memo', 'reminder'],
-        action: () => {
-          createNote({ title: 'New Note' })
-          setIsRightPanelOpen(true)
-          setUtilityTab('notes')
+        {
+          id: 'action-assistant',
+          title: 'Open Legislation Assistant',
+          subtitle: 'Ask questions about Traffic Code (2nd Rendition) and Penal Codes',
+          category: 'Actions',
+          icon: '⚖️',
+          keywords: ['assistant', 'ai', 'legislation', 'help', 'explain', 'law'],
+          action: () => {
+            openAssistant()
+          },
         },
-      },
-      {
-        id: 'action-add-shortcut',
-        title: 'Add Quick Access Shortcut',
-        subtitle: 'Pin a custom command, law, or page to the left sidebar',
-        category: 'Actions',
-        icon: '📌',
-        keywords: ['shortcut', 'add', 'quick', 'access', 'pin'],
-        action: () => {
-          setIsAddShortcutOpen(true)
+        {
+          id: 'action-new-note',
+          title: 'Create New Note',
+          subtitle: 'Open officer notebook and start typing immediately',
+          category: 'Actions',
+          icon: '⚡',
+          keywords: ['new', 'note', 'create', 'memo', 'reminder'],
+          action: () => {
+            createNote({ title: 'New Note' })
+            setIsRightPanelOpen(true)
+            setUtilityTab('notes')
+          },
         },
-      },
-      {
-        id: 'action-backup',
-        title: 'Backup & Storage Manager',
-        subtitle: 'Export JSON backup, import backup, or manage local data',
-        category: 'Actions',
-        icon: '💾',
-        keywords: ['backup', 'export', 'import', 'restore', 'storage', 'data', 'json'],
-        action: () => {
-          setIsBackupModalOpen(true)
+        {
+          id: 'action-add-shortcut',
+          title: 'Add Quick Access Shortcut',
+          subtitle: 'Pin a custom command, law, or page to the left sidebar',
+          category: 'Actions',
+          icon: '📌',
+          keywords: ['shortcut', 'add', 'quick', 'access', 'pin'],
+          action: () => {
+            setIsAddShortcutOpen(true)
+          },
         },
-      },
-      {
-        id: 'action-toggle-panel',
-        title: isRightPanelOpen ? 'Collapse Utility Panel' : 'Expand Utility Panel',
-        subtitle: 'Toggle right sidebar for Notes, Pinned, and Recent items',
-        category: 'Actions',
-        icon: '📂',
-        keywords: ['panel', 'toggle', 'utility', 'sidebar'],
-        action: () => {
-          toggleRightPanel()
+        {
+          id: 'action-backup',
+          title: 'Backup & Storage Manager',
+          subtitle: 'Export JSON backup, import backup, or manage local data',
+          category: 'Actions',
+          icon: '💾',
+          keywords: ['backup', 'export', 'import', 'restore', 'storage', 'data', 'json'],
+          action: () => {
+            setIsBackupModalOpen(true)
+          },
         },
-      },
-      {
-        id: 'action-toggle-theme',
-        title: 'Toggle Theme Appearance',
-        subtitle: 'Switch between Dark, Light, or Auto mode',
-        category: 'Actions',
-        icon: '🌓',
-        keywords: ['theme', 'dark', 'light', 'mode', 'color'],
-        action: () => {
-          toggleTheme()
-          showToast('Theme updated', 'info')
+        {
+          id: 'action-toggle-panel',
+          title: isRightPanelOpen ? 'Collapse Utility Panel' : 'Expand Utility Panel',
+          subtitle: 'Toggle right sidebar for Notes, Pinned, and Recent items',
+          category: 'Actions',
+          icon: '📂',
+          keywords: ['panel', 'toggle', 'utility', 'sidebar'],
+          action: () => {
+            toggleRightPanel()
+          },
         },
-      },
-    ],
-    [createNote, isRightPanelOpen, setIsAddShortcutOpen, setIsBackupModalOpen, setIsRightPanelOpen, setUtilityTab, showToast, toggleRightPanel, toggleTheme]
+        {
+          id: 'action-toggle-theme',
+          title: 'Toggle Theme Appearance',
+          subtitle: 'Switch between Dark, Light, or Auto mode',
+          category: 'Actions',
+          icon: '🌓',
+          keywords: ['theme', 'dark', 'light', 'mode', 'color'],
+          action: () => {
+            toggleTheme()
+            showToast('Theme updated', 'info')
+          },
+        },
+      ]
+
+      if (activeDetention) {
+        items.unshift({
+          id: 'action-resume-detention',
+          title: `Resume Active Detention (Passport #${activeDetention.passportNumber || 'N/A'})`,
+          subtitle: `Active Case ${activeDetention.caseId} • ${activeDetention.charges.length} charge(s)`,
+          category: 'Actions',
+          icon: '⚡',
+          keywords: ['active', 'detention', 'resume', 'custody', 'suspect', activeDetention.passportNumber],
+          action: () => {
+            setIsArrestCommandCenterOpen(true)
+          },
+        })
+      }
+
+      return items
+    },
+    [activeDetention, createNote, isRightPanelOpen, openAssistant, setIsAddShortcutOpen, setIsArrestCommandCenterOpen, setIsBackupModalOpen, setIsRightPanelOpen, setUtilityTab, showToast, toggleRightPanel, toggleTheme]
   )
 
   // Notes Items

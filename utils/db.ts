@@ -60,29 +60,80 @@ export interface FineRecord {
   sourceDocument: string
 }
 
+export interface DetentionChargeItem {
+  id: string
+  code: string
+  title: string
+  fine?: string
+  fineAmount: number
+  sentence?: string
+  sentenceMonths: number
+  stars?: string
+  bail?: string
+  sourceDocument: string
+  fineStatus: 'NOT_ISSUED' | 'ISSUED' | 'NOT_APPLICABLE'
+  fineIssuedAt?: string
+  fineRecordId?: string
+}
+
+export interface DetentionChecklistState {
+  suspectIdentified: boolean
+  chargesSelected: boolean
+  requiredFinesIssued: boolean
+  chargesCommunicated: boolean
+  rightsRead: boolean
+  rightsUnderstood: boolean
+  docStatementCommunicated: boolean
+  arrestFinalized: boolean
+}
+
+export interface ActiveDetention {
+  id: string
+  caseId: string
+  startTime: string
+  officerName: string
+  organization: string
+  passportNumber: string
+  suspectName?: string
+  charges: DetentionChargeItem[]
+  checklist: DetentionChecklistState
+  notes?: string
+  status: 'ACTIVE' | 'FINALIZED' | 'ABANDONED'
+}
+
 export interface ArrestChargeItem {
   code: string
   title: string
   fine?: string
+  fineAmount?: number
+  fineStatus?: 'NOT_ISSUED' | 'ISSUED' | 'NOT_APPLICABLE'
+  fineIssuedAt?: string
   sentence?: string
+  sentenceMonths?: number
   stars?: string
   bail?: string
 }
 
 export interface ShiftArrestRecord {
   id: string
+  caseId?: string
   type: 'arrest'
   timestamp: string
   shiftId: string | null
   organization: string
+  officerName?: string
   suspectName?: string
   passportNumber?: string
   status: 'ARRESTED'
   charges: ArrestChargeItem[]
+  finesIssuedCount?: number
   totalSentenceMonths: number
   totalFineAmount: number
   stars?: string
   bailStatus?: string
+  checklist?: DetentionChecklistState
+  notes?: string
+  docStatementIncluded?: boolean
 }
 
 export interface ShiftRecord {
@@ -771,6 +822,41 @@ export async function saveArrest(arrest: ShiftArrestRecord): Promise<void> {
 export async function getArrestsByShift(shiftId: string): Promise<ShiftArrestRecord[]> {
   const all = await getAllArrests()
   return all.filter((a) => a.shiftId === shiftId)
+}
+
+// -------------------------------------------------------------
+// ACTIVE DETENTION PERSISTENCE
+// -------------------------------------------------------------
+
+export const ACTIVE_DETENTION_KEY = 'leogrp_active_detention'
+
+export function saveActiveDetention(detention: ActiveDetention | null): void {
+  if (typeof window === 'undefined') return
+  if (detention && detention.status === 'ACTIVE') {
+    localStorage.setItem(ACTIVE_DETENTION_KEY, JSON.stringify(detention))
+  } else {
+    localStorage.removeItem(ACTIVE_DETENTION_KEY)
+  }
+}
+
+export function getActiveDetention(): ActiveDetention | null {
+  if (typeof window === 'undefined') return null
+  const saved = localStorage.getItem(ACTIVE_DETENTION_KEY)
+  if (!saved) return null
+  try {
+    const parsed = JSON.parse(saved)
+    if (parsed && parsed.id && parsed.status === 'ACTIVE') {
+      return parsed as ActiveDetention
+    }
+  } catch (e) {
+    console.error('Failed to parse active detention:', e)
+  }
+  return null
+}
+
+export function clearActiveDetention(): void {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(ACTIVE_DETENTION_KEY)
 }
 
 // -------------------------------------------------------------

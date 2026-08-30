@@ -14,11 +14,17 @@ import {
 } from '@/utils/presets'
 import IssueFineModal from '@/components/modals/IssueFineModal'
 import IssueArrestModal from '@/components/modals/IssueArrestModal'
+import StartDetentionModal from '@/components/modals/StartDetentionModal'
 
 function PatrolmanGuideContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
+  const {
+    activeDetention,
+    setIsArrestCommandCenterOpen,
+    addChargeToDetention,
+  } = useDuty()
   const {
     recordRecentItem,
     pinItem,
@@ -38,11 +44,12 @@ function PatrolmanGuideContent() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [activeDetailEntry, setActiveDetailEntry] = useState<LawEntry | null>(null)
 
-  // Fine Issuance state
+  // Detention & Fine states
+  const [isStartDetentionOpen, setIsStartDetentionOpen] = useState(false)
   const [fineModalEntry, setFineModalEntry] = useState<LawEntry | null>(null)
   const [isFineModalOpen, setIsFineModalOpen] = useState(false)
 
-  // Charge collector / Arrest state
+  // Charge collector state
   const [selectedCharges, setSelectedCharges] = useState<LawEntry[]>([])
   const [isArrestModalOpen, setIsArrestModalOpen] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
@@ -190,6 +197,10 @@ function PatrolmanGuideContent() {
   }
 
   const handleAddCharge = (entry: LawEntry) => {
+    if (activeDetention) {
+      addChargeToDetention(entry)
+    }
+
     if (!selectedCharges.find((c) => c.code === entry.code)) {
       setSelectedCharges((prev) => [...prev, entry])
       recordRecentItem({
@@ -198,7 +209,7 @@ function PatrolmanGuideContent() {
         title: entry.code,
         subtitle: `Selected: ${entry.description}`,
       })
-      showToast(`Added charge ${entry.code}`, 'success')
+      showToast(`Added charge § ${entry.code}`, 'success')
     } else {
       showToast('Charge already in collector', 'info')
     }
@@ -275,8 +286,24 @@ function PatrolmanGuideContent() {
           </p>
         </div>
 
-        {/* Global Stats / View Toggle */}
+        {/* Global Stats / View Toggle / Detain Person */}
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setIsStartDetentionOpen(true)}
+            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-mono text-xs font-bold rounded flex items-center gap-1.5 shadow transition-colors"
+          >
+            <span>🚨</span> + Detain Person
+          </button>
+
+          {activeDetention && (
+            <button
+              onClick={() => setIsArrestCommandCenterOpen(true)}
+              className="px-3 py-1.5 bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30 font-mono text-xs font-bold rounded flex items-center gap-1.5 shadow transition-colors animate-pulse"
+            >
+              <span>⚡</span> Active Detention ({activeDetention.charges.length})
+            </button>
+          )}
+
           <div className="flex items-center bg-surface-container rounded border border-outline-variant p-0.5">
             <button
               onClick={() => setViewMode('cards')}
@@ -302,10 +329,10 @@ function PatrolmanGuideContent() {
 
           {selectedCharges.length > 0 && (
             <button
-              onClick={() => setIsArrestModalOpen(true)}
+              onClick={() => setIsArrestCommandCenterOpen(true)}
               className="px-3 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-semibold rounded flex items-center gap-1.5 shadow transition-colors"
             >
-              <span>🔒</span> Active Charges ({selectedCharges.length})
+              <span>🔒</span> Arrest Workstation ({selectedCharges.length})
             </button>
           )}
         </div>
@@ -563,6 +590,17 @@ function PatrolmanGuideContent() {
                   </span>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAddCharge(entry)}
+                      className={`px-2.5 py-1 text-xs font-mono rounded flex items-center gap-1 border transition-colors ${
+                        selectedCharges.some((c) => c.code === entry.code)
+                          ? 'bg-primary/20 text-primary border-primary/40 font-bold'
+                          : 'bg-surface-container-high hover:bg-surface-variant text-on-surface border-outline-variant'
+                      }`}
+                      title="Add to charges / active detention"
+                    >
+                      <span>+</span> Charge
+                    </button>
                     <button
                       onClick={() => handleCopyProvision(entry)}
                       className="px-2.5 py-1 bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-mono rounded flex items-center gap-1 border border-outline-variant transition-colors"
@@ -853,6 +891,12 @@ function PatrolmanGuideContent() {
         charges={selectedCharges}
         onRemoveCharge={handleRemoveCharge}
         onClearCharges={() => setSelectedCharges([])}
+      />
+
+      {/* Start Active Detention Modal */}
+      <StartDetentionModal
+        isOpen={isStartDetentionOpen}
+        onClose={() => setIsStartDetentionOpen(false)}
       />
     </div>
   )

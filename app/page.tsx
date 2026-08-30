@@ -8,7 +8,15 @@ import { useProductivity } from '@/contexts/ProductivityContext'
 
 export default function Home() {
   const { profile } = useUserProfile()
-  const { isOnDuty, currentDutyStart, lifetimeArrests, lifetimeFines, lifetimeFinesCount } = useDuty()
+  const {
+    isOnDuty,
+    currentDutyStart,
+    lifetimeArrests,
+    lifetimeFines,
+    lifetimeFinesCount,
+    activeDetention,
+    setIsArrestCommandCenterOpen,
+  } = useDuty()
   const { createNote, recordRecentItem } = useProductivity()
 
   useEffect(() => {
@@ -98,6 +106,13 @@ export default function Home() {
             >
               {isOnDuty ? 'Manage Active Shift' : 'Start Patrol Shift'}
             </Link>
+
+            <button
+              onClick={() => setIsArrestCommandCenterOpen(true)}
+              className="px-3.5 py-2 text-xs font-mono text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded transition-colors flex items-center gap-1.5 font-bold"
+            >
+              <span>🚨</span> {activeDetention ? 'Resume Arrest' : 'Arrest Command Center'}
+            </button>
 
             <button
               onClick={() => createNote({ title: 'Shift Notes' })}
