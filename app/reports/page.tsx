@@ -382,102 +382,7 @@ ${weaponsReturnedSection}
         </div>
       </div>
 
-      <div>
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">Evidence Generator</h1>
-          <p className="text-gray-600 dark:text-gray-400">Generate properly formatted evidence reports.</p>
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Current Time: {new Date().toLocaleString()}</p>
-        </div>
-
-        <div className="card p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date *</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Time *</label>
-              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input w-full" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description *</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="input w-full min-h-[120px]" placeholder="Detailed description of the incident..." />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search & Add Charges</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => handleSearchCharges(e.target.value)}
-                onFocus={() => searchTerm.length >= 2 && setShowChargeDropdown(true)}
-                onBlur={() => setTimeout(() => setShowChargeDropdown(false), 200)}
-                className="input w-full"
-                placeholder="Search for charges..."
-              />
-              
-              {showChargeDropdown && availableCharges.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {availableCharges.map((charge) => (
-                    <button
-                      key={charge.code}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        addCharge(charge)
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      <div className="font-mono text-blue-600 dark:text-blue-300 text-sm">{charge.code}</div>
-                      <div className="text-gray-900 dark:text-gray-300 text-sm">{charge.description}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {selectedCharges.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Selected charges:</p>
-                {selectedCharges.map((charge) => (
-                  <div key={charge.code} className="flex items-start justify-between bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
-                    <span className="font-mono text-blue-600 dark:text-blue-300 text-sm">{charge.code} {charge.description}</span>
-                    <button onClick={() => removeCharge(charge.code)} className="text-red-600 dark:text-red-400 ml-4">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bodycam Footage</label>
-              <input type="text" value={bodycamFootage} onChange={(e) => setBodycamFootage(e.target.value)} className="input w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bodycam Proof</label>
-              <input type="text" value={bodycamProof} onChange={(e) => setBodycamProof(e.target.value)} className="input w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">License Plates</label>
-              <input type="text" value={licensePlates} onChange={(e) => setLicensePlates(e.target.value)} className="input w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Makeup</label>
-              <input type="text" value={makeup} onChange={(e) => setMakeup(e.target.value)} className="input w-full" />
-            </div>
-          </div>
-
-          <button onClick={generateEvidenceReport} className="btn btn-primary w-full">Generate & Copy Report</button>
-        </div>
-      </div>
-
+      {/* Shift / Duty Report Generator (FIRST / AT THE TOP) */}
       <div>
         <div className="mb-6">
           <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">Shift Report Generator</h1>
@@ -613,51 +518,47 @@ ${weaponsReturnedSection}
                       onClick={() => setShowWeaponDropdown(!showWeaponDropdown)}
                       className="input w-full text-left flex items-center justify-between"
                     >
-                      <span className="text-gray-500 dark:text-gray-400">Add weapons...</span>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <span className="text-gray-500">Add a weapon...</span>
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
                     
                     {showWeaponDropdown && (
                       <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                        {WEAPONS.filter(w => !selectedWeapons.find(sw => sw.weapon === w)).length > 0 ? (
-                          WEAPONS.filter(w => !selectedWeapons.find(sw => sw.weapon === w)).map((weapon) => (
-                            <button
-                              key={weapon}
-                              onClick={() => addWeaponFromDropdown(weapon)}
-                              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-gray-200"
-                            >
-                              {weapon}
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-4 py-2 text-gray-500 dark:text-gray-400 text-sm">All weapons selected</div>
-                        )}
+                        {WEAPONS.map((weapon) => (
+                          <button
+                            key={weapon}
+                            type="button"
+                            onClick={() => addWeaponFromDropdown(weapon)}
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-gray-100"
+                          >
+                            {weapon}
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
 
                   {selectedWeapons.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Selected weapons:</p>
-                      {selectedWeapons.map((item) => (
-                        <div key={item.weapon} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-200">{item.weapon}</p>
-                          </div>
+                    <div className="space-y-2 mt-3">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Selected weapons (specify ammo):</p>
+                      {selectedWeapons.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 p-2 rounded-md">
+                          <span className="text-sm text-gray-900 dark:text-gray-200 flex-1">{item.weapon}</span>
                           <input
                             type="text"
+                            placeholder="Ammo amount..."
                             value={item.ammo}
                             onChange={(e) => updateWeaponAmmo(item.weapon, e.target.value)}
-                            placeholder="Ammo amount"
-                            className="input w-32"
+                            className="input w-32 text-sm"
                           />
-                          <button 
-                            onClick={() => removeWeapon(item.weapon)} 
+                          <button
+                            type="button"
+                            onClick={() => removeWeapon(item.weapon)}
                             className="text-red-600 dark:text-red-400 hover:text-red-800"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           </button>
@@ -810,6 +711,103 @@ ${weaponsReturnedSection}
         </div>
       </div>
 
+      {/* Evidence Generator (BELOW DUTY REPORT) */}
+      <div>
+        <div className="mb-6">
+          <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">Evidence Generator</h1>
+          <p className="text-gray-600 dark:text-gray-400">Generate properly formatted evidence reports.</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Current Time: {new Date().toLocaleString()}</p>
+        </div>
+
+        <div className="card p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date *</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Time *</label>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input w-full" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description *</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="input w-full min-h-[120px]" placeholder="Detailed description of the incident..." />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search & Add Charges</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => handleSearchCharges(e.target.value)}
+                onFocus={() => searchTerm.length >= 2 && setShowChargeDropdown(true)}
+                onBlur={() => setTimeout(() => setShowChargeDropdown(false), 200)}
+                className="input w-full"
+                placeholder="Search for charges..."
+              />
+              
+              {showChargeDropdown && availableCharges.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  {availableCharges.map((charge) => (
+                    <button
+                      key={charge.code}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        addCharge(charge)
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <div className="font-mono text-blue-600 dark:text-blue-300 text-sm">{charge.code}</div>
+                      <div className="text-gray-900 dark:text-gray-300 text-sm">{charge.description}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {selectedCharges.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Selected charges:</p>
+                {selectedCharges.map((charge) => (
+                  <div key={charge.code} className="flex items-start justify-between bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
+                    <span className="font-mono text-blue-600 dark:text-blue-300 text-sm">{charge.code} {charge.description}</span>
+                    <button onClick={() => removeCharge(charge.code)} className="text-red-600 dark:text-red-400 ml-4">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bodycam Footage</label>
+              <input type="text" value={bodycamFootage} onChange={(e) => setBodycamFootage(e.target.value)} className="input w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bodycam Proof</label>
+              <input type="text" value={bodycamProof} onChange={(e) => setBodycamProof(e.target.value)} className="input w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">License Plates</label>
+              <input type="text" value={licensePlates} onChange={(e) => setLicensePlates(e.target.value)} className="input w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Makeup</label>
+              <input type="text" value={makeup} onChange={(e) => setMakeup(e.target.value)} className="input w-full" />
+            </div>
+          </div>
+
+          <button onClick={generateEvidenceReport} className="btn btn-primary w-full">Generate & Copy Report</button>
+        </div>
+      </div>
+
       {/* Weapon Status Modal */}
       {showWeaponModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -907,8 +905,14 @@ ${weaponsReturnedSection}
         onClose={() => setIsStartDetentionOpen(false)}
       />
 
-      <footer className="text-center py-6 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700">
-        Made by <span className="font-semibold text-blue-600 dark:text-blue-400">Avansh Yadav (EN3)</span> - Currently Server Administrator
+      {/* Integrated Tactical Precision Footer */}
+      <footer className="pt-8 pb-6 border-t border-outline-variant/60 text-center font-mono text-xs text-on-surface-variant space-y-1">
+        <div className="font-bold tracking-wider text-primary uppercase text-sm">
+          LEO-GRP
+        </div>
+        <div className="text-[11px] text-on-surface-variant/80">
+          Made by Avansh Vukovic | 129253 | Ex-Admin EN3
+        </div>
       </footer>
     </div>
   )
