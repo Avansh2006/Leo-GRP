@@ -1,8 +1,15 @@
+/**
+ * Bodycam & RP Commands Reference for LEO-GRP
+ * Fully organization-aware: Synchronized with the global active organization single source of truth.
+ * Supports GrandPro saving, uniform & undercover attachment, PDA/drone ops, and multi-agency department radio traffic.
+ */
+
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useToast } from '@/components/ToastProvider'
 import { useProductivity } from '@/contexts/ProductivityContext'
+import { useDuty } from '@/contexts/DutyContext'
 
 interface Command {
   text: string
@@ -18,41 +25,33 @@ interface Category {
 
 export default function BodycamCommandsPage() {
   const { showToast } = useToast()
-  const [selectedOrg, setSelectedOrg] = useState('LSPD')
+  const { currentOrganization, setCurrentOrganization } = useDuty()
+  const { recordRecentItem, pinItem, unpinItem, isItemPinned } = useProductivity()
+
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['saving_grandpro', 'attaching'])
 
   const organizations = ['LSPD', 'SAHP', 'FIB', 'GOV', 'NG', 'EMS']
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedOrg = localStorage.getItem('leogrp_selected_org')
-      if (savedOrg && organizations.includes(savedOrg)) {
-        setSelectedOrg(savedOrg)
-      }
-    }
-  }, [])
-
   const handleOrgChange = (newOrg: string) => {
-    setSelectedOrg(newOrg)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_selected_org', newOrg)
-    }
+    setCurrentOrganization(newOrg)
+    showToast(`Active organization set to ${newOrg}`, 'success')
   }
 
-  const categories: Category[] = [
+  // General Commands categories using active organization
+  const categories: Category[] = useMemo(() => [
     {
       id: 'saving_grandpro',
       name: '🔴 SAVING BODYCAM — GRANDPRO',
       icon: '🔴',
       commands: [
         {
-          text: `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${selectedOrg} Cloud Servers.`
+          text: `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${currentOrganization} Cloud Servers.`
         },
         {
           text: '/do insert new SD card into GrandPro and it is recording'
         },
         {
-          text: `/do put SD Card into phone, connects to ${selectedOrg} Cloud Servers, downloads Bodycam on SD Card`
+          text: `/do put SD Card into phone, connects to ${currentOrganization} Cloud Servers, downloads Bodycam on SD Card`
         }
       ]
     },
@@ -62,13 +61,13 @@ export default function BodycamCommandsPage() {
       icon: '📹',
       commands: [
         {
-          label: 'ATTACHING BODYCAM (Uniform) - Must be done: in offices, next to NPCs at HQ, locker rooms, armory, or next to FIB car. Re-attach after Bad Dream, Code A, Change of Clothes, or every 4 hours.',
+          label: `ATTACHING BODYCAM (Uniform) - Must be done: in offices, next to NPCs at HQ, locker rooms, armory, or next to ${currentOrganization} vehicle. Re-attach after Bad Dream, Code A, Change of Clothes, or every 4 hours.`,
           text: '/me Takes out bodycam, attaches it to chest, checks its ballistic, water proof'
         },
         { text: '/me makes sure it is recording and checks for the red light' },
         { text: '/do It is recording, is ballistic and water proof' },
         {
-          label: 'ATTACHING BODYCAM UNDERCOVER - Must be done: in offices, next to NPCs at HQ, locker rooms, armory, or next to FIB car. Re-attach after Bad Dream, Code A, Change of Clothes, or every 4 hours.',
+          label: `ATTACHING BODYCAM UNDERCOVER - Must be done: in offices, next to NPCs at HQ, locker rooms, armory, or next to ${currentOrganization} vehicle. Re-attach after Bad Dream, Code A, Change of Clothes, or every 4 hours.`,
           text: '/me takes out bodycam and attaches it to belt, hides it, checks its ballistic and water proof'
         },
         { text: '/me makes sure it is recording and checks for the red light' },
@@ -97,8 +96,8 @@ export default function BodycamCommandsPage() {
       icon: '💾',
       commands: [
         {
-          label: 'SAVING A SITUATION - Bodycam needs to be uploaded to the FIB cloud to be valid.',
-          text: `/me saves bodycam, uploads it to the ${selectedOrg} Cloud and continues recording`
+          label: `SAVING A SITUATION - Bodycam needs to be uploaded to the ${currentOrganization} cloud to be valid.`,
+          text: `/me saves bodycam, uploads it to the ${currentOrganization} Cloud and continues recording`
         },
         { text: '/do It is recording.' },
       ]
@@ -121,8 +120,8 @@ export default function BodycamCommandsPage() {
       icon: '📱',
       commands: [
         {
-          label: 'CONNECT PDA - PDA needs to be connected to the nearest cell tower to look up information.',
-          text: `/me connects PDA to the nearest ${selectedOrg} cell tower`
+          label: `CONNECT PDA - PDA needs to be connected to the nearest ${currentOrganization} cell tower to look up information.`,
+          text: `/me connects PDA to the nearest ${currentOrganization} cell tower`
         },
       ]
     },
@@ -132,20 +131,20 @@ export default function BodycamCommandsPage() {
       icon: '🚁',
       commands: [
         {
-          label: 'WHILE ON DUTY - If in duty clothes, launch the FIB drone.',
-          text: `/me launches ${selectedOrg} drone`
+          label: `WHILE ON DUTY - If in duty clothes, launch the ${currentOrganization} drone.`,
+          text: `/me launches ${currentOrganization} drone`
         },
         {
-          label: 'WHILE UNDERCOVER - Take drone from FIB car (or lockers) and put in backpack. Cannot launch 2 drones in a row unless you picked it up off the ground.',
-          text: `/me takes the ${selectedOrg} drone from the trunk and puts it in the backpack`
+          label: `WHILE UNDERCOVER - Take drone from ${currentOrganization} car (or lockers) and put in backpack. Cannot launch 2 drones in a row unless you picked it up off the ground.`,
+          text: `/me takes the ${currentOrganization} drone from the trunk and puts it in the backpack`
         },
         { 
           label: 'Later:',
-          text: `/me takes the ${selectedOrg} drone from the backpack and launches it` 
+          text: `/me takes the ${currentOrganization} drone from the backpack and launches it` 
         },
         { 
           label: 'After situation recorded:',
-          text: `/me takes the ${selectedOrg} drone from the ground and puts it in the backpack` 
+          text: `/me takes the ${currentOrganization} drone from the ground and puts it in the backpack` 
         },
       ]
     },
@@ -182,7 +181,7 @@ export default function BodycamCommandsPage() {
       commands: [
         {
           label: 'Option 1:',
-          text: `/do saves bodycam onto an SSD Card and uploads into PDA to ${selectedOrg} Cloud servers and continues recording`
+          text: `/do saves bodycam onto an SSD Card and uploads into PDA to ${currentOrganization} Cloud servers and continues recording`
         },
         { text: '/me downloads bodycam onto USB stick using PDA and then hands over USB stick to Attorney' },
         {
@@ -194,14 +193,14 @@ export default function BodycamCommandsPage() {
     },
     {
       id: 'contracts',
-      name: '📝 FIB Contracts',
+      name: `📝 ${currentOrganization} Employment & Code of Conduct`,
       icon: '📝',
       commands: [
         {
-          label: 'FIB CONTRACTS:',
-          text: `/me Signs the ${selectedOrg} Employment Contract on the desk`
+          label: `${currentOrganization} CONTRACTS:`,
+          text: `/me Signs the ${currentOrganization} Employment Contract on the desk`
         },
-        { text: `/me Signs the ${selectedOrg} Code of Conduct` },
+        { text: `/me Signs the ${currentOrganization} Code of Conduct` },
       ]
     },
     {
@@ -226,137 +225,177 @@ export default function BodycamCommandsPage() {
         { text: '/me drops the jumpsuit on the bed' },
       ]
     },
-  ]
+  ], [currentOrganization])
 
-  const departmentMessages: Category[] = [
-    {
-      id: 'doj',
-      name: '⚖️ DOJ Related',
-      icon: '⚖️',
-      commands: [
-        { text: `${selectedOrg} to DOJ: How copy?` },
-        { text: `${selectedOrg} to DOJ: Good copy, send traffic!` },
-        { text: `${selectedOrg} to DOJ: Bad copy!` },
-        { text: `${selectedOrg} to DOJ: Bad copy, we're currently in a situation!` },
-        { text: `${selectedOrg} to DOJ: We have a 10-15 at DOC requesting a lawyer, Are there any available?` },
-        { text: `${selectedOrg} to DOJ: 10-4, much appreciated!` },
-      ]
-    },
-    {
-      id: 'lspd',
-      name: '👮‍♂️👮‍♀️ LSPD Related',
-      icon: '👮‍♂️',
-      commands: [
-        { text: `${selectedOrg} to LSPD: How copy?` },
-        { text: `${selectedOrg} to LSPD: Good copy, send traffic!` },
-        { text: `${selectedOrg} to LSPD: Bad copy!` },
-        { text: `${selectedOrg} to LSPD: Bad copy, we're currently in a situation!` },
-        { text: `${selectedOrg} to LSPD: Can we have a quick meeting at your HQ?` },
-        { text: `${selectedOrg} to LSPD: Requesting permission to land at your helipad.` },
-        { text: `${selectedOrg} to LSPD: We are entering your jurisdiction in chase of a car hijacker, help would be appreciated.` },
-        { text: `${selectedOrg} to LSPD: We have one of your units in custody, could you 10-17 to DOC?` },
-        { text: `${selectedOrg} to LSPD: We're currently enroute!` },
-        { text: `${selectedOrg} to LSPD: 10-4, much appreciated!` },
-        { text: `${selectedOrg} to LSPD: Permission Granted!` },
-      ]
-    },
-    {
-      id: 'sahp',
-      name: '🚓 SAHP Related',
-      icon: '🚓',
-      commands: [
-        { text: `${selectedOrg} to SAHP: Good copy, send traffic!` },
-        { text: `${selectedOrg} to SAHP: Bad copy!` },
-        { text: `${selectedOrg} to SAHP: Bad copy, we're currently in a situation!` },
-        { text: `${selectedOrg} to SAHP: Can we have a quick meeting at your hall?` },
-        { text: `${selectedOrg} to SAHP: Requesting permission to land at your helipad.` },
-        { text: `${selectedOrg} to SAHP: We have one of your agents in custody, could you 10-17 to DOC?` },
-        { text: `${selectedOrg} to SAHP: We're currently enroute!` },
-        { text: `${selectedOrg} to SAHP: Troopers enroute!` },
-        { text: `${selectedOrg} to SAHP: 10-4, much appreciated!` },
-        { text: `${selectedOrg} to SAHP: Permission Granted!` },
-      ]
-    },
-    {
-      id: 'ng',
-      name: '🙍‍♂️ NG Related',
-      icon: '🙍‍♂️',
-      commands: [
-        { text: `${selectedOrg} to NG: How copy?` },
-        { text: `${selectedOrg} to NG: Good copy, send traffic!` },
-        { text: `${selectedOrg} to NG: Bad copy!` },
-        { text: `${selectedOrg} to NG: Bad copy, we're currently in a situation!` },
-        { text: `${selectedOrg} to NG: Can we have a quick meeting at your main barracks?` },
-        { text: `${selectedOrg} to NG: Requesting permission to land at your main barracks.` },
-        { text: `${selectedOrg} to NG: We have one of your soldiers in custody, could you 10-17 to DOC?` },
-        { text: `${selectedOrg} to NG: We're currently enroute!` },
-        { text: `${selectedOrg} to NG: 10-4, much appreciated!` },
-        { text: `${selectedOrg} to NG: Permission Granted!` },
-      ]
-    },
-    {
-      id: 'ems',
-      name: '👨‍⚕️👨‍⚕️ EMS Related',
-      icon: '👨‍⚕️',
-      commands: [
-        { text: `${selectedOrg} to EMS: How copy?` },
-        { text: `${selectedOrg} to EMS: Good copy, send traffic!` },
-        { text: `${selectedOrg} to EMS: Bad copy!` },
-        { text: `${selectedOrg} to EMS: Bad copy, we're currently in a situation!` },
-        { text: `${selectedOrg} to EMS: Ghetto is off limits for the next 25 minutes, please inform all your units.` },
-        { text: `${selectedOrg} to EMS: Can we have a quick meeting at Pillbox Hospital?` },
-        { text: `${selectedOrg} to EMS: Requesting permission to land at your helipad.` },
-        { text: `${selectedOrg} to EMS: We have one of your employees in custody, could you 10-17 to DOC?` },
-        { text: `${selectedOrg} to EMS: We're currently enroute!` },
-        { text: `${selectedOrg} to EMS: Clean!` },
-        { text: `${selectedOrg} to EMS: 10-4, much appreciated!` },
-        { text: `${selectedOrg} to EMS: Permission Granted!` },
-      ]
-    },
-    {
-      id: 'gov',
-      name: '🚔 Government Related',
-      icon: '🚔',
-      commands: [
-        { text: `${selectedOrg} to GOV: How copy?` },
-        { text: `${selectedOrg} to GOV: Good copy, send traffic!` },
-        { text: `${selectedOrg} to GOV: Bad copy!` },
-        { text: `${selectedOrg} to GOV: Bad copy, we're currently in a situation!` },
-        { text: `${selectedOrg} to GOV: Agents enroute!` },
-        { text: `${selectedOrg} to GOV: Can we have a quick meeting at capitol?` },
-        { text: `${selectedOrg} to GOV: Requesting permission to land on your lawn.` },
-        { text: `${selectedOrg} to GOV: We have one of your units in custody, could you 10-17 to DOC?` },
-        { text: `${selectedOrg} to GOV: 10-4, much appreciated!` },
-      ]
-    },
-    {
+  // Department Radio Messages dynamically generated for the active organization
+  const departmentMessages: Category[] = useMemo(() => {
+    const list: Category[] = [
+      {
+        id: 'doj',
+        name: '⚖️ DOJ Related',
+        icon: '⚖️',
+        commands: [
+          { text: `${currentOrganization} to DOJ: How copy?` },
+          { text: `${currentOrganization} to DOJ: Good copy, send traffic!` },
+          { text: `${currentOrganization} to DOJ: Bad copy!` },
+          { text: `${currentOrganization} to DOJ: Bad copy, we're currently in a situation!` },
+          { text: `${currentOrganization} to DOJ: We have a 10-15 at DOC requesting a lawyer, Are there any available?` },
+          { text: `${currentOrganization} to DOJ: 10-4, much appreciated!` },
+        ]
+      }
+    ]
+
+    if (currentOrganization !== 'LSPD') {
+      list.push({
+        id: 'lspd',
+        name: '👮‍♂️ LSPD Related',
+        icon: '👮‍♂️',
+        commands: [
+          { text: `${currentOrganization} to LSPD: How copy?` },
+          { text: `${currentOrganization} to LSPD: Good copy, send traffic!` },
+          { text: `${currentOrganization} to LSPD: Bad copy!` },
+          { text: `${currentOrganization} to LSPD: Bad copy, we're currently in a situation!` },
+          { text: `${currentOrganization} to LSPD: Can we have a quick meeting at your HQ?` },
+          { text: `${currentOrganization} to LSPD: Requesting permission to land at your helipad.` },
+          { text: `${currentOrganization} to LSPD: We are entering your jurisdiction in chase of a car hijacker, help would be appreciated.` },
+          { text: `${currentOrganization} to LSPD: We have one of your units in custody, could you 10-17 to DOC?` },
+          { text: `${currentOrganization} to LSPD: We're currently enroute!` },
+          { text: `${currentOrganization} to LSPD: 10-4, much appreciated!` },
+          { text: `${currentOrganization} to LSPD: Permission Granted!` },
+        ]
+      })
+    }
+
+    if (currentOrganization !== 'SAHP') {
+      list.push({
+        id: 'sahp',
+        name: '🚓 SAHP Related',
+        icon: '🚓',
+        commands: [
+          { text: `${currentOrganization} to SAHP: Good copy, send traffic!` },
+          { text: `${currentOrganization} to SAHP: Bad copy!` },
+          { text: `${currentOrganization} to SAHP: Bad copy, we're currently in a situation!` },
+          { text: `${currentOrganization} to SAHP: Can we have a quick meeting at your hall?` },
+          { text: `${currentOrganization} to SAHP: Requesting permission to land at your helipad.` },
+          { text: `${currentOrganization} to SAHP: We have one of your agents in custody, could you 10-17 to DOC?` },
+          { text: `${currentOrganization} to SAHP: We're currently enroute!` },
+          { text: `${currentOrganization} to SAHP: Troopers enroute!` },
+          { text: `${currentOrganization} to SAHP: 10-4, much appreciated!` },
+          { text: `${currentOrganization} to SAHP: Permission Granted!` },
+        ]
+      })
+    }
+
+    if (currentOrganization !== 'FIB') {
+      list.push({
+        id: 'fib',
+        name: '🕵️ FIB Related',
+        icon: '🕵️',
+        commands: [
+          { text: `${currentOrganization} to FIB: How copy?` },
+          { text: `${currentOrganization} to FIB: Good copy, send traffic!` },
+          { text: `${currentOrganization} to FIB: Bad copy!` },
+          { text: `${currentOrganization} to FIB: Bad copy, we're currently in a situation!` },
+          { text: `${currentOrganization} to FIB: Can we have a quick meeting at your HQ?` },
+          { text: `${currentOrganization} to FIB: Requesting permission to land at your roof helipad.` },
+          { text: `${currentOrganization} to FIB: We have one of your agents in custody, could you 10-17 to DOC?` },
+          { text: `${currentOrganization} to FIB: Agents enroute!` },
+          { text: `${currentOrganization} to FIB: 10-4, much appreciated!` },
+          { text: `${currentOrganization} to FIB: Permission Granted!` },
+        ]
+      })
+    }
+
+    if (currentOrganization !== 'GOV') {
+      list.push({
+        id: 'gov',
+        name: '🚔 Government Related',
+        icon: '🚔',
+        commands: [
+          { text: `${currentOrganization} to GOV: How copy?` },
+          { text: `${currentOrganization} to GOV: Good copy, send traffic!` },
+          { text: `${currentOrganization} to GOV: Bad copy!` },
+          { text: `${currentOrganization} to GOV: Bad copy, we're currently in a situation!` },
+          { text: `${currentOrganization} to GOV: Agents enroute!` },
+          { text: `${currentOrganization} to GOV: Can we have a quick meeting at capitol?` },
+          { text: `${currentOrganization} to GOV: Requesting permission to land on your lawn.` },
+          { text: `${currentOrganization} to GOV: We have one of your units in custody, could you 10-17 to DOC?` },
+          { text: `${currentOrganization} to GOV: 10-4, much appreciated!` },
+        ]
+      })
+    }
+
+    if (currentOrganization !== 'NG') {
+      list.push({
+        id: 'ng',
+        name: '🎖️ National Guard Related',
+        icon: '🎖️',
+        commands: [
+          { text: `${currentOrganization} to NG: How copy?` },
+          { text: `${currentOrganization} to NG: Good copy, send traffic!` },
+          { text: `${currentOrganization} to NG: Bad copy!` },
+          { text: `${currentOrganization} to NG: Bad copy, we're currently in a situation!` },
+          { text: `${currentOrganization} to NG: Can we have a quick meeting at your main barracks?` },
+          { text: `${currentOrganization} to NG: Requesting permission to land at your main barracks.` },
+          { text: `${currentOrganization} to NG: We have one of your soldiers in custody, could you 10-17 to DOC?` },
+          { text: `${currentOrganization} to NG: We're currently enroute!` },
+          { text: `${currentOrganization} to NG: 10-4, much appreciated!` },
+          { text: `${currentOrganization} to NG: Permission Granted!` },
+        ]
+      })
+    }
+
+    if (currentOrganization !== 'EMS') {
+      list.push({
+        id: 'ems',
+        name: '👨‍⚕️ EMS Related',
+        icon: '👨‍⚕️',
+        commands: [
+          { text: `${currentOrganization} to EMS: How copy?` },
+          { text: `${currentOrganization} to EMS: Good copy, send traffic!` },
+          { text: `${currentOrganization} to EMS: Bad copy!` },
+          { text: `${currentOrganization} to EMS: Bad copy, we're currently in a situation!` },
+          { text: `${currentOrganization} to EMS: Ghetto is off limits for the next 25 minutes, please inform all your units.` },
+          { text: `${currentOrganization} to EMS: Can we have a quick meeting at Pillbox Hospital?` },
+          { text: `${currentOrganization} to EMS: Requesting permission to land at your helipad.` },
+          { text: `${currentOrganization} to EMS: We have one of your employees in custody, could you 10-17 to DOC?` },
+          { text: `${currentOrganization} to EMS: We're currently enroute!` },
+          { text: `${currentOrganization} to EMS: Clean!` },
+          { text: `${currentOrganization} to EMS: 10-4, much appreciated!` },
+          { text: `${currentOrganization} to EMS: Permission Granted!` },
+        ]
+      })
+    }
+
+    // Global broadcasts
+    list.push({
       id: 'global',
-      name: '🚨🚨 Global Related',
+      name: '🚨 Global Broadcasts',
       icon: '🚨',
       commands: [
-        { text: `${selectedOrg} to GLOBAL: What's the situation?` },
-        { text: `${selectedOrg} to ALL: Global is for Regroupping for latest Store Robbery.Please Dispatch Max units` },
-        { text: `${selectedOrg} to ALL: Global is for heavy 10-10s, send all available units!` },
-        { text: `${selectedOrg} to ALL: Federals is getting robbed at global, send all available units!` },
-        { text: `${selectedOrg} to ALL: Global is for a hood watch, send all available units!` },
-        { text: `${selectedOrg} to ALL: Global is for a checkpoint, everyone is invited!` },
-        { text: `${selectedOrg} to ALL: Be on standby for a possible hostage situation!` },
-        { text: `${selectedOrg} to ALL: The Global is 10-99.` },
+        { text: `${currentOrganization} to GLOBAL: What's the situation?` },
+        { text: `${currentOrganization} to ALL: Global is for Regroupping for latest Store Robbery. Please Dispatch Max units` },
+        { text: `${currentOrganization} to ALL: Global is for heavy 10-10s, send all available units!` },
+        { text: `${currentOrganization} to ALL: Federals is getting robbed at global, send all available units!` },
+        { text: `${currentOrganization} to ALL: Global is for a hood watch, send all available units!` },
+        { text: `${currentOrganization} to ALL: Global is for a checkpoint, everyone is invited!` },
+        { text: `${currentOrganization} to ALL: Be on standby for a possible hostage situation!` },
+        { text: `${currentOrganization} to ALL: The Global is 10-99.` },
       ]
-    },
-  ]
+    })
 
-  const { recordRecentItem, pinItem, unpinItem, isItemPinned } = useProductivity()
+    return list
+  }, [currentOrganization])
 
   useEffect(() => {
     recordRecentItem({
       type: 'page',
       targetId: '/bodycam-commands',
-      title: `${selectedOrg} Bodycam Commands`,
+      title: `${currentOrganization} Bodycam Commands`,
       subtitle: 'Roleplay Macros & Dispatch',
       url: '/bodycam-commands',
     })
-  }, [selectedOrg, recordRecentItem])
+  }, [currentOrganization, recordRecentItem])
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories((prev) =>
@@ -387,30 +426,36 @@ export default function BodycamCommandsPage() {
         type: 'command',
         targetId: command.text,
         title: command.label ? command.label.split('-')[0].trim() : command.text.slice(0, 30),
-        subtitle: `${selectedOrg} • ${categoryName}`,
-        data: { text: command.text, org: selectedOrg },
+        subtitle: `${currentOrganization} • ${categoryName}`,
+        data: { text: command.text, org: currentOrganization },
       })
       showToast('Pinned command to utility panel', 'success')
     }
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="mb-6 flex items-start justify-between">
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* Header & Single Source of Truth Organization Selector */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant pb-4">
         <div>
-          <h1 className="text-3xl font-bold text-primary mb-1">{selectedOrg} Bodycam Commands</h1>
-          <p className="text-on-surface-variant text-sm">
-            Standard Operating Procedure roleplay commands for {selectedOrg}
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-primary">{currentOrganization} Bodycam Commands</h1>
+            <span className="px-2 py-0.5 bg-primary/20 text-primary border border-primary/40 font-mono text-xs font-bold rounded">
+              {currentOrganization} ACTIVE
+            </span>
+          </div>
+          <p className="text-on-surface-variant text-sm mt-1">
+            Standard Operating Procedure roleplay commands dynamically formatted for {currentOrganization}
           </p>
         </div>
         
         {/* Organization Selector */}
-        <div className="flex flex-col items-end">
-          <label className="text-xs font-mono uppercase text-on-surface-variant mb-1">Select Organization:</label>
+        <div className="flex flex-col items-end gap-1">
+          <label className="text-xs font-mono uppercase text-on-surface-variant font-bold">Active Organization:</label>
           <select
-            value={selectedOrg}
+            value={currentOrganization}
             onChange={(e) => handleOrgChange(e.target.value)}
-            className="bg-surface-dim border border-outline-variant rounded px-3 py-1.5 text-on-surface text-sm font-mono focus:outline-none focus:border-primary"
+            className="bg-surface-container border border-outline-variant rounded px-3 py-1.5 text-on-surface text-xs font-mono font-bold focus:outline-none focus:border-primary shadow-sm"
           >
             {organizations.map((org) => (
               <option key={org} value={org}>
@@ -422,25 +467,25 @@ export default function BodycamCommandsPage() {
       </div>
 
       {/* General Commands */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-on-surface mb-3 flex items-center gap-2">
-          <span>General Commands</span>
+      <div>
+        <h2 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2 font-mono">
+          <span>📋 General SOP & Bodycam Commands</span>
         </h2>
         <div className="space-y-3">
           {categories.map((category) => {
             const isExpanded = expandedCategories.includes(category.id)
             
             return (
-              <div key={category.id} className="card overflow-hidden">
+              <div key={category.id} className="card overflow-hidden border border-outline-variant rounded-lg">
                 <button
                   onClick={() => toggleCategory(category.id)}
-                  className="w-full px-5 py-3.5 flex items-center justify-between bg-surface-container-low hover:bg-surface-container transition-colors"
+                  className="w-full px-5 py-3 flex items-center justify-between bg-surface-container-low hover:bg-surface-container transition-colors"
                 >
-                  <h3 className="text-base font-semibold text-on-surface flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-on-surface flex items-center gap-2 font-mono">
                     <span>{category.name}</span>
                   </h3>
                   <svg
-                    className={`w-5 h-5 text-on-surface-variant transition-transform ${
+                    className={`w-4 h-4 text-on-surface-variant transition-transform duration-200 ${
                       isExpanded ? 'transform rotate-180' : ''
                     }`}
                     fill="none"
@@ -457,22 +502,22 @@ export default function BodycamCommandsPage() {
                 </button>
 
                 {isExpanded && (
-                  <div className="px-5 pb-5 pt-2 space-y-3 bg-surface-container-lowest">
+                  <div className="px-5 pb-4 pt-2 space-y-2.5 bg-surface-container-lowest border-t border-outline-variant/60">
                     {category.commands.map((command, idx) => {
                       const isPinned = isItemPinned('command', command.text)
                       return (
-                        <div key={idx} className="space-y-1.5">
+                        <div key={idx} className="space-y-1">
                           {command.label && (
-                            <p className="text-xs font-semibold text-primary">{command.label}</p>
+                            <p className="text-[11px] font-semibold text-primary font-mono">{command.label}</p>
                           )}
-                          <div className="flex items-start gap-2 bg-surface-dim border border-outline-variant/60 p-3 rounded hover:border-outline transition-colors group">
-                            <code className="flex-1 text-on-surface text-xs font-mono break-words leading-relaxed">
+                          <div className="flex items-start gap-2 bg-surface-dim border border-outline-variant/60 p-2.5 rounded hover:border-outline transition-colors group">
+                            <code className="flex-1 text-on-surface text-xs font-mono break-words leading-relaxed select-text">
                               {command.text}
                             </code>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               <button
                                 onClick={() => handleTogglePin(command, category.name)}
-                                className={`p-1.5 rounded transition-colors text-xs ${
+                                className={`p-1 rounded transition-colors text-xs ${
                                   isPinned
                                     ? 'text-primary bg-primary/10'
                                     : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
@@ -483,22 +528,10 @@ export default function BodycamCommandsPage() {
                               </button>
                               <button
                                 onClick={() => handleCopy(command.text, command.label)}
-                                className="p-1.5 text-primary hover:text-primary-container hover:bg-surface-container rounded transition-colors"
+                                className="px-2 py-1 text-xs font-mono font-bold bg-primary hover:bg-primary-container text-on-primary rounded transition-colors flex items-center gap-1 shadow-sm"
                                 title="Copy Command"
                               >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                  />
-                                </svg>
+                                <span>📋</span> Copy
                               </button>
                             </div>
                           </div>
@@ -514,23 +547,25 @@ export default function BodycamCommandsPage() {
       </div>
 
       {/* Department Messages */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-on-surface mb-3">📩 Department Messages</h2>
+      <div>
+        <h2 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2 font-mono">
+          <span>📩 Inter-Department Radio Communications</span>
+        </h2>
         <div className="space-y-3">
           {departmentMessages.map((category) => {
             const isExpanded = expandedCategories.includes(category.id)
             
             return (
-              <div key={category.id} className="card overflow-hidden">
+              <div key={category.id} className="card overflow-hidden border border-outline-variant rounded-lg">
                 <button
                   onClick={() => toggleCategory(category.id)}
-                  className="w-full px-5 py-3.5 flex items-center justify-between bg-surface-container-low hover:bg-surface-container transition-colors"
+                  className="w-full px-5 py-3 flex items-center justify-between bg-surface-container-low hover:bg-surface-container transition-colors"
                 >
-                  <h3 className="text-base font-semibold text-on-surface">
+                  <h3 className="text-sm font-semibold text-on-surface font-mono">
                     {category.name}
                   </h3>
                   <svg
-                    className={`w-5 h-5 text-on-surface-variant transition-transform ${
+                    className={`w-4 h-4 text-on-surface-variant transition-transform duration-200 ${
                       isExpanded ? 'transform rotate-180' : ''
                     }`}
                     fill="none"
@@ -547,18 +582,18 @@ export default function BodycamCommandsPage() {
                 </button>
 
                 {isExpanded && (
-                  <div className="px-5 pb-5 pt-2 space-y-2 bg-surface-container-lowest">
+                  <div className="px-5 pb-4 pt-2 space-y-2 bg-surface-container-lowest border-t border-outline-variant/60">
                     {category.commands.map((command, idx) => {
                       const isPinned = isItemPinned('command', command.text)
                       return (
                         <div key={idx} className="flex items-start gap-2 bg-surface-dim border border-outline-variant/60 p-2.5 rounded hover:border-outline transition-colors group">
-                          <code className="flex-1 text-on-surface text-xs font-mono break-words leading-relaxed">
+                          <code className="flex-1 text-on-surface text-xs font-mono break-words leading-relaxed select-text">
                             {command.text}
                           </code>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <button
                               onClick={() => handleTogglePin(command, category.name)}
-                              className={`p-1.5 rounded transition-colors text-xs ${
+                              className={`p-1 rounded transition-colors text-xs ${
                                 isPinned
                                   ? 'text-primary bg-primary/10'
                                   : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
@@ -569,22 +604,10 @@ export default function BodycamCommandsPage() {
                             </button>
                             <button
                               onClick={() => handleCopy(command.text)}
-                              className="p-1.5 text-primary hover:text-primary-container hover:bg-surface-container rounded transition-colors"
+                              className="px-2 py-1 text-xs font-mono font-bold bg-primary hover:bg-primary-container text-on-primary rounded transition-colors flex items-center gap-1 shadow-sm"
                               title="Copy Command"
                             >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                />
-                              </svg>
+                              <span>📋</span> Copy
                             </button>
                           </div>
                         </div>

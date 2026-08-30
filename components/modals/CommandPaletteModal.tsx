@@ -26,6 +26,7 @@ export default function CommandPaletteModal() {
   const {
     activeDetention,
     setIsArrestCommandCenterOpen,
+    currentOrganization,
   } = useDuty()
   const {
     isCommandPaletteOpen,
@@ -78,9 +79,9 @@ export default function CommandPaletteModal() {
     }
   }, [isCommandPaletteOpen, lawEntries.length])
 
-  // Real commands from the application
+  // Real commands from the application dynamically built for current organization
   const appCommands: PaletteItem[] = useMemo(() => {
-    const org = (typeof window !== 'undefined' ? localStorage.getItem('leogrp_selected_org') : null) || 'LSPD'
+    const org = currentOrganization || 'LSPD'
     return [
       {
         id: 'cmd-grandpro-save-1',
@@ -90,8 +91,7 @@ export default function CommandPaletteModal() {
         icon: '🔴',
         keywords: ['grandpro', 'sd card', 'save', 'saving', 'bodycam', 'cloud', 'upload', org.toLowerCase()],
         action: () => {
-          const currentOrg = (typeof window !== 'undefined' ? localStorage.getItem('leogrp_selected_org') : null) || 'LSPD'
-          const text = `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${currentOrg} Cloud Servers.`
+          const text = `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${org} Cloud Servers.`
           navigator.clipboard.writeText(text)
           recordRecentItem({
             type: 'command',
@@ -129,8 +129,7 @@ export default function CommandPaletteModal() {
         icon: '🔴',
         keywords: ['grandpro', 'sd card', 'phone', 'download', 'bodycam', 'cloud', org.toLowerCase()],
         action: () => {
-          const currentOrg = (typeof window !== 'undefined' ? localStorage.getItem('leogrp_selected_org') : null) || 'LSPD'
-          const text = `/do put SD Card into phone, connects to ${currentOrg} Cloud Servers, downloads Bodycam on SD Card`
+          const text = `/do put SD Card into phone, connects to ${org} Cloud Servers, downloads Bodycam on SD Card`
           navigator.clipboard.writeText(text)
           recordRecentItem({
             type: 'command',
@@ -199,6 +198,25 @@ export default function CommandPaletteModal() {
         },
       },
       {
+        id: 'cmd-save-situation',
+        title: `Save Situation (${org} Cloud)`,
+        subtitle: `/me saves bodycam, uploads it to the ${org} Cloud and continues recording`,
+        category: 'Commands',
+        icon: '💾',
+        keywords: ['save', 'cloud', 'bodycam', 'situation', org.toLowerCase()],
+        action: () => {
+          const text = `/me saves bodycam, uploads it to the ${org} Cloud and continues recording`
+          navigator.clipboard.writeText(text)
+          recordRecentItem({
+            type: 'command',
+            targetId: text,
+            title: `Save Situation (${org})`,
+            subtitle: text,
+          })
+          showToast('Command copied: Save Situation', 'success')
+        },
+      },
+      {
         id: 'cmd-miranda-rights',
         title: 'Miranda Rights Warning',
         subtitle: '/me reads Miranda Rights: You have the right to remain silent...',
@@ -238,13 +256,13 @@ export default function CommandPaletteModal() {
       },
       {
         id: 'cmd-connect-pda',
-        title: 'Connect PDA to Tower',
-        subtitle: '/me connects PDA to the nearest cell tower',
+        title: `Connect PDA to ${org} Tower`,
+        subtitle: `/me connects PDA to the nearest ${org} cell tower`,
         category: 'Commands',
         icon: '📱',
-        keywords: ['pda', 'tower', 'connect', 'lookup', 'mdc'],
+        keywords: ['pda', 'tower', 'connect', 'lookup', 'mdc', org.toLowerCase()],
         action: () => {
-          const text = '/me connects PDA to the nearest cell tower'
+          const text = `/me connects PDA to the nearest ${org} cell tower`
           navigator.clipboard.writeText(text)
           recordRecentItem({
             type: 'command',
@@ -257,13 +275,13 @@ export default function CommandPaletteModal() {
       },
       {
         id: 'cmd-launch-drone',
-        title: 'Launch Department Drone',
-        subtitle: '/me launches department drone',
+        title: `Launch ${org} Drone`,
+        subtitle: `/me launches ${org} drone`,
         category: 'Commands',
         icon: '🚁',
-        keywords: ['drone', 'launch', 'recon', 'aerial'],
+        keywords: ['drone', 'launch', 'recon', 'aerial', org.toLowerCase()],
         action: () => {
-          const text = '/me launches department drone'
+          const text = `/me launches ${org} drone`
           navigator.clipboard.writeText(text)
           recordRecentItem({
             type: 'command',
@@ -273,9 +291,85 @@ export default function CommandPaletteModal() {
           })
           showToast('Command copied: Launch Drone', 'success')
         },
-      }
+      },
+      {
+        id: 'cmd-lawyer-ssd',
+        title: `Hand SSD to Lawyer (${org} Cloud)`,
+        subtitle: `/do saves bodycam onto an SSD Card and uploads into PDA to ${org} Cloud servers and continues recording`,
+        category: 'Commands',
+        icon: '⚖️',
+        keywords: ['lawyer', 'ssd', 'usb', 'attorney', org.toLowerCase()],
+        action: () => {
+          const text = `/do saves bodycam onto an SSD Card and uploads into PDA to ${org} Cloud servers and continues recording`
+          navigator.clipboard.writeText(text)
+          recordRecentItem({
+            type: 'command',
+            targetId: text,
+            title: 'Hand SSD to Lawyer',
+            subtitle: text,
+          })
+          showToast('Command copied: Hand SSD to Lawyer', 'success')
+        },
+      },
+      {
+        id: 'cmd-employment-contract',
+        title: `Sign ${org} Employment Contract`,
+        subtitle: `/me Signs the ${org} Employment Contract on the desk`,
+        category: 'Commands',
+        icon: '📝',
+        keywords: ['contract', 'employment', 'sign', org.toLowerCase()],
+        action: () => {
+          const text = `/me Signs the ${org} Employment Contract on the desk`
+          navigator.clipboard.writeText(text)
+          recordRecentItem({
+            type: 'command',
+            targetId: text,
+            title: `Sign ${org} Contract`,
+            subtitle: text,
+          })
+          showToast('Command copied: Sign Contract', 'success')
+        },
+      },
+      {
+        id: 'cmd-radio-doj',
+        title: `${org} to DOJ Radio Traffic`,
+        subtitle: `${org} to DOJ: How copy?`,
+        category: 'Commands',
+        icon: '📻',
+        keywords: ['radio', 'doj', 'dispatch', org.toLowerCase()],
+        action: () => {
+          const text = `${org} to DOJ: How copy?`
+          navigator.clipboard.writeText(text)
+          recordRecentItem({
+            type: 'command',
+            targetId: text,
+            title: `${org} to DOJ`,
+            subtitle: text,
+          })
+          showToast('Command copied: Radio DOJ', 'success')
+        },
+      },
+      {
+        id: 'cmd-radio-global-1010',
+        title: `${org} Global Broadcast (Heavy 10-10s)`,
+        subtitle: `${org} to ALL: Global is for heavy 10-10s, send all available units!`,
+        category: 'Commands',
+        icon: '🚨',
+        keywords: ['radio', 'global', '10-10', 'backup', org.toLowerCase()],
+        action: () => {
+          const text = `${org} to ALL: Global is for heavy 10-10s, send all available units!`
+          navigator.clipboard.writeText(text)
+          recordRecentItem({
+            type: 'command',
+            targetId: text,
+            title: `${org} Global 10-10s`,
+            subtitle: text,
+          })
+          showToast('Command copied: Global 10-10 Broadcast', 'success')
+        },
+      },
     ]
-  }, [recordRecentItem, showToast])
+  }, [currentOrganization, recordRecentItem, showToast])
 
   // Pages
   const pageItems: PaletteItem[] = useMemo(

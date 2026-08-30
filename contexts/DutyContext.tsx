@@ -187,6 +187,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   const [currentDutyStart, setCurrentDutyStart] = useState<string | null>(null)
   const [currentOrganization, setCurrentOrgState] = useState('LSPD')
   const [includeSuspectName, setIncludeSuspectNameState] = useState(true)
+  const [isInitialized, setIsInitialized] = useState(false)
 
   // Active Detention & Workstation Modal State
   const [activeDetention, setActiveDetention] = useState<ActiveDetention | null>(null)
@@ -219,7 +220,11 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       // Organization
-      const savedOrg = localStorage.getItem(CURRENT_ORG_KEY) || localStorage.getItem('user_org')
+      const savedOrg =
+        localStorage.getItem('leogrp_selected_org') ||
+        localStorage.getItem(CURRENT_ORG_KEY) ||
+        localStorage.getItem('user_org') ||
+        localStorage.getItem('organization')
       if (savedOrg) setCurrentOrgState(savedOrg)
 
       // Suspect Name preference
@@ -249,7 +254,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
             setIsOnDuty(true)
             setCurrentShiftId(parsed.shiftId)
             setCurrentDutyStart(parsed.onDutyTime)
-            setCurrentOrgState(parsed.organization || 'LSPD')
+            setCurrentOrgState(parsed.organization || savedOrg || 'LSPD')
             setWeaponsTaken(parsed.weaponsTaken || [])
             setCurrentShiftFines(parsed.currentShiftFines || 0)
             setCurrentShiftFinesAmount(parsed.currentShiftFinesAmount || 0)
@@ -259,9 +264,11 @@ export function DutyProvider({ children }: { children: ReactNode }) {
             setCurrentEventCounters(parsed.currentEventCounters || [])
           }
         } catch (e) {
-          console.error('Failed to parse active shift:', e)
+          console.error('Failed to parse active shift from localStorage:', e)
         }
       }
+
+      setIsInitialized(true)
     }
 
     // Load persisted shift logs & lifetime stats from IndexedDB
@@ -282,7 +289,8 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
   // Sync active shift state to localStorage for persistence across reloads
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (!isInitialized || typeof window === 'undefined') return
+
     if (isOnDuty && currentShiftId) {
       const activeData = {
         isOnDuty: true,
@@ -302,6 +310,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(ACTIVE_SHIFT_KEY)
     }
   }, [
+    isInitialized,
     isOnDuty,
     currentShiftId,
     currentDutyStart,
@@ -319,8 +328,17 @@ export function DutyProvider({ children }: { children: ReactNode }) {
     setCurrentOrgState(org)
     if (typeof window !== 'undefined') {
       localStorage.setItem(CURRENT_ORG_KEY, org)
+      localStorage.setItem('leogrp_selected_org', org)
       localStorage.setItem('user_org', org)
+      localStorage.setItem('organization', org)
     }
+    setActiveDetention((prev) => {
+      if (!prev || prev.status !== 'ACTIVE') return prev
+      return {
+        ...prev,
+        organization: org,
+      }
+    })
   }, [])
 
   const setIncludeSuspectName = useCallback((val: boolean) => {

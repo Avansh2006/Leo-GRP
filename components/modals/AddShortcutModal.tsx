@@ -2,10 +2,12 @@
 
 import React, { useState } from 'react'
 import { useProductivity } from '@/contexts/ProductivityContext'
+import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
 
 export default function AddShortcutModal() {
   const { isAddShortcutOpen, setIsAddShortcutOpen, addQuickAccessItem } = useProductivity()
+  const { currentOrganization } = useDuty()
   const { showToast } = useToast()
 
   const [activeTab, setActiveTab] = useState<'preset' | 'custom'>('preset')
@@ -17,6 +19,12 @@ export default function AddShortcutModal() {
   if (!isAddShortcutOpen) return null
 
   const presets = [
+    {
+      title: `Save Bodycam (GrandPro — ${currentOrganization})`,
+      type: 'command' as const,
+      target: `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${currentOrganization} Cloud Servers.`,
+      snippet: `/me saves bodycam to SD Card, uploads to ${currentOrganization}...`,
+    },
     {
       title: 'Attaching Bodycam (Uniform)',
       type: 'command' as const,
