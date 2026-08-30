@@ -1,19 +1,27 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useProductivity } from '@/contexts/ProductivityContext'
-import { useToast } from '@/components/ToastProvider'
-import {
-  retrieveLegislationContext,
-  generateInstantLegalExplanation,
-  RetrievedSource,
-} from '@/utils/legislationRetriever'
 import {
   aiModelProvider,
   AIModelStatus,
   RECOMMENDED_LOCAL_MODEL,
+  AIDebugTrace,
 } from '@/utils/aiModelProvider'
+import {
+  retrieveLegislationContext,
+  generateQuestionAwareResponse,
+  RetrievedSource,
+  ConversationTurn,
+} from '@/utils/legislationRetriever'
+import { useToast } from '@/components/ToastProvider'
+import { useProductivity } from '@/contexts/ProductivityContext'
+
+interface LegislationAssistantModalProps {
+  isOpen: boolean
+  onClose: () => void
+  initialQuery?: string
+}
 
 interface ChatMessage {
   id: string
@@ -21,12 +29,7 @@ interface ChatMessage {
   text: string
   sources?: RetrievedSource[]
   timestamp: string
-}
-
-interface LegislationAssistantModalProps {
-  isOpen: boolean
-  onClose: () => void
-  initialQuery?: string
+  debugTrace?: AIDebugTrace | null
 }
 
 export default function LegislationAssistantModal({
@@ -41,51 +44,52 @@ export default function LegislationAssistantModal({
   const [inputQuery, setInputQuery] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
-  const [aiStatus, setAiStatus] = useState<AIModelStatus>(aiModelProvider.getStatus())
+  const [aiStatus, setAiStatus] = useState<AIModelStatus>('NOT_INSTALLED')
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [statusText, setStatusText] = useState('')
   const [showConsentDialog, setShowConsentDialog] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showDebugTrace, setShowDebugTrace] = useState(false)
+  const [currentDebugTrace, setCurrentDebugTrace] = useState<AIDebugTrace | null>(null)
   const [webGPUInfo, setWebGPUInfo] = useState<{ supported: boolean; message: string } | null>(null)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Subscribe to AI Model Provider state changes
+  // Subscribe to AI Model Provider state
   useEffect(() => {
-    const unsubscribe = aiModelProvider.subscribe((status, prog, text) => {
+    const unsubscribe = aiModelProvider.subscribe((status, progress, text) => {
       setAiStatus(status)
-      if (prog !== undefined) setDownloadProgress(prog)
+      if (progress !== undefined) setDownloadProgress(progress)
       if (text !== undefined) setStatusText(text)
     })
+
+    aiModelProvider.checkDeviceWebGPUSupport().then(setWebGPUInfo)
+
     return () => unsubscribe()
   }, [])
 
-  // Check WebGPU capabilities on open
-  useEffect(() => {
-    if (isOpen) {
-      aiModelProvider.checkDeviceWebGPUSupport().then(setWebGPUInfo)
-      setTimeout(() => inputRef.current?.focus(), 50)
-    }
-  }, [isOpen])
-
-  // Handle initial pre-filled query if provided (e.g. from "Ask Assistant" on a law card)
-  useEffect(() => {
-    if (isOpen && initialQuery) {
-      setInputQuery(initialQuery)
-    }
-  }, [isOpen, initialQuery])
-
+  // Auto-scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isProcessing])
+
+  // Focus input and handle initial query on open
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 80)
+      if (initialQuery && initialQuery.trim()) {
+        setInputQuery(initialQuery)
+      }
+    }
+  }, [isOpen, initialQuery])
 
   if (!isOpen) return null
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     const query = inputQuery.trim()
-    if (!query) return
+    if (!query || isProcessing) return
 
     const userMsgId = `msg-${Date.now()}`
     const userMsg: ChatMessage = {
@@ -94,6 +98,12 @@ export default function LegislationAssistantModal({
       text: query,
       timestamp: new Date().toISOString(),
     }
+
+    // Build recent conversation turns for context-awareness
+    const conversationTurns: ConversationTurn[] = messages.slice(-6).map((m) => ({
+      sender: m.sender,
+      text: m.text,
+    }))
 
     setMessages((prev) => [...prev, userMsg])
     setInputQuery('')
@@ -107,11 +117,11 @@ export default function LegislationAssistantModal({
     })
 
     try {
-      // 1. Retrieve authoritative legislation context
-      const retrieval = await retrieveLegislationContext(query, 5)
+      // 1. Retrieve authoritative legislation context with question awareness & history
+      const retrieval = await retrieveLegislationContext(query, 4, conversationTurns)
 
       // 2. Generate answer
-      if (aiStatus === 'READY' || aiStatus === 'INSTALLED') {
+      if (aiStatus === 'READY') {
         let streamText = ''
         const assistantMsgId = `msg-ai-${Date.now()}`
 
@@ -121,7 +131,7 @@ export default function LegislationAssistantModal({
           {
             id: assistantMsgId,
             sender: 'assistant',
-            text: 'Thinking...',
+            text: 'Analyzing legislation...',
             sources: retrieval.sources,
             timestamp: new Date().toISOString(),
           },
@@ -129,7 +139,8 @@ export default function LegislationAssistantModal({
 
         await aiModelProvider.generateExplanation(
           query,
-          retrieval.contextText,
+          retrieval,
+          conversationTurns,
           (token) => {
             streamText += token
             setMessages((prev) =>
@@ -137,13 +148,37 @@ export default function LegislationAssistantModal({
             )
           },
           (final) => {
+            const trace = aiModelProvider.getLastDebugTrace()
+            setCurrentDebugTrace(trace)
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantMsgId ? { ...m, debugTrace: trace } : m))
+            )
             setIsProcessing(false)
           }
         )
       } else {
-        // Fast Instant Retrieval Mode
-        await new Promise((res) => setTimeout(res, 200))
-        const explanation = generateInstantLegalExplanation(retrieval)
+        // Fast Instant Retrieval-Only Mode (Deterministic & Question-Aware)
+        await new Promise((res) => setTimeout(res, 150))
+        const explanation = generateQuestionAwareResponse(query, retrieval, conversationTurns)
+        const finalPrompt = aiModelProvider.buildPrompt(query, retrieval)
+
+        const debugTrace: AIDebugTrace = {
+          userQuery: query,
+          intent: retrieval.intent,
+          detectedSection: retrieval.detectedSection,
+          retrievedSources: retrieval.sources.map((s) => ({
+            code: s.code,
+            title: s.title,
+            score: s.relevanceScore,
+            fine: s.fine,
+            sentence: s.sentence,
+          })),
+          finalPrompt,
+          generatedResponse: explanation,
+          timestamp: new Date().toISOString(),
+        }
+
+        setCurrentDebugTrace(debugTrace)
 
         setMessages((prev) => [
           ...prev,
@@ -153,17 +188,19 @@ export default function LegislationAssistantModal({
             text: explanation,
             sources: retrieval.sources,
             timestamp: new Date().toISOString(),
+            debugTrace,
           },
         ])
         setIsProcessing(false)
       }
     } catch (err) {
+      console.error('Assistant error:', err)
       setMessages((prev) => [
         ...prev,
         {
           id: `msg-err-${Date.now()}`,
           sender: 'assistant',
-          text: 'Encountered an issue retrieving legislation. Please try another query.',
+          text: 'I encountered an issue retrieving the legislation. Please check your query or section number.',
           timestamp: new Date().toISOString(),
         },
       ])
@@ -198,7 +235,7 @@ export default function LegislationAssistantModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl h-[85vh] bg-surface-container-low border border-outline-variant rounded-lg shadow-2xl overflow-hidden text-on-surface flex flex-col"
+        className="w-full max-w-3xl h-[88vh] bg-surface-container-low border border-outline-variant rounded-lg shadow-2xl overflow-hidden text-on-surface flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}
@@ -234,6 +271,17 @@ export default function LegislationAssistantModal({
 
           <div className="flex items-center gap-1.5">
             <button
+              onClick={() => setShowDebugTrace(!showDebugTrace)}
+              className={`px-2 py-1 rounded text-xs font-mono border transition-colors ${
+                showDebugTrace
+                  ? 'bg-primary text-on-primary border-primary'
+                  : 'bg-surface-container-high text-on-surface-variant border-outline-variant hover:text-on-surface'
+              }`}
+              title="Toggle Developer Debug / Retrieval Trace"
+            >
+              🐞 Debug
+            </button>
+            <button
               onClick={() => setShowSettings(!showSettings)}
               className="p-1.5 text-on-surface-variant hover:text-on-surface rounded text-xs font-mono"
               title="Assistant Settings & Model Management"
@@ -243,6 +291,7 @@ export default function LegislationAssistantModal({
             <button
               onClick={() => {
                 setMessages([])
+                setCurrentDebugTrace(null)
                 showToast('Cleared conversation history', 'info')
               }}
               className="p-1.5 text-on-surface-variant hover:text-on-surface rounded text-xs font-mono"
@@ -259,7 +308,36 @@ export default function LegislationAssistantModal({
           </div>
         </div>
 
-        {/* Settings Drawer / Panel (if opened) */}
+        {/* Developer Debug Trace Drawer */}
+        {showDebugTrace && currentDebugTrace && (
+          <div className="p-3 bg-black/90 border-b border-amber-500/40 text-xs font-mono space-y-2 animate-fadeIn flex-shrink-0 max-h-48 overflow-y-auto">
+            <div className="flex items-center justify-between text-amber-400 font-bold border-b border-amber-500/20 pb-1">
+              <span>🐞 Developer Debug Trace</span>
+              <span className="text-[10px] text-amber-300/70">Intent: {currentDebugTrace.intent.toUpperCase()}</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <strong className="text-on-surface">User Query:</strong>
+                <div className="text-on-surface-variant truncate">{currentDebugTrace.userQuery}</div>
+                {currentDebugTrace.detectedSection && (
+                  <div className="text-secondary">Target Section: {currentDebugTrace.detectedSection}</div>
+                )}
+              </div>
+              <div>
+                <strong className="text-on-surface">Retrieved Provisions ({currentDebugTrace.retrievedSources.length}):</strong>
+                <ul className="text-[10px] text-on-surface-variant space-y-0.5">
+                  {currentDebugTrace.retrievedSources.map((s, idx) => (
+                    <li key={idx} className="truncate">
+                      #{idx + 1} § {s.code} (Score: {s.score}) — {s.title}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Drawer / Panel */}
         {showSettings && (
           <div className="p-3 bg-surface-container border-b border-outline-variant text-xs font-mono space-y-2 animate-fadeIn flex-shrink-0">
             <div className="flex items-center justify-between">
@@ -339,26 +417,27 @@ export default function LegislationAssistantModal({
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans">
           {messages.length === 0 ? (
-            <div className="py-12 text-center flex flex-col items-center justify-center space-y-3">
+            <div className="py-10 text-center flex flex-col items-center justify-center space-y-3">
               <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-2xl">
                 ⚖️
               </div>
               <div className="space-y-1 max-w-md">
                 <h4 className="font-semibold text-base text-on-surface">
-                  Ask anything about San Andreas Legislation
+                  Question-Aware Legislation Assistant
                 </h4>
                 <p className="text-xs text-on-surface-variant font-mono leading-relaxed">
-                  Instant local retrieval over the active Traffic Code (2nd Rendition) and Penal Codes.
+                  Answers your specific legal and procedural questions based directly on the active Traffic Code (2nd Rendition) and Penal Codes.
                 </p>
               </div>
 
               {/* Sample Prompts */}
-              <div className="flex flex-wrap justify-center gap-2 max-w-lg pt-2">
+              <div className="flex flex-wrap justify-center gap-2 max-w-xl pt-2">
                 {[
-                  'What are the penalties for Reckless Driving?',
-                  'Explain § T.C. 3.5 Driving Under Influence',
-                  'What is the speed limit in special zones?',
-                  'What are the rules for open carry of weapons?',
+                  'What is the DUI provision?',
+                  'What happens when someone refuses to identify themselves?',
+                  'Explain § 3.5.',
+                  'Can I arrest someone for this?',
+                  'What is the penalty for reckless driving?',
                   'How do I handle a suspect requesting a lawyer?',
                 ].map((prompt) => (
                   <button
@@ -382,7 +461,7 @@ export default function LegislationAssistantModal({
                 }`}
               >
                 <div
-                  className={`max-w-[90%] sm:max-w-[80%] rounded-lg p-3.5 text-xs sm:text-sm leading-relaxed ${
+                  className={`max-w-[92%] sm:max-w-[85%] rounded-lg p-3.5 text-xs sm:text-sm leading-relaxed ${
                     msg.sender === 'user'
                       ? 'bg-primary text-on-primary font-mono'
                       : 'bg-surface-container border border-outline-variant text-on-surface'
@@ -394,7 +473,7 @@ export default function LegislationAssistantModal({
                   {msg.sources && msg.sources.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-outline-variant/60 space-y-1.5">
                       <div className="text-[10px] font-mono font-bold uppercase text-on-surface-variant flex items-center gap-1">
-                        <span>📚</span> Authoritative Sources:
+                        <span>📚</span> Cited Provisions:
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {msg.sources.map((s) => (
@@ -405,9 +484,9 @@ export default function LegislationAssistantModal({
                               onClose()
                             }}
                             className="px-2 py-0.5 bg-surface-container-highest hover:bg-primary/20 border border-outline-variant hover:border-primary/40 rounded text-[11px] font-mono text-primary flex items-center gap-1 transition-colors"
-                            title={`Open ${s.code} in Legislation Guide`}
+                            title={`Open § ${s.code} in Legislation Guide`}
                           >
-                            <span>§</span> {s.code} ({s.title.slice(0, 20)}...)
+                            <span>§</span> {s.code} ({s.title.slice(0, 24)}...)
                           </button>
                         ))}
                       </div>
@@ -423,6 +502,17 @@ export default function LegislationAssistantModal({
                     >
                       <span>📝</span> Save to Notes
                     </button>
+                    {msg.debugTrace && (
+                      <button
+                        onClick={() => {
+                          setCurrentDebugTrace(msg.debugTrace || null)
+                          setShowDebugTrace(true)
+                        }}
+                        className="text-[10px] font-mono text-amber-400/80 hover:text-amber-400 transition-colors flex items-center gap-1"
+                      >
+                        <span>🐞</span> View Trace
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -432,7 +522,7 @@ export default function LegislationAssistantModal({
           {isProcessing && (
             <div className="flex items-center gap-2 text-xs font-mono text-on-surface-variant py-2">
               <span className="animate-spin">⚙️</span>
-              <span>Retrieving authoritative legislation provisions...</span>
+              <span>Retrieving authoritative legislation and analyzing query...</span>
             </div>
           )}
 
@@ -447,7 +537,7 @@ export default function LegislationAssistantModal({
           <input
             ref={inputRef}
             type="text"
-            placeholder="Ask about traffic violations, charges, penalties, or procedures..."
+            placeholder="Ask about DUI, refusal to identify, arrest authority, penalties, or procedures..."
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
             className="flex-1 px-3.5 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface placeholder:text-on-surface-variant font-mono text-xs sm:text-sm focus:outline-none focus:border-primary"

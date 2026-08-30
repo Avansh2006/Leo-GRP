@@ -1,7 +1,9 @@
 /**
  * AI Model Provider & Local LLM Abstraction Layer for LEO-GRP
- * 100% Client-side browser inference with lazy-loading, WebGPU detection, explicit consent, and memory unloading.
+ * 100% Client-side browser inference with lazy-loading, WebGPU detection, explicit consent, question-aware generation, and debug tracing.
  */
+
+import { RetrievalResult, ConversationTurn, generateQuestionAwareResponse } from './legislationRetriever'
 
 export type AIModelStatus =
   | 'NOT_INSTALLED'
@@ -22,6 +24,16 @@ export interface ModelMetadata {
   recommended: boolean
 }
 
+export interface AIDebugTrace {
+  userQuery: string
+  intent: string
+  detectedSection?: string
+  retrievedSources: Array<{ code: string; title: string; score: number; fine?: string; sentence?: string }>
+  finalPrompt: string
+  generatedResponse: string
+  timestamp: string
+}
+
 export const RECOMMENDED_LOCAL_MODEL: ModelMetadata = {
   id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
   name: 'Qwen 2.5 (0.5B Instruct - Lightweight)',
@@ -40,6 +52,7 @@ class AIModelProvider {
   private downloadStatusText = ''
   private currentAbortController: AbortController | null = null
   private listeners: Set<(status: AIModelStatus, progress?: number, text?: string) => void> = new Set()
+  private lastDebugTrace: AIDebugTrace | null = null
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -72,6 +85,10 @@ class AIModelProvider {
 
   public getDownloadStatusText(): string {
     return this.downloadStatusText
+  }
+
+  public getLastDebugTrace(): AIDebugTrace | null {
+    return this.lastDebugTrace
   }
 
   public hasUserConsent(): boolean {
@@ -142,11 +159,35 @@ class AIModelProvider {
   }
 
   /**
-   * Stream a local explanation using context and query
+   * Build complete structured prompt containing system rules, user question, and retrieved context
+   */
+  public buildPrompt(query: string, retrieval: RetrievalResult): string {
+    return `SYSTEM:
+You are the official LEO-GRP local legislation assistant.
+Your job is to explain the provided legislation accurately.
+Use ONLY the supplied legislation as the authoritative source.
+Do not invent laws, penalties, procedures, or legal interpretations.
+
+USER QUESTION:
+${query}
+
+RELEVANT LEGISLATION:
+${retrieval.contextText || 'No relevant provisions found.'}
+
+INSTRUCTIONS:
+- Answer the user's specific question directly.
+- Explain the relevant provision in clear officer-friendly language.
+- Cite the relevant provisions using bracketed notation (e.g. [§ T.C. 3.5]).
+- If the provided legislation does not answer the question, explicitly state that the available legislation does not provide enough information.`.trim()
+  }
+
+  /**
+   * Stream a local question-aware explanation using context, query, and conversation turns
    */
   public async generateExplanation(
     query: string,
-    context: string,
+    retrieval: RetrievalResult,
+    conversationHistory: ConversationTurn[],
     onToken: (token: string) => void,
     onComplete: (fullText: string) => void
   ): Promise<void> {
@@ -154,17 +195,35 @@ class AIModelProvider {
     this.notify()
     this.currentAbortController = new AbortController()
 
-    const fullResponse = `Based on the active **Traffic Code 2nd Rendition (28.07.2025)** and **Penal Codes**:\n\n${context}\n\nOfficer Guidance:\n• Ensure you read the Miranda Rights immediately upon detention.\n• Cite the appropriate section codes when generating the evidence report.`
-    
-    // Simulate streaming chunks
+    const finalPrompt = this.buildPrompt(query, retrieval)
+    const generatedResponse = generateQuestionAwareResponse(query, retrieval, conversationHistory)
+
+    // Record developer debug trace
+    this.lastDebugTrace = {
+      userQuery: query,
+      intent: retrieval.intent,
+      detectedSection: retrieval.detectedSection,
+      retrievedSources: retrieval.sources.map((s) => ({
+        code: s.code,
+        title: s.title,
+        score: s.relevanceScore,
+        fine: s.fine,
+        sentence: s.sentence,
+      })),
+      finalPrompt,
+      generatedResponse,
+      timestamp: new Date().toISOString(),
+    }
+
+    // Simulate natural chunk streaming
     let current = ''
-    const words = fullResponse.split(' ')
+    const words = generatedResponse.split(' ')
 
     for (let i = 0; i < words.length; i++) {
       if (this.currentAbortController.signal.aborted) {
         break
       }
-      await new Promise((res) => setTimeout(res, 25))
+      await new Promise((res) => setTimeout(res, 20))
       const chunk = words[i] + ' '
       current += chunk
       onToken(chunk)
@@ -179,15 +238,15 @@ class AIModelProvider {
     if (this.currentAbortController) {
       this.currentAbortController.abort()
       this.currentAbortController = null
+      this.status = 'READY'
+      this.notify()
     }
-    this.status = 'READY'
-    this.notify()
   }
 
   public unloadModel(): void {
     this.stopGeneration()
     this.status = 'UNLOADED'
-    this.downloadStatusText = 'Model unloaded from RAM.'
+    this.downloadStatusText = 'Model memory unloaded from browser.'
     this.notify()
   }
 
