@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useDuty } from '@/contexts/DutyContext'
 
 export default function DutyHeaderStatus() {
-  const { isOnDuty, currentDutyStart, currentShiftArrests, currentShiftFines } = useDuty()
+  const { isOnDuty, currentDutyStart, currentShiftArrests, currentShiftFines, currentShiftFinesAmount } = useDuty()
   const [elapsedString, setElapsedString] = useState('00:00:00')
 
   useEffect(() => {
@@ -63,8 +63,12 @@ export default function DutyHeaderStatus() {
       </span>
       {(currentShiftArrests > 0 || currentShiftFines > 0) && (
         <span className="hidden md:inline-flex items-center gap-1.5 text-[10px] font-mono text-on-surface-variant pl-1.5 border-l border-outline-variant">
+          {currentShiftFinesAmount > 0 ? (
+            <span className="text-secondary font-semibold">F: ${currentShiftFinesAmount.toLocaleString()} ({currentShiftFines})</span>
+          ) : (
+            <span>F: {currentShiftFines}</span>
+          )}
           <span>A: {currentShiftArrests}</span>
-          <span>F: {currentShiftFines}</span>
         </span>
       )}
     </Link>

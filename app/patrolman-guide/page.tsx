@@ -12,12 +12,13 @@ import {
   saveCustomChargeTemplate,
   deleteCustomChargeTemplate,
 } from '@/utils/presets'
+import IssueFineModal from '@/components/modals/IssueFineModal'
+import IssueArrestModal from '@/components/modals/IssueArrestModal'
 
 function PatrolmanGuideContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
-  const { incrementArrests, addArrestRecord } = useDuty()
   const {
     recordRecentItem,
     pinItem,
@@ -37,11 +38,13 @@ function PatrolmanGuideContent() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [activeDetailEntry, setActiveDetailEntry] = useState<LawEntry | null>(null)
 
-  // Charge collector state
+  // Fine Issuance state
+  const [fineModalEntry, setFineModalEntry] = useState<LawEntry | null>(null)
+  const [isFineModalOpen, setIsFineModalOpen] = useState(false)
+
+  // Charge collector / Arrest state
   const [selectedCharges, setSelectedCharges] = useState<LawEntry[]>([])
-  const [suspectName, setSuspectName] = useState('')
-  const [suspectId, setSuspectId] = useState('')
-  const [showArrestModal, setShowArrestModal] = useState(false)
+  const [isArrestModalOpen, setIsArrestModalOpen] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [customTemplates, setCustomTemplates] = useState<ChargeTemplate[]>([])
   const [saveTemplateName, setSaveTemplateName] = useState('')
@@ -214,8 +217,7 @@ function PatrolmanGuideContent() {
     if (selectedCharges.length === 0) return
     const text = selectedCharges.map((c) => `${c.code} ${c.description}`).join('\n')
     navigator.clipboard.writeText(text)
-    incrementArrests()
-    showToast(`Copied ${selectedCharges.length} charges! Arrest count updated.`, 'success')
+    showToast(`Copied ${selectedCharges.length} charges to clipboard`, 'success')
   }
 
   const calculateTotals = () => {
@@ -300,10 +302,10 @@ function PatrolmanGuideContent() {
 
           {selectedCharges.length > 0 && (
             <button
-              onClick={() => setShowArrestModal(true)}
-              className="px-3 py-1.5 bg-secondary hover:bg-secondary-container text-black font-mono text-xs font-semibold rounded flex items-center gap-1.5 shadow"
+              onClick={() => setIsArrestModalOpen(true)}
+              className="px-3 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-semibold rounded flex items-center gap-1.5 shadow transition-colors"
             >
-              <span>📑</span> Active Charges ({selectedCharges.length})
+              <span>🔒</span> Active Charges ({selectedCharges.length})
             </button>
           )}
         </div>
@@ -415,15 +417,15 @@ function PatrolmanGuideContent() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopyAllCharges}
-              className="px-3 py-1 bg-secondary text-black hover:bg-secondary-container text-xs font-mono font-bold rounded flex items-center gap-1"
+              className="px-3 py-1 bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-mono font-semibold rounded flex items-center gap-1 border border-outline-variant transition-colors"
             >
-              <span>📋</span> Copy All Charges
+              <span>📋</span> Copy Charges
             </button>
             <button
-              onClick={() => setShowArrestModal(true)}
-              className="px-2.5 py-1 bg-primary text-on-primary hover:bg-primary-container text-xs font-mono rounded"
+              onClick={() => setIsArrestModalOpen(true)}
+              className="px-3 py-1 bg-primary text-on-primary hover:bg-primary-container text-xs font-mono font-bold rounded flex items-center gap-1 shadow-sm transition-all"
             >
-              Log Arrest
+              <span>🔒</span> Issue Arrest
             </button>
             <button
               onClick={handleClearCharges}
@@ -569,17 +571,14 @@ function PatrolmanGuideContent() {
                       <span>📋</span> Copy
                     </button>
                     <button
-                      onClick={() =>
-                        isChargeSelected ? handleRemoveCharge(entry.code) : handleAddCharge(entry)
-                      }
-                      className={`px-2.5 py-1 text-xs font-mono rounded flex items-center gap-1 transition-colors ${
-                        isChargeSelected
-                          ? 'bg-error/20 text-error border border-error/30 hover:bg-error/30'
-                          : 'bg-primary text-on-primary hover:bg-primary-container font-semibold'
-                      }`}
+                      onClick={() => {
+                        setFineModalEntry(entry)
+                        setIsFineModalOpen(true)
+                      }}
+                      className="px-3 py-1 bg-secondary text-on-secondary hover:brightness-110 font-bold text-xs font-mono rounded-lg flex items-center gap-1 transition-all shadow-sm active:scale-98"
+                      title="Issue fine citation for this provision"
                     >
-                      <span>{isChargeSelected ? '✕' : '+'}</span>
-                      {isChargeSelected ? 'Remove' : 'Add Charge'}
+                      <span>⚡</span> Issue Fine
                     </button>
                   </div>
                 </div>
@@ -651,9 +650,19 @@ function PatrolmanGuideContent() {
                         <button
                           onClick={() => handleCopyProvision(entry)}
                           className="p-1 rounded text-on-surface-variant hover:text-on-surface"
-                          title="Copy"
+                          title="Copy Provision"
                         >
                           📋
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFineModalEntry(entry)
+                            setIsFineModalOpen(true)
+                          }}
+                          className="px-2 py-0.5 rounded font-mono text-[11px] bg-secondary text-on-secondary font-bold hover:brightness-110"
+                          title="Issue Fine Citation"
+                        >
+                          ⚡ Issue Fine
                         </button>
                         <button
                           onClick={() =>
@@ -662,10 +671,11 @@ function PatrolmanGuideContent() {
                           className={`px-2 py-0.5 rounded font-mono text-[11px] ${
                             isChargeSelected
                               ? 'bg-error/20 text-error'
-                              : 'bg-primary text-on-primary'
+                              : 'bg-surface-container-high text-on-surface hover:text-primary'
                           }`}
+                          title={isChargeSelected ? 'Remove from charges' : 'Add to charges collector'}
                         >
-                          {isChargeSelected ? 'Remove' : '+ Charge'}
+                          {isChargeSelected ? '✕' : '+'}
                         </button>
                       </div>
                     </td>
@@ -790,6 +800,16 @@ function PatrolmanGuideContent() {
                   <span>📋</span> Copy Provision
                 </button>
                 <button
+                  onClick={() => {
+                    setFineModalEntry(activeDetailEntry)
+                    setIsFineModalOpen(true)
+                    setActiveDetailEntry(null)
+                  }}
+                  className="px-3.5 py-1.5 bg-secondary text-on-secondary hover:brightness-110 font-bold text-xs font-mono rounded-lg flex items-center gap-1.5 shadow-sm active:scale-98"
+                >
+                  <span>⚡</span> Issue Fine
+                </button>
+                <button
                   onClick={() => handleTogglePinLaw(activeDetailEntry)}
                   className="px-3 py-1.5 bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-mono font-semibold rounded border border-outline-variant flex items-center gap-1.5"
                 >
@@ -808,7 +828,7 @@ function PatrolmanGuideContent() {
                   }}
                   className="px-3 py-1.5 bg-primary text-on-primary hover:bg-primary-container text-xs font-mono font-semibold rounded flex items-center gap-1.5 ml-auto"
                 >
-                  <span>⚡</span> Add to Charges
+                  <span>+</span> Add to Charges
                 </button>
               </div>
             </div>
@@ -816,107 +836,24 @@ function PatrolmanGuideContent() {
         </div>
       )}
 
-      {/* Arrest / Charge Logging Modal */}
-      {showArrestModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-brightness-75 animate-fadeIn"
-          onClick={() => setShowArrestModal(false)}
-        >
-          <div
-            className="w-full max-w-lg bg-surface-container-low border border-outline-variant rounded-lg shadow-2xl p-5 text-on-surface space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-outline-variant pb-3">
-              <h3 className="text-base font-bold text-on-surface flex items-center gap-2">
-                <span>📑</span> Complete Arrest Record
-              </h3>
-              <button
-                onClick={() => setShowArrestModal(false)}
-                className="text-on-surface-variant hover:text-on-surface"
-              >
-                ✕
-              </button>
-            </div>
+      {/* Issue Fine Citation Modal */}
+      <IssueFineModal
+        isOpen={isFineModalOpen}
+        onClose={() => {
+          setIsFineModalOpen(false)
+          setFineModalEntry(null)
+        }}
+        entry={fineModalEntry}
+      />
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-mono text-on-surface-variant mb-1">
-                  Suspect Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. John Doe"
-                  value={suspectName}
-                  onChange={(e) => setSuspectName(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded text-on-surface font-mono text-xs focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-on-surface-variant mb-1">
-                  Suspect ID / Passport
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 12345"
-                  value={suspectId}
-                  onChange={(e) => setSuspectId(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded text-on-surface font-mono text-xs focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div className="p-3 bg-surface-container rounded border border-outline-variant space-y-1.5 text-xs font-mono">
-                <div className="font-bold text-on-surface">Selected Charges ({selectedCharges.length}):</div>
-                <div className="max-h-32 overflow-y-auto space-y-1 text-on-surface-variant">
-                  {selectedCharges.map((c) => (
-                    <div key={c.code} className="flex justify-between items-center text-[11px]">
-                      <span>{c.code} {c.description}</span>
-                      <button
-                        onClick={() => handleRemoveCharge(c.code)}
-                        className="text-error ml-2 hover:underline"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
-              <button
-                onClick={() => setShowArrestModal(false)}
-                className="px-3 py-1.5 text-xs font-mono text-on-surface-variant hover:text-on-surface"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (!suspectName.trim()) {
-                    showToast('Please enter a suspect name', 'warning')
-                    return
-                  }
-                  addArrestRecord(
-                    suspectName,
-                    selectedCharges.map((c) => c.code),
-                    totals.totalFine,
-                    suspectId
-                  )
-                  incrementArrests()
-                  showToast('Arrest record logged successfully!', 'success')
-                  setSelectedCharges([])
-                  setSuspectName('')
-                  setSuspectId('')
-                  setShowArrestModal(false)
-                }}
-                className="px-4 py-1.5 bg-primary text-on-primary font-mono text-xs font-semibold rounded hover:bg-primary-container"
-              >
-                Save & Log Arrest
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Custodial Arrest Modal */}
+      <IssueArrestModal
+        isOpen={isArrestModalOpen}
+        onClose={() => setIsArrestModalOpen(false)}
+        charges={selectedCharges}
+        onRemoveCharge={handleRemoveCharge}
+        onClearCharges={() => setSelectedCharges([])}
+      />
     </div>
   )
 }

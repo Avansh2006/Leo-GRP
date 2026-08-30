@@ -285,7 +285,7 @@ export function ProductivityProvider({ children }: { children: ReactNode }) {
 
       const updated = [...quickAccessItems, newItem]
       setQuickAccessItems(updated)
-      await dbSaveQAItem(newItem)
+      await dbSaveQAList(updated)
     },
     [quickAccessItems]
   )

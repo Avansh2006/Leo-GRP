@@ -10,7 +10,7 @@ import { useNotifications } from '@/contexts/NotificationContext'
 const Navbar = () => {
   const pathname = usePathname()
   const { theme, colorScheme, setTheme, setColorScheme, toggleTheme } = useTheme()
-  const { isOnDuty, arrestCount, fineCount } = useDuty()
+  const { isOnDuty, currentShiftArrests, currentShiftFines } = useDuty()
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
   const [showNotifications, setShowNotifications] = useState(false)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
@@ -68,8 +68,8 @@ const Navbar = () => {
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                   On Duty
                 </span>
-                <span className="text-xs text-gray-600 dark:text-gray-400">Arrests: {arrestCount}</span>
-                <span className="text-xs text-gray-600 dark:text-gray-400">Fines: {fineCount}</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400">Arrests: {currentShiftArrests}</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400">Fines: {currentShiftFines}</span>
               </div>
             )}
             

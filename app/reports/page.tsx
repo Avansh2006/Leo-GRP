@@ -7,6 +7,8 @@ import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 import { EVENT_PRESETS } from '@/utils/presets'
+import { ShiftRecord } from '@/utils/db'
+import ShiftSummaryModal from '@/components/modals/ShiftSummaryModal'
 
 const VESTS = [
   'Vest Level 1',
@@ -38,21 +40,28 @@ export default function ReportsPage() {
   const { profile } = useUserProfile()
   const { 
     isOnDuty, 
-    arrestCount, 
-    fineCount, 
+    lifetimeArrests, 
+    lifetimeFines, 
+    lifetimeFinesCount,
     currentShiftArrests, 
     currentShiftFines, 
+    currentShiftFinesAmount,
     weaponsTaken, 
     currentDutyStart, 
     currentEventCounters,
+    dutyLogs,
+    lastEndedShiftReport,
+    isShiftSummaryOpen,
+    setIsShiftSummaryOpen,
     startDuty, 
     endDuty, 
-    incrementFines,
     addEventCounter,
     incrementEventCounter,
     removeEventCounter,
   } = useDuty()
   const { recordRecentItem } = useProductivity()
+  
+  const [selectedHistoricalShift, setSelectedHistoricalShift] = useState<ShiftRecord | null>(null)
   
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -142,8 +151,6 @@ export default function ReportsPage() {
       showToast('Please fill in Date, Time, and Description', 'error')
       return
     }
-
-    incrementFines()
 
     const chargesList = selectedCharges
       .map((charge) => `- ${charge.code} ${charge.description}`)
@@ -738,8 +745,20 @@ ${weaponsReturnedSection}
               <p className={`text-2xl font-bold ${isOnDuty ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>
                 {isOnDuty ? 'ON DUTY' : 'OFF DUTY'}
               </p>
-              {isOnDuty && <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">This Shift - Arrests: {currentShiftArrests} | Fines: {currentShiftFines}</p>}
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Lifetime - Arrests: {arrestCount} | Fines: {fineCount}</p>
+              {isOnDuty && (
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  This Shift - Arrests: <strong className="text-amber-400">{currentShiftArrests}</strong> | Fines:{' '}
+                  <strong className="text-green-500 font-mono">
+                    ${currentShiftFinesAmount.toLocaleString()} ({currentShiftFines})
+                  </strong>
+                </p>
+              )}
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Lifetime - Arrests: <strong className="text-amber-400">{lifetimeArrests}</strong> | Fines:{' '}
+                <strong className="text-green-500 font-mono">
+                  ${lifetimeFines.toLocaleString()} ({lifetimeFinesCount})
+                </strong>
+              </p>
             </div>
             
             {!isOnDuty ? (
@@ -840,6 +859,16 @@ ${weaponsReturnedSection}
           </div>
         </div>
       )}
+
+      {/* End of Shift Summary Modal */}
+      <ShiftSummaryModal
+        isOpen={isShiftSummaryOpen || !!selectedHistoricalShift}
+        onClose={() => {
+          setIsShiftSummaryOpen(false)
+          setSelectedHistoricalShift(null)
+        }}
+        shift={selectedHistoricalShift || lastEndedShiftReport}
+      />
 
       <footer className="text-center py-6 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700">
         Made by <span className="font-semibold text-blue-600 dark:text-blue-400">Avansh Yadav (EN3)</span> - Currently Server Administrator

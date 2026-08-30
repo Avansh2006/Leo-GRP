@@ -45,6 +45,63 @@ export interface RecentItem {
   timestamp: string
 }
 
+export interface FineRecord {
+  id: string
+  type: 'fine'
+  timestamp: string
+  shiftId: string | null
+  organization: string
+  suspectName?: string
+  passportNumber?: string
+  provisionCode: string
+  provisionTitle: string
+  fineAmount: number
+  fineFormatted: string
+  sourceDocument: string
+}
+
+export interface ArrestChargeItem {
+  code: string
+  title: string
+  fine?: string
+  sentence?: string
+  stars?: string
+  bail?: string
+}
+
+export interface ShiftArrestRecord {
+  id: string
+  type: 'arrest'
+  timestamp: string
+  shiftId: string | null
+  organization: string
+  suspectName?: string
+  passportNumber?: string
+  status: 'ARRESTED'
+  charges: ArrestChargeItem[]
+  totalSentenceMonths: number
+  totalFineAmount: number
+  stars?: string
+  bailStatus?: string
+}
+
+export interface ShiftRecord {
+  id: string
+  organization: string
+  onDutyTime: string
+  offDutyTime?: string
+  fines: FineRecord[]
+  arrests: ShiftArrestRecord[]
+  totalFinesAmount: number
+  totalFinesCount: number
+  totalArrestsCount: number
+  eventsAttended?: string
+  eventCounters?: Array<{ name: string; count: number }>
+  weaponsTaken?: string[]
+  weaponsReturned?: string[]
+  weaponStatus?: Array<{ name: string; status: string }>
+}
+
 export interface AppBackup {
   format: 'leo-grp-backup'
   version: number
@@ -54,11 +111,15 @@ export interface AppBackup {
     quickAccess: QuickAccessItem[]
     pinned: PinnedItem[]
     recent: RecentItem[]
+    fines?: FineRecord[]
+    arrests?: ShiftArrestRecord[]
+    shifts?: ShiftRecord[]
+    settings?: Record<string, any>
   }
 }
 
 const DB_NAME = 'leogrp_productivity_db'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 const STORES = {
   NOTES: 'notes',
@@ -66,6 +127,9 @@ const STORES = {
   PINNED: 'pinned',
   RECENT: 'recent',
   METADATA: 'metadata',
+  FINES: 'fines',
+  ARRESTS: 'arrests',
+  SHIFTS: 'shifts',
 } as const
 
 export function generateId(prefix = 'id'): string {
@@ -124,19 +188,55 @@ export function isValidRecentItem(obj: any): obj is RecentItem {
   )
 }
 
-// In-memory fallback if IndexedDB fails or is unavailable
+export function isValidFineRecord(obj: any): obj is FineRecord {
+  return (
+    obj &&
+    typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
+    obj.type === 'fine' &&
+    typeof obj.provisionCode === 'string' &&
+    typeof obj.fineAmount === 'number'
+  )
+}
+
+export function isValidShiftArrestRecord(obj: any): obj is ShiftArrestRecord {
+  return (
+    obj &&
+    typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
+    obj.type === 'arrest' &&
+    Array.isArray(obj.charges)
+  )
+}
+
+export function isValidShiftRecord(obj: any): obj is ShiftRecord {
+  return (
+    obj &&
+    typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
+    typeof obj.onDutyTime === 'string'
+  )
+}
+
+// In-memory fallback if IndexedDB is unavailable
 const memoryFallback: {
   notes: Record<string, Note>
   quickAccess: Record<string, QuickAccessItem>
   pinned: Record<string, PinnedItem>
   recent: RecentItem[]
   metadata: Record<string, any>
+  fines: Record<string, FineRecord>
+  arrests: Record<string, ShiftArrestRecord>
+  shifts: Record<string, ShiftRecord>
 } = {
   notes: {},
   quickAccess: {},
   pinned: {},
   recent: [],
   metadata: {},
+  fines: {},
+  arrests: {},
+  shifts: {},
 }
 
 function isIndexedDBSupported(): boolean {
@@ -158,9 +258,9 @@ export function openDB(): Promise<IDBDatabase> {
         // Notes Store
         if (!db.objectStoreNames.contains(STORES.NOTES)) {
           const notesStore = db.createObjectStore(STORES.NOTES, { keyPath: 'id' })
-          notesStore.createIndex('updatedAt', 'updatedAt', { unique: false })
-          notesStore.createIndex('pinned', 'pinned', { unique: false })
           notesStore.createIndex('category', 'category', { unique: false })
+          notesStore.createIndex('pinned', 'pinned', { unique: false })
+          notesStore.createIndex('updatedAt', 'updatedAt', { unique: false })
         }
 
         // Quick Access Store
@@ -169,11 +269,10 @@ export function openDB(): Promise<IDBDatabase> {
           qaStore.createIndex('position', 'position', { unique: false })
         }
 
-        // Pinned Items Store
+        // Pinned Store
         if (!db.objectStoreNames.contains(STORES.PINNED)) {
           const pinnedStore = db.createObjectStore(STORES.PINNED, { keyPath: 'id' })
           pinnedStore.createIndex('type', 'type', { unique: false })
-          pinnedStore.createIndex('targetId', 'targetId', { unique: false })
           pinnedStore.createIndex('position', 'position', { unique: false })
         }
 
@@ -183,16 +282,42 @@ export function openDB(): Promise<IDBDatabase> {
           recentStore.createIndex('timestamp', 'timestamp', { unique: false })
         }
 
-        // Metadata Store
+        // Metadata / Settings Store
         if (!db.objectStoreNames.contains(STORES.METADATA)) {
           db.createObjectStore(STORES.METADATA, { keyPath: 'key' })
+        }
+
+        // Version 2: Fines Store
+        if (!db.objectStoreNames.contains(STORES.FINES)) {
+          const finesStore = db.createObjectStore(STORES.FINES, { keyPath: 'id' })
+          finesStore.createIndex('shiftId', 'shiftId', { unique: false })
+          finesStore.createIndex('timestamp', 'timestamp', { unique: false })
+          finesStore.createIndex('organization', 'organization', { unique: false })
+        }
+
+        // Version 2: Arrests Store
+        if (!db.objectStoreNames.contains(STORES.ARRESTS)) {
+          const arrestsStore = db.createObjectStore(STORES.ARRESTS, { keyPath: 'id' })
+          arrestsStore.createIndex('shiftId', 'shiftId', { unique: false })
+          arrestsStore.createIndex('timestamp', 'timestamp', { unique: false })
+          arrestsStore.createIndex('organization', 'organization', { unique: false })
+        }
+
+        // Version 2: Shifts Store
+        if (!db.objectStoreNames.contains(STORES.SHIFTS)) {
+          const shiftsStore = db.createObjectStore(STORES.SHIFTS, { keyPath: 'id' })
+          shiftsStore.createIndex('onDutyTime', 'onDutyTime', { unique: false })
+          shiftsStore.createIndex('organization', 'organization', { unique: false })
         }
       }
 
       request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error || new Error('Failed to open database'))
-    } catch (e) {
-      reject(e)
+      request.onerror = () => reject(request.error)
+      request.onblocked = () => {
+        console.warn('IndexedDB upgrade blocked: please close other tabs.')
+      }
+    } catch (err) {
+      reject(err)
     }
   })
 }
@@ -208,11 +333,9 @@ export async function getAllNotes(): Promise<Note[]> {
       const tx = db.transaction(STORES.NOTES, 'readonly')
       const store = tx.objectStore(STORES.NOTES)
       const request = store.getAll()
-
       request.onsuccess = () => {
         const raw = (request.result as any[]) || []
         const notes = raw.filter(isValidNote)
-        // Sort: pinned first, then by updatedAt descending
         notes.sort((a, b) => {
           if (a.pinned && !b.pinned) return -1
           if (!a.pinned && b.pinned) return 1
@@ -223,7 +346,6 @@ export async function getAllNotes(): Promise<Note[]> {
       request.onerror = () => reject(request.error)
     })
   } catch (e) {
-    console.warn('Falling back to memory/localStorage for notes:', e)
     const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_notes_fallback') : null
     if (saved) {
       try {
@@ -231,25 +353,7 @@ export async function getAllNotes(): Promise<Note[]> {
         if (Array.isArray(parsed)) return parsed.filter(isValidNote)
       } catch {}
     }
-    return Object.values(memoryFallback.notes).filter(isValidNote)
-  }
-}
-
-export async function getNoteById(id: string): Promise<Note | null> {
-  try {
-    const db = await openDB()
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORES.NOTES, 'readonly')
-      const store = tx.objectStore(STORES.NOTES)
-      const request = store.get(id)
-      request.onsuccess = () => {
-        const res = request.result
-        resolve(isValidNote(res) ? res : null)
-      }
-      request.onerror = () => reject(request.error)
-    })
-  } catch (e) {
-    return memoryFallback.notes[id] || null
+    return Object.values(memoryFallback.notes)
   }
 }
 
@@ -291,7 +395,7 @@ export async function deleteNote(id: string): Promise<void> {
 }
 
 // -------------------------------------------------------------
-// QUICK ACCESS API
+// QUICK ACCESS API (WITH RELIABLE PERSISTENCE & HYDRATION)
 // -------------------------------------------------------------
 
 const DEFAULT_QUICK_ACCESS: QuickAccessItem[] = [
@@ -324,6 +428,8 @@ const DEFAULT_QUICK_ACCESS: QuickAccessItem[] = [
   },
 ]
 
+const QA_INITIALIZED_KEY = 'leogrp_qa_initialized'
+
 export async function getQuickAccessItems(): Promise<QuickAccessItem[]> {
   try {
     const db = await openDB()
@@ -334,9 +440,17 @@ export async function getQuickAccessItems(): Promise<QuickAccessItem[]> {
       request.onsuccess = () => {
         const raw = (request.result as any[]) || []
         const items = raw.filter(isValidQuickAccessItem)
-        if (items.length === 0) {
+        const isInitialized = typeof window !== 'undefined' ? localStorage.getItem(QA_INITIALIZED_KEY) === 'true' : false
+
+        if (!isInitialized && items.length === 0) {
+          // First startup: seed default items into IndexedDB and mark initialized
+          saveQuickAccessList(DEFAULT_QUICK_ACCESS).catch(console.error)
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(QA_INITIALIZED_KEY, 'true')
+          }
           resolve(DEFAULT_QUICK_ACCESS)
         } else {
+          // User data exists (even if empty array []) -> source of truth
           items.sort((a, b) => a.position - b.position)
           resolve(items)
         }
@@ -345,39 +459,36 @@ export async function getQuickAccessItems(): Promise<QuickAccessItem[]> {
     })
   } catch (e) {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_qa_fallback') : null
+    const isInitialized = typeof window !== 'undefined' ? localStorage.getItem(QA_INITIALIZED_KEY) === 'true' : false
+
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed.filter(isValidQuickAccessItem)
         }
       } catch {}
     }
-    return DEFAULT_QUICK_ACCESS
-  }
-}
 
-export async function saveQuickAccessItem(item: QuickAccessItem): Promise<void> {
-  if (!isValidQuickAccessItem(item)) return
-  try {
-    const db = await openDB()
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORES.QUICK_ACCESS, 'readwrite')
-      const store = tx.objectStore(STORES.QUICK_ACCESS)
-      const request = store.put(item)
-      request.onsuccess = () => resolve()
-      request.onerror = () => reject(request.error)
-    })
-  } catch (e) {
-    memoryFallback.quickAccess[item.id] = item
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_qa_fallback', JSON.stringify(Object.values(memoryFallback.quickAccess)))
+    if (!isInitialized) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(QA_INITIALIZED_KEY, 'true')
+        localStorage.setItem('leogrp_qa_fallback', JSON.stringify(DEFAULT_QUICK_ACCESS))
+      }
+      return DEFAULT_QUICK_ACCESS
     }
+
+    return Object.values(memoryFallback.quickAccess)
   }
 }
 
 export async function saveQuickAccessList(items: QuickAccessItem[]): Promise<void> {
   const validItems = items.filter(isValidQuickAccessItem)
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(QA_INITIALIZED_KEY, 'true')
+    localStorage.setItem('leogrp_qa_fallback', JSON.stringify(validItems))
+  }
+
   try {
     const db = await openDB()
     return new Promise((resolve, reject) => {
@@ -391,27 +502,36 @@ export async function saveQuickAccessList(items: QuickAccessItem[]): Promise<voi
       tx.onerror = () => reject(tx.error)
     })
   } catch (e) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_qa_fallback', JSON.stringify(validItems))
+    memoryFallback.quickAccess = {}
+    validItems.forEach((item, idx) => {
+      memoryFallback.quickAccess[item.id] = { ...item, position: idx }
+    })
+  }
+}
+
+export async function saveQuickAccessItem(item: QuickAccessItem): Promise<void> {
+  if (!isValidQuickAccessItem(item)) return
+  try {
+    const current = await getQuickAccessItems()
+    const index = current.findIndex((i) => i.id === item.id)
+    if (index !== -1) {
+      current[index] = item
+    } else {
+      current.push(item)
     }
+    await saveQuickAccessList(current)
+  } catch (e) {
+    memoryFallback.quickAccess[item.id] = item
   }
 }
 
 export async function deleteQuickAccessItem(id: string): Promise<void> {
   try {
-    const db = await openDB()
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORES.QUICK_ACCESS, 'readwrite')
-      const store = tx.objectStore(STORES.QUICK_ACCESS)
-      const request = store.delete(id)
-      request.onsuccess = () => resolve()
-      request.onerror = () => reject(request.error)
-    })
+    const current = await getQuickAccessItems()
+    const filtered = current.filter((i) => i.id !== id)
+    await saveQuickAccessList(filtered)
   } catch (e) {
     delete memoryFallback.quickAccess[id]
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_qa_fallback', JSON.stringify(Object.values(memoryFallback.quickAccess)))
-    }
   }
 }
 
@@ -435,14 +555,7 @@ export async function getAllPinnedItems(): Promise<PinnedItem[]> {
       request.onerror = () => reject(request.error)
     })
   } catch (e) {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_pinned_fallback') : null
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) return parsed.filter(isValidPinnedItem)
-      } catch {}
-    }
-    return Object.values(memoryFallback.pinned).filter(isValidPinnedItem)
+    return Object.values(memoryFallback.pinned)
   }
 }
 
@@ -459,9 +572,6 @@ export async function savePinnedItem(item: PinnedItem): Promise<void> {
     })
   } catch (e) {
     memoryFallback.pinned[item.id] = item
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_pinned_fallback', JSON.stringify(Object.values(memoryFallback.pinned)))
-    }
   }
 }
 
@@ -477,14 +587,11 @@ export async function deletePinnedItem(id: string): Promise<void> {
     })
   } catch (e) {
     delete memoryFallback.pinned[id]
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_pinned_fallback', JSON.stringify(Object.values(memoryFallback.pinned)))
-    }
   }
 }
 
 // -------------------------------------------------------------
-// RECENT ITEMS API (Max 30 items)
+// RECENT ITEMS API
 // -------------------------------------------------------------
 
 const MAX_RECENT_ITEMS = 30
@@ -505,50 +612,39 @@ export async function getRecentItems(): Promise<RecentItem[]> {
       request.onerror = () => reject(request.error)
     })
   } catch (e) {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_recent_fallback') : null
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) return parsed.filter(isValidRecentItem)
-      } catch {}
-    }
-    return memoryFallback.recent.filter(isValidRecentItem)
+    return memoryFallback.recent
   }
 }
 
-export async function addRecentItem(item: Omit<RecentItem, 'id' | 'timestamp'> & { id?: string; timestamp?: string }): Promise<void> {
-  const newItem: RecentItem = {
-    id: item.id || generateId('recent'),
-    type: item.type,
-    targetId: item.targetId,
-    title: item.title,
-    subtitle: item.subtitle,
-    url: item.url,
-    timestamp: item.timestamp || new Date().toISOString(),
-  }
-
-  if (!isValidRecentItem(newItem)) return
-
+export async function addRecentItem(item: RecentItem): Promise<void> {
+  if (!isValidRecentItem(item)) return
   try {
     const db = await openDB()
-    const all = await getRecentItems()
-    const filtered = all.filter(r => !(r.type === newItem.type && r.targetId === newItem.targetId))
-    const updated = [newItem, ...filtered].slice(0, MAX_RECENT_ITEMS)
-
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.RECENT, 'readwrite')
       const store = tx.objectStore(STORES.RECENT)
-      store.clear()
-      updated.forEach(it => store.put(it))
+      
+      const getReq = store.getAll()
+      getReq.onsuccess = () => {
+        const existing = (getReq.result as RecentItem[]) || []
+        const filtered = existing.filter(
+          (r) => !(r.type === item.type && r.targetId === item.targetId)
+        )
+        
+        filtered.unshift(item)
+        const toKeep = filtered.slice(0, MAX_RECENT_ITEMS)
+        
+        store.clear()
+        toKeep.forEach((r) => store.put(r))
+      }
+      
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
   } catch (e) {
-    const filtered = memoryFallback.recent.filter(r => !(r.type === newItem.type && r.targetId === newItem.targetId))
-    memoryFallback.recent = [newItem, ...filtered].slice(0, MAX_RECENT_ITEMS)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_recent_fallback', JSON.stringify(memoryFallback.recent))
-    }
+    memoryFallback.recent = [item, ...memoryFallback.recent.filter(
+      (r) => !(r.type === item.type && r.targetId === item.targetId)
+    )].slice(0, MAX_RECENT_ITEMS)
   }
 }
 
@@ -564,149 +660,342 @@ export async function clearRecentItems(): Promise<void> {
     })
   } catch (e) {
     memoryFallback.recent = []
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('leogrp_recent_fallback')
-    }
   }
 }
 
 // -------------------------------------------------------------
-// BACKUP, RESTORE & DATA MANAGEMENT
+// FINES API (STRUCTURED PERSISTENCE & NO DOUBLE COUNTING)
 // -------------------------------------------------------------
 
-export async function exportAllData(): Promise<string> {
-  const [notes, quickAccess, pinned, recent] = await Promise.all([
+export async function getAllFines(): Promise<FineRecord[]> {
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.FINES, 'readonly')
+      const store = tx.objectStore(STORES.FINES)
+      const request = store.getAll()
+      request.onsuccess = () => {
+        const raw = (request.result as any[]) || []
+        const fines = raw.filter(isValidFineRecord)
+        fines.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        resolve(fines)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_fines_fallback') : null
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) return parsed.filter(isValidFineRecord)
+      } catch {}
+    }
+    return Object.values(memoryFallback.fines)
+  }
+}
+
+export async function saveFine(fine: FineRecord): Promise<void> {
+  if (!isValidFineRecord(fine)) return
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.FINES, 'readwrite')
+      const store = tx.objectStore(STORES.FINES)
+      const request = store.put(fine)
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    memoryFallback.fines[fine.id] = fine
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('leogrp_fines_fallback', JSON.stringify(Object.values(memoryFallback.fines)))
+    }
+  }
+}
+
+export async function getFinesByShift(shiftId: string): Promise<FineRecord[]> {
+  const all = await getAllFines()
+  return all.filter((f) => f.shiftId === shiftId)
+}
+
+// -------------------------------------------------------------
+// ARRESTS API
+// -------------------------------------------------------------
+
+export async function getAllArrests(): Promise<ShiftArrestRecord[]> {
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.ARRESTS, 'readonly')
+      const store = tx.objectStore(STORES.ARRESTS)
+      const request = store.getAll()
+      request.onsuccess = () => {
+        const raw = (request.result as any[]) || []
+        const arrests = raw.filter(isValidShiftArrestRecord)
+        arrests.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        resolve(arrests)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_arrests_fallback') : null
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) return parsed.filter(isValidShiftArrestRecord)
+      } catch {}
+    }
+    return Object.values(memoryFallback.arrests)
+  }
+}
+
+export async function saveArrest(arrest: ShiftArrestRecord): Promise<void> {
+  if (!isValidShiftArrestRecord(arrest)) return
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.ARRESTS, 'readwrite')
+      const store = tx.objectStore(STORES.ARRESTS)
+      const request = store.put(arrest)
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    memoryFallback.arrests[arrest.id] = arrest
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('leogrp_arrests_fallback', JSON.stringify(Object.values(memoryFallback.arrests)))
+    }
+  }
+}
+
+export async function getArrestsByShift(shiftId: string): Promise<ShiftArrestRecord[]> {
+  const all = await getAllArrests()
+  return all.filter((a) => a.shiftId === shiftId)
+}
+
+// -------------------------------------------------------------
+// SHIFTS API
+// -------------------------------------------------------------
+
+export async function getAllShifts(): Promise<ShiftRecord[]> {
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.SHIFTS, 'readonly')
+      const store = tx.objectStore(STORES.SHIFTS)
+      const request = store.getAll()
+      request.onsuccess = () => {
+        const raw = (request.result as any[]) || []
+        const shifts = raw.filter(isValidShiftRecord)
+        shifts.sort((a, b) => new Date(b.onDutyTime).getTime() - new Date(a.onDutyTime).getTime())
+        resolve(shifts)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_shifts_fallback') : null
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) return parsed.filter(isValidShiftRecord)
+      } catch {}
+    }
+    return Object.values(memoryFallback.shifts)
+  }
+}
+
+export async function saveShift(shift: ShiftRecord): Promise<void> {
+  if (!isValidShiftRecord(shift)) return
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.SHIFTS, 'readwrite')
+      const store = tx.objectStore(STORES.SHIFTS)
+      const request = store.put(shift)
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    memoryFallback.shifts[shift.id] = shift
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('leogrp_shifts_fallback', JSON.stringify(Object.values(memoryFallback.shifts)))
+    }
+  }
+}
+
+export async function getDutyStatistics(): Promise<{
+  lifetimeFinesAmount: number
+  lifetimeFinesCount: number
+  lifetimeArrestsCount: number
+}> {
+  const [fines, arrests] = await Promise.all([getAllFines(), getAllArrests()])
+  const lifetimeFinesAmount = fines.reduce((sum, f) => sum + (f.fineAmount || 0), 0)
+  const lifetimeFinesCount = fines.length
+  const lifetimeArrestsCount = arrests.length
+
+  return {
+    lifetimeFinesAmount,
+    lifetimeFinesCount,
+    lifetimeArrestsCount,
+  }
+}
+
+// -------------------------------------------------------------
+// BACKUP & RESTORE UTILITY
+// -------------------------------------------------------------
+
+export async function exportDatabaseBackup(): Promise<AppBackup> {
+  const [notes, quickAccess, pinned, recent, fines, arrests, shifts] = await Promise.all([
     getAllNotes(),
     getQuickAccessItems(),
     getAllPinnedItems(),
     getRecentItems(),
+    getAllFines(),
+    getAllArrests(),
+    getAllShifts(),
   ])
 
-  const backup: AppBackup = {
+  return {
     format: 'leo-grp-backup',
-    version: 1,
+    version: DB_VERSION,
     exportedAt: new Date().toISOString(),
     data: {
       notes,
       quickAccess,
       pinned,
       recent,
+      fines,
+      arrests,
+      shifts,
+      settings: {
+        includeSuspectName: typeof window !== 'undefined' ? localStorage.getItem('leogrp_include_suspect_name') !== 'false' : true,
+      },
     },
   }
-
-  const jsonString = JSON.stringify(backup, null, 2)
-
-  // Download file directly
-  if (typeof window !== 'undefined') {
-    const dateStr = new Date().toISOString().split('T')[0]
-    const filename = `leo-grp-backup-${dateStr}.json`
-    const blob = new Blob([jsonString], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
-  return jsonString
 }
 
-export async function validateBackupJson(jsonString: string): Promise<{ valid: boolean; backup?: AppBackup; error?: string }> {
+export async function importDatabaseBackup(
+  backupData: any,
+  mode: 'merge' | 'replace' = 'replace'
+): Promise<{
+  notesCount: number
+  quickAccessCount: number
+  pinnedCount: number
+  recentCount: number
+  finesCount: number
+  arrestsCount: number
+  shiftsCount: number
+}> {
+  if (!backupData || typeof backupData !== 'object' || backupData.format !== 'leo-grp-backup') {
+    throw new Error('Invalid backup file format. Expected a valid LEO-GRP JSON backup.')
+  }
+
+  const raw = backupData.data || {}
+  const validNotes = (raw.notes || []).filter(isValidNote)
+  const validQA = (raw.quickAccess || []).filter(isValidQuickAccessItem)
+  const validPinned = (raw.pinned || []).filter(isValidPinnedItem)
+  const validRecent = (raw.recent || []).filter(isValidRecentItem)
+  const validFines = (raw.fines || []).filter(isValidFineRecord)
+  const validArrests = (raw.arrests || []).filter(isValidShiftArrestRecord)
+  const validShifts = (raw.shifts || []).filter(isValidShiftRecord)
+
   try {
-    const parsed = JSON.parse(jsonString)
-    if (!parsed || typeof parsed !== 'object') {
-      return { valid: false, error: 'Invalid JSON format' }
+    const db = await openDB()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(
+        [
+          STORES.NOTES,
+          STORES.QUICK_ACCESS,
+          STORES.PINNED,
+          STORES.RECENT,
+          STORES.FINES,
+          STORES.ARRESTS,
+          STORES.SHIFTS,
+        ],
+        'readwrite'
+      )
+
+      // Notes
+      const notesStore = tx.objectStore(STORES.NOTES)
+      if (mode === 'replace') notesStore.clear()
+      validNotes.forEach((n: Note) => notesStore.put(n))
+
+      // Quick Access
+      const qaStore = tx.objectStore(STORES.QUICK_ACCESS)
+      if (mode === 'replace') qaStore.clear()
+      validQA.forEach((qa: QuickAccessItem, idx: number) => qaStore.put({ ...qa, position: idx }))
+
+      // Pinned
+      const pinnedStore = tx.objectStore(STORES.PINNED)
+      if (mode === 'replace') pinnedStore.clear()
+      validPinned.forEach((p: PinnedItem, idx: number) => pinnedStore.put({ ...p, position: idx }))
+
+      // Recent
+      const recentStore = tx.objectStore(STORES.RECENT)
+      if (mode === 'replace') recentStore.clear()
+      validRecent.forEach((r: RecentItem) => recentStore.put(r))
+
+      // Fines
+      const finesStore = tx.objectStore(STORES.FINES)
+      if (mode === 'replace') finesStore.clear()
+      validFines.forEach((f: FineRecord) => finesStore.put(f))
+
+      // Arrests
+      const arrestsStore = tx.objectStore(STORES.ARRESTS)
+      if (mode === 'replace') arrestsStore.clear()
+      validArrests.forEach((a: ShiftArrestRecord) => arrestsStore.put(a))
+
+      // Shifts
+      const shiftsStore = tx.objectStore(STORES.SHIFTS)
+      if (mode === 'replace') shiftsStore.clear()
+      validShifts.forEach((s: ShiftRecord) => shiftsStore.put(s))
+
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+
+    if (raw.settings?.includeSuspectName !== undefined && typeof window !== 'undefined') {
+      localStorage.setItem('leogrp_include_suspect_name', String(raw.settings.includeSuspectName))
     }
-    if (parsed.format !== 'leo-grp-backup') {
-      return { valid: false, error: 'File is not a valid LEO-GRP backup' }
+  } catch (e) {
+    // Save to memory fallback & localStorage
+    validNotes.forEach((n: Note) => (memoryFallback.notes[n.id] = n))
+    validQA.forEach((qa: QuickAccessItem, idx: number) => (memoryFallback.quickAccess[qa.id] = { ...qa, position: idx }))
+    validPinned.forEach((p: PinnedItem) => (memoryFallback.pinned[p.id] = p))
+    memoryFallback.recent = validRecent
+    validFines.forEach((f: FineRecord) => (memoryFallback.fines[f.id] = f))
+    validArrests.forEach((a: ShiftArrestRecord) => (memoryFallback.arrests[a.id] = a))
+    validShifts.forEach((s: ShiftRecord) => (memoryFallback.shifts[s.id] = s))
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('leogrp_notes_fallback', JSON.stringify(validNotes))
+      localStorage.setItem('leogrp_qa_fallback', JSON.stringify(validQA))
+      localStorage.setItem('leogrp_fines_fallback', JSON.stringify(validFines))
+      localStorage.setItem('leogrp_arrests_fallback', JSON.stringify(validArrests))
+      localStorage.setItem('leogrp_shifts_fallback', JSON.stringify(validShifts))
     }
-    if (!parsed.data || typeof parsed.data !== 'object') {
-      return { valid: false, error: 'Backup is missing data object' }
-    }
-
-    return { valid: true, backup: parsed as AppBackup }
-  } catch (e: any) {
-    return { valid: false, error: e?.message || 'Malformed JSON file' }
-  }
-}
-
-export async function importBackupData(backup: AppBackup, mode: 'merge' | 'replace'): Promise<{ notesCount: number; quickAccessCount: number; pinnedCount: number }> {
-  const incomingNotes = (backup.data.notes || []).filter(isValidNote)
-  const incomingQA = (backup.data.quickAccess || []).filter(isValidQuickAccessItem)
-  const incomingPinned = (backup.data.pinned || []).filter(isValidPinnedItem)
-  const incomingRecent = (backup.data.recent || []).filter(isValidRecentItem)
-
-  if (mode === 'replace') {
-    // Clear and replace
-    await clearAllLocalProductivityData()
-    for (const note of incomingNotes) await saveNote(note)
-    await saveQuickAccessList(incomingQA)
-    for (const pin of incomingPinned) await savePinnedItem(pin)
-    for (const rec of incomingRecent) await addRecentItem(rec)
-
-    return {
-      notesCount: incomingNotes.length,
-      quickAccessCount: incomingQA.length,
-      pinnedCount: incomingPinned.length,
-    }
-  }
-
-  // Merge Mode
-  const existingNotes = await getAllNotes()
-  const existingQA = await getQuickAccessItems()
-  const existingPinned = await getAllPinnedItems()
-
-  // Merge Notes: match by ID; if exists, keep newer by updatedAt
-  const noteMap = new Map<string, Note>()
-  existingNotes.forEach(n => noteMap.set(n.id, n))
-  for (const inNote of incomingNotes) {
-    if (noteMap.has(inNote.id)) {
-      const current = noteMap.get(inNote.id)!
-      if (new Date(inNote.updatedAt).getTime() > new Date(current.updatedAt).getTime()) {
-        noteMap.set(inNote.id, inNote)
-      }
-    } else {
-      noteMap.set(inNote.id, inNote)
-    }
-  }
-
-  for (const note of noteMap.values()) {
-    await saveNote(note)
-  }
-
-  // Merge Quick Access: append new targets without duplicating target
-  const qaTargets = new Set(existingQA.map(q => q.target))
-  const mergedQA = [...existingQA]
-  for (const inQA of incomingQA) {
-    if (!qaTargets.has(inQA.target)) {
-      mergedQA.push(inQA)
-      qaTargets.add(inQA.target)
-    }
-  }
-  await saveQuickAccessList(mergedQA)
-
-  // Merge Pinned
-  const pinKeys = new Set(existingPinned.map(p => `${p.type}-${p.targetId}`))
-  for (const inPin of incomingPinned) {
-    const key = `${inPin.type}-${inPin.targetId}`
-    if (!pinKeys.has(key)) {
-      await savePinnedItem(inPin)
-      pinKeys.add(key)
-    }
-  }
-
-  // Merge Recent
-  for (const inRec of incomingRecent) {
-    await addRecentItem(inRec)
   }
 
   return {
-    notesCount: noteMap.size,
-    quickAccessCount: mergedQA.length,
-    pinnedCount: pinKeys.size,
+    notesCount: validNotes.length,
+    quickAccessCount: validQA.length,
+    pinnedCount: validPinned.length,
+    recentCount: validRecent.length,
+    finesCount: validFines.length,
+    arrestsCount: validArrests.length,
+    shiftsCount: validShifts.length,
+  }
+}
+
+export async function validateBackupJson(jsonString: string): Promise<{ valid: boolean; backup?: any; error?: string }> {
+  try {
+    const parsed = JSON.parse(jsonString)
+    if (!parsed || typeof parsed !== 'object' || parsed.format !== 'leo-grp-backup') {
+      return { valid: false, error: 'Invalid backup format. Must be a valid LEO-GRP JSON backup file.' }
+    }
+    return { valid: true, backup: parsed }
+  } catch (e: any) {
+    return { valid: false, error: `JSON Parse error: ${e.message}` }
   }
 }
 
@@ -714,11 +1003,25 @@ export async function clearAllLocalProductivityData(): Promise<void> {
   try {
     const db = await openDB()
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction([STORES.NOTES, STORES.QUICK_ACCESS, STORES.PINNED, STORES.RECENT], 'readwrite')
+      const tx = db.transaction(
+        [
+          STORES.NOTES,
+          STORES.QUICK_ACCESS,
+          STORES.PINNED,
+          STORES.RECENT,
+          STORES.FINES,
+          STORES.ARRESTS,
+          STORES.SHIFTS,
+        ],
+        'readwrite'
+      )
       tx.objectStore(STORES.NOTES).clear()
       tx.objectStore(STORES.QUICK_ACCESS).clear()
       tx.objectStore(STORES.PINNED).clear()
       tx.objectStore(STORES.RECENT).clear()
+      tx.objectStore(STORES.FINES).clear()
+      tx.objectStore(STORES.ARRESTS).clear()
+      tx.objectStore(STORES.SHIFTS).clear()
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
@@ -727,12 +1030,12 @@ export async function clearAllLocalProductivityData(): Promise<void> {
     memoryFallback.quickAccess = {}
     memoryFallback.pinned = {}
     memoryFallback.recent = []
-  }
-
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('leogrp_notes_fallback')
-    localStorage.removeItem('leogrp_qa_fallback')
-    localStorage.removeItem('leogrp_pinned_fallback')
-    localStorage.removeItem('leogrp_recent_fallback')
+    memoryFallback.fines = {}
+    memoryFallback.arrests = {}
+    memoryFallback.shifts = {}
   }
 }
+
+// Aliases for compatibility
+export { exportDatabaseBackup as exportAllData }
+export { importDatabaseBackup as importBackupData }

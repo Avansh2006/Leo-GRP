@@ -67,7 +67,7 @@ export default function DataBackupModal({ isOpen, onClose }: DataBackupModalProp
 
       const result = await importBackupData(validation.backup, importMode)
       showToast(
-        `Imported successfully (${result.notesCount} notes, ${result.quickAccessCount} shortcuts, ${result.pinnedCount} pins). Refreshing...`,
+        `Imported successfully (${result.notesCount} notes, ${result.quickAccessCount} shortcuts, ${result.pinnedCount} pins, ${result.finesCount || 0} fines, ${result.arrestsCount || 0} arrests). Refreshing...`,
         'success'
       )
 

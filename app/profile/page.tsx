@@ -10,7 +10,16 @@ import SimpleBarChart from '@/components/SimpleBarChart'
 import { aiModelProvider, AIModelStatus, RECOMMENDED_LOCAL_MODEL } from '@/utils/aiModelProvider'
 
 export default function ProfilePage() {
-  const { dutyLogs } = useDuty()
+  const {
+    dutyLogs,
+    lifetimeFines,
+    lifetimeFinesCount,
+    lifetimeArrests,
+    includeSuspectName,
+    setIncludeSuspectName,
+    currentOrganization,
+    setCurrentOrganization,
+  } = useDuty()
   const { showToast } = useToast()
   const { achievements, checkAchievements } = useNotifications()
   const { profile, updateProfile, addLoadout, removeLoadout, updateLoadout } = useUserProfile()
@@ -101,8 +110,8 @@ export default function ProfilePage() {
 
     return {
       lifetime: {
-        arrests: dutyLogs.reduce((sum, log) => sum + log.totalArrests, 0),
-        fines: dutyLogs.reduce((sum, log) => sum + log.totalFines, 0),
+        arrests: dutyLogs.reduce((sum, log) => sum + (log.totalArrestsCount || log.arrests?.length || 0), 0),
+        fines: dutyLogs.reduce((sum, log) => sum + (log.totalFinesCount || log.fines?.length || 0), 0),
         shifts: dutyLogs.length,
         hours: dutyLogs.reduce((sum, log) => {
           if (!log.offDutyTime) return sum
@@ -111,8 +120,8 @@ export default function ProfilePage() {
         }, 0)
       },
       week: {
-        arrests: weekLogs.reduce((sum, log) => sum + log.totalArrests, 0),
-        fines: weekLogs.reduce((sum, log) => sum + log.totalFines, 0),
+        arrests: weekLogs.reduce((sum, log) => sum + (log.totalArrestsCount || log.arrests?.length || 0), 0),
+        fines: weekLogs.reduce((sum, log) => sum + (log.totalFinesCount || log.fines?.length || 0), 0),
         shifts: weekLogs.length,
         hours: weekLogs.reduce((sum, log) => {
           if (!log.offDutyTime) return sum
@@ -121,8 +130,8 @@ export default function ProfilePage() {
         }, 0)
       },
       today: {
-        arrests: todayLogs.reduce((sum, log) => sum + log.totalArrests, 0),
-        fines: todayLogs.reduce((sum, log) => sum + log.totalFines, 0),
+        arrests: todayLogs.reduce((sum, log) => sum + (log.totalArrestsCount || log.arrests?.length || 0), 0),
+        fines: todayLogs.reduce((sum, log) => sum + (log.totalFinesCount || log.fines?.length || 0), 0),
         shifts: todayLogs.length,
         hours: todayLogs.reduce((sum, log) => {
           if (!log.offDutyTime) return sum
@@ -147,13 +156,20 @@ export default function ProfilePage() {
 
   // Filter logs based on search and weapon status
   const filteredLogs = dutyLogs.filter(log => {
+    const term = searchTerm.toLowerCase()
     const matchesSearch = searchTerm === '' || 
-      log.eventsAttended?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.arrestRecords?.some(r => 
-        r.suspectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (r.suspectId && r.suspectId.toLowerCase().includes(searchTerm.toLowerCase()))
+      log.eventsAttended?.toLowerCase().includes(term) ||
+      log.organization?.toLowerCase().includes(term) ||
+      log.arrests?.some(r => 
+        (r.suspectName && r.suspectName.toLowerCase().includes(term)) ||
+        (r.passportNumber && r.passportNumber.toLowerCase().includes(term))
       ) ||
-      formatDate(log.onDutyTime).toLowerCase().includes(searchTerm.toLowerCase())
+      log.fines?.some(f => 
+        (f.suspectName && f.suspectName.toLowerCase().includes(term)) ||
+        (f.passportNumber && f.passportNumber.toLowerCase().includes(term)) ||
+        f.provisionCode.toLowerCase().includes(term)
+      ) ||
+      formatDate(log.onDutyTime).toLowerCase().includes(term)
 
     const matchesFilter = filterStatus === 'all' ||
       log.weaponStatus?.some(w => w.status === filterStatus)
@@ -329,8 +345,80 @@ export default function ProfilePage() {
         </div>
       </div>
 
-        {/* Legislation AI & Local Engine Card */}
-        <div className="card mb-6 border border-outline-variant bg-surface-container-low">
+      {/* Operational & Privacy Preferences Card */}
+      <div className="card mb-6 border border-outline-variant bg-surface-container-low">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xl">⚙️</span>
+          <div>
+            <h2 className="text-lg font-bold text-on-surface">Operational & Privacy Settings</h2>
+            <p className="text-xs text-on-surface-variant font-mono">
+              Configure law enforcement agency affiliation and suspect privacy options.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+          {/* Active Agency / Org */}
+          <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2">
+            <div className="text-on-surface-variant font-bold uppercase text-[11px]">
+              Active Organization / Agency:
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {['LSPD', 'SAHP', 'FIB', 'GOV', 'NG', 'EMS'].map((org) => (
+                <button
+                  key={org}
+                  onClick={() => {
+                    setCurrentOrganization(org)
+                    showToast(`Active agency set to ${org}`, 'success')
+                  }}
+                  className={`px-3 py-1 rounded text-xs font-mono font-bold transition-colors ${
+                    currentOrganization === org
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  {org}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-on-surface-variant">
+              Applies dynamically to macro commands, bodycam cloud uploads, and duty logs.
+            </p>
+          </div>
+
+          {/* Suspect Name Privacy Toggle */}
+          <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-on-surface-variant font-bold uppercase text-[11px]">
+                Include Suspect Name:
+              </span>
+              <button
+                onClick={() => {
+                  const next = !includeSuspectName
+                  setIncludeSuspectName(next)
+                  showToast(
+                    next ? 'Suspect name logging enabled' : 'Suspect name logging disabled (Privacy Mode)',
+                    'info'
+                  )
+                }}
+                className={`px-3 py-1 rounded text-xs font-mono font-bold transition-all shadow-sm ${
+                  includeSuspectName
+                    ? 'bg-secondary text-on-secondary hover:brightness-110'
+                    : 'bg-surface-container-highest text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                {includeSuspectName ? 'ON (Prompted)' : 'OFF (Passport Only)'}
+              </button>
+            </div>
+            <p className="text-[10px] text-on-surface-variant leading-relaxed">
+              When <strong>ON</strong>, suspect names are prompted and recorded in fines & arrests. When <strong>OFF</strong>, logs strictly use Passport / Citizen ID numbers without recording names.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Legislation AI & Local Engine Card */}
+      <div className="card mb-6 border border-outline-variant bg-surface-container-low">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2">
               <span className="text-xl">⚖️</span>
@@ -815,20 +903,23 @@ export default function ProfilePage() {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                Lifetime Statistics
+                Lifetime Statistics (IndexedDB Verified)
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Arrests</p>
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.lifetime.arrests}</p>
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">{lifetimeArrests}</p>
                 </div>
                 <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Fines</p>
-                  <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{stats.lifetime.fines}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Lifetime Fines</p>
+                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                    ${lifetimeFines.toLocaleString()}
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{lifetimeFinesCount} fines issued</p>
                 </div>
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Shifts</p>
-                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.lifetime.shifts}</p>
+                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{dutyLogs.length}</p>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Hours</p>
@@ -837,7 +928,7 @@ export default function ProfilePage() {
                 <div className="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 p-4 rounded-lg border border-pink-200 dark:border-pink-800">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Avg Actions/Shift</p>
                   <p className="text-3xl font-bold text-pink-600 dark:text-pink-400">
-                    {stats.lifetime.shifts > 0 ? ((stats.lifetime.arrests + stats.lifetime.fines) / stats.lifetime.shifts).toFixed(1) : '0'}
+                    {dutyLogs.length > 0 ? ((lifetimeArrests + lifetimeFinesCount) / dutyLogs.length).toFixed(1) : '0'}
                   </p>
                 </div>
               </div>
@@ -859,7 +950,7 @@ export default function ProfilePage() {
                   title="Recent Shift Arrests"
                   data={dutyLogs.slice(0, 7).reverse().map((log, idx) => ({
                     label: `Shift ${idx + 1}`,
-                    value: log.totalArrests,
+                    value: log.totalArrestsCount || log.arrests?.length || 0,
                     color: 'bg-gradient-to-r from-green-400 to-green-600'
                   }))}
                 />
@@ -869,7 +960,7 @@ export default function ProfilePage() {
                   title="Recent Shift Fines"
                   data={dutyLogs.slice(0, 7).reverse().map((log, idx) => ({
                     label: `Shift ${idx + 1}`,
-                    value: log.totalFines,
+                    value: log.totalFinesCount || log.fines?.length || 0,
                     color: 'bg-gradient-to-r from-yellow-400 to-yellow-600'
                   }))}
                 />
@@ -902,10 +993,12 @@ export default function ProfilePage() {
                   <SimpleBarChart
                     title="Overall Weapon Status"
                     data={(() => {
-                      const statusCounts = { returned: 0, lost: 0, broken: 0, used: 0 }
+                      const statusCounts: Record<string, number> = { returned: 0, lost: 0, broken: 0, used: 0 }
                       dutyLogs.forEach(log => {
                         log.weaponStatus?.forEach(weapon => {
-                          statusCounts[weapon.status]++
+                          if (statusCounts[weapon.status] !== undefined) {
+                            statusCounts[weapon.status]++
+                          }
                         })
                       })
                       return [
@@ -1001,11 +1094,15 @@ export default function ProfilePage() {
                   <div className="space-y-2">
                     <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
                       <span className="text-sm text-gray-600 dark:text-gray-400">Total Arrests</span>
-                      <span className="font-bold text-green-600 dark:text-green-400">{log.totalArrests}</span>
+                      <span className="font-bold text-green-600 dark:text-green-400">
+                        {log.totalArrestsCount || log.arrests?.length || 0}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
                       <span className="text-sm text-gray-600 dark:text-gray-400">Total Fines</span>
-                      <span className="font-bold text-yellow-600 dark:text-yellow-400">{log.totalFines}</span>
+                      <span className="font-bold text-yellow-600 dark:text-yellow-400">
+                        ${(log.totalFinesAmount || 0).toLocaleString()} ({log.totalFinesCount || log.fines?.length || 0})
+                      </span>
                     </div>
                     <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
                       <span className="text-sm text-gray-600 dark:text-gray-400">Events Attended</span>
@@ -1021,7 +1118,7 @@ export default function ProfilePage() {
                     <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded">
                       <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Weapons Taken</p>
                       <ul className="text-sm text-gray-900 dark:text-gray-100 space-y-1">
-                        {log.weaponsTaken.map((weapon, idx) => (
+                        {(log.weaponsTaken || []).map((weapon, idx) => (
                           <li key={idx} className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
                             {weapon}
@@ -1059,30 +1156,58 @@ export default function ProfilePage() {
               </div>
 
               {/* Arrest Records */}
-              {log.arrestRecords && log.arrestRecords.length > 0 && (
+              {log.arrests && log.arrests.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Arrest Records ({log.arrestRecords.length})</h4>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Arrests ({log.arrests.length})</h4>
                   <div className="space-y-3">
-                    {log.arrestRecords.map((arrest) => (
+                    {log.arrests.map((arrest) => (
                       <div key={arrest.id} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <p className="font-semibold text-gray-900 dark:text-gray-100">{arrest.suspectName}</p>
-                            {arrest.suspectId && (
-                              <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">ID: {arrest.suspectId}</p>
+                            {arrest.suspectName && (
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">{arrest.suspectName}</p>
+                            )}
+                            {arrest.passportNumber && (
+                              <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Passport: {arrest.passportNumber}</p>
                             )}
                             <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(arrest.timestamp)}</p>
                           </div>
-                          <span className="text-sm font-bold text-green-600 dark:text-green-400">${arrest.fines}</span>
+                          <span className="text-sm font-bold text-amber-500">${arrest.totalFineAmount?.toLocaleString() || 0}</span>
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           <p className="font-medium mb-1">Charges:</p>
                           <ul className="space-y-1 text-xs">
                             {arrest.charges.map((charge, idx) => (
-                              <li key={idx}>• {charge}</li>
+                              <li key={idx}>• § {charge.code} — {charge.title}</li>
                             ))}
                           </ul>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fine Records */}
+              {log.fines && log.fines.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Fines Issued ({log.fines.length})</h4>
+                  <div className="space-y-2">
+                    {log.fines.map((fine) => (
+                      <div key={fine.id} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg flex items-center justify-between text-xs font-mono">
+                        <div>
+                          <span className="font-bold text-primary mr-2">§ {fine.provisionCode}</span>
+                          <span className="text-gray-900 dark:text-gray-100">{fine.provisionTitle}</span>
+                          {(fine.passportNumber || fine.suspectName) && (
+                            <div className="text-gray-500 text-[11px] mt-0.5">
+                              {fine.passportNumber && <span>Passport: {fine.passportNumber} </span>}
+                              {fine.suspectName && <span>({fine.suspectName})</span>}
+                            </div>
+                          )}
+                        </div>
+                        <span className="font-bold text-green-600 dark:text-green-400 text-sm">
+                          {fine.fineFormatted || `$${fine.fineAmount.toLocaleString()}`}
+                        </span>
                       </div>
                     ))}
                   </div>

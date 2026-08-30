@@ -8,7 +8,7 @@ import { useProductivity } from '@/contexts/ProductivityContext'
 
 export default function Home() {
   const { profile } = useUserProfile()
-  const { isOnDuty, currentDutyStart, arrestCount, fineCount } = useDuty()
+  const { isOnDuty, currentDutyStart, lifetimeArrests, lifetimeFines, lifetimeFinesCount } = useDuty()
   const { createNote, recordRecentItem } = useProductivity()
 
   useEffect(() => {
@@ -131,12 +131,12 @@ export default function Home() {
 
         <div className="bg-surface-container-lowest border border-outline-variant rounded p-3.5">
           <div className="font-mono text-[10px] uppercase text-on-surface-variant">Lifetime Arrests</div>
-          <div className="text-base font-bold text-on-surface mt-1 font-mono">{arrestCount}</div>
+          <div className="text-base font-bold text-on-surface mt-1 font-mono">{lifetimeArrests}</div>
         </div>
 
         <div className="bg-surface-container-lowest border border-outline-variant rounded p-3.5">
           <div className="font-mono text-[10px] uppercase text-on-surface-variant">Lifetime Fines</div>
-          <div className="text-base font-bold text-on-surface mt-1 font-mono">{fineCount}</div>
+          <div className="text-base font-bold text-secondary mt-1 font-mono">${lifetimeFines.toLocaleString()}</div>
         </div>
 
         <div className="bg-surface-container-lowest border border-outline-variant rounded p-3.5">
