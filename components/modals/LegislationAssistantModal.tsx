@@ -180,8 +180,8 @@ export default function LegislationAssistantModal({
             score: s.relevanceScore,
             fine: s.fine,
             sentence: s.sentence,
-            applicabilityStatus: s.applicabilityStatus,
-            missingFacts: s.missingFacts,
+            matchType: s.matchType,
+            conditionText: s.conditionText,
           })),
           rejectedSources: retrieval.rejectedSources.map((r) => ({
             code: r.code,

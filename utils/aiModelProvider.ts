@@ -42,8 +42,8 @@ export interface AIDebugTrace {
     score: number
     fine?: string
     sentence?: string
-    applicabilityStatus?: string
-    missingFacts?: string
+    matchType?: string
+    conditionText?: string
   }>
   rejectedSources: Array<{
     code: string
@@ -185,29 +185,29 @@ class AIModelProvider {
    */
   public buildPrompt(query: string, retrieval: RetrievalResult): string {
     return `SYSTEM:
-You are the official LEO-GRP local legislation assistant.
-Your job is to explain the provided legislation accurately.
-Use ONLY the supplied legislation as the authoritative source.
-Do not invent laws, penalties, procedures, or legal interpretations.
+You are the LEO-GRP Legislation Assistant — a fast, operational reference tool for Law Enforcement Officers in Grand RP.
+Your job is to identify and present the correct legislation charges concisely.
+Use ONLY the supplied active legislation dataset.
 
-USER QUESTION:
+USER SCENARIO / QUESTION:
 ${query}
 
-DETECTED SCENARIO & TOPIC:
+DETECTED SCENARIO:
 - Primary Topic: ${retrieval.concepts.primaryTopic}
 - Actions: ${retrieval.concepts.actions.join(', ') || 'None'}
 - Excluded / Negated: ${retrieval.concepts.negatedActions.join(', ') || 'None'}
-- Location: ${retrieval.concepts.locations.join(', ') || 'Unspecified'}
+- Locations: ${retrieval.concepts.locations.join(', ') || 'Unspecified'}
 
-RELEVANT LEGISLATION:
+RETRIEVED PROVISIONS:
 ${retrieval.contextText || 'No matching provisions found in active database.'}
 
-INSTRUCTIONS:
-- Answer the user's specific scenario directly.
-- Distinguish between a topically relevant provision and whether facts prove all elements apply.
-- Explain what facts are missing if applicability cannot be conclusively established.
-- Never recommend an inapplicable or unrelated charge.
-- Cite the relevant provisions using bracketed notation (e.g. [§ T.C. 6.2.f]).`.trim()
+OUTPUT RULES (CRISP CHARGE-FIRST FORMAT):
+1. For charge identification, show: Section (§) → Title → Fine → Short condition for applying.
+2. Direct Match vs Conditional: If exact facts are known (e.g. driving lane), show the direct charge immediately.
+3. No Disclaimers: Do NOT start with "Based on active legislation", "Potentially Applicable", or long legal disclaimers.
+4. Abandoned Vehicles: If asked about vehicle abandonment and no specific charge exists in active legislation, clearly state: "I couldn't find a specific vehicle-abandonment charge in the active legislation."
+5. Yes/No: For "Can I charge..." questions, start with "Yes — ", "No — ", or "Conditionally — ".
+6. No Filler: Return only directly applicable or conditional matches. Never return unrelated criminal or traffic charges.`.trim()
   }
 
   /**
@@ -246,8 +246,8 @@ INSTRUCTIONS:
         score: s.relevanceScore,
         fine: s.fine,
         sentence: s.sentence,
-        applicabilityStatus: s.applicabilityStatus,
-        missingFacts: s.missingFacts,
+        matchType: s.matchType,
+        conditionText: s.conditionText,
       })),
       rejectedSources: retrieval.rejectedSources.map((r) => ({
         code: r.code,
