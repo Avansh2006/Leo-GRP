@@ -18,12 +18,44 @@ interface Category {
 
 export default function BodycamCommandsPage() {
   const { showToast } = useToast()
-  const [selectedOrg, setSelectedOrg] = useState('FIB')
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['attaching'])
+  const [selectedOrg, setSelectedOrg] = useState('LSPD')
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(['saving_grandpro', 'attaching'])
 
-  const organizations = ['FIB', 'EMS', 'NG', 'SAHP', 'LSPD', 'GOV']
+  const organizations = ['LSPD', 'SAHP', 'FIB', 'GOV', 'NG', 'EMS']
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedOrg = localStorage.getItem('leogrp_selected_org')
+      if (savedOrg && organizations.includes(savedOrg)) {
+        setSelectedOrg(savedOrg)
+      }
+    }
+  }, [])
+
+  const handleOrgChange = (newOrg: string) => {
+    setSelectedOrg(newOrg)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('leogrp_selected_org', newOrg)
+    }
+  }
 
   const categories: Category[] = [
+    {
+      id: 'saving_grandpro',
+      name: '🔴 SAVING BODYCAM — GRANDPRO',
+      icon: '🔴',
+      commands: [
+        {
+          text: `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${selectedOrg} Cloud Servers.`
+        },
+        {
+          text: '/do insert new SD card into GrandPro and it is recording'
+        },
+        {
+          text: `/do put SD Card into phone, connects to ${selectedOrg} Cloud Servers, downloads Bodycam on SD Card`
+        }
+      ]
+    },
     {
       id: 'attaching',
       name: '📹 Attaching Bodycam',
@@ -377,7 +409,7 @@ export default function BodycamCommandsPage() {
           <label className="text-xs font-mono uppercase text-on-surface-variant mb-1">Select Organization:</label>
           <select
             value={selectedOrg}
-            onChange={(e) => setSelectedOrg(e.target.value)}
+            onChange={(e) => handleOrgChange(e.target.value)}
             className="bg-surface-dim border border-outline-variant rounded px-3 py-1.5 text-on-surface text-sm font-mono focus:outline-none focus:border-primary"
           >
             {organizations.map((org) => (

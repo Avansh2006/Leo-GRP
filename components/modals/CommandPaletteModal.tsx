@@ -74,8 +74,68 @@ export default function CommandPaletteModal() {
   }, [isCommandPaletteOpen, lawEntries.length])
 
   // Real commands from the application
-  const appCommands: PaletteItem[] = useMemo(
-    () => [
+  const appCommands: PaletteItem[] = useMemo(() => {
+    const org = (typeof window !== 'undefined' ? localStorage.getItem('leogrp_selected_org') : null) || 'LSPD'
+    return [
+      {
+        id: 'cmd-grandpro-save-1',
+        title: 'Save Bodycam to SD Card (GrandPro)',
+        subtitle: `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${org} Cloud Servers.`,
+        category: 'Commands',
+        icon: '🔴',
+        keywords: ['grandpro', 'sd card', 'save', 'saving', 'bodycam', 'cloud', 'upload', org.toLowerCase()],
+        action: () => {
+          const currentOrg = (typeof window !== 'undefined' ? localStorage.getItem('leogrp_selected_org') : null) || 'LSPD'
+          const text = `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${currentOrg} Cloud Servers.`
+          navigator.clipboard.writeText(text)
+          recordRecentItem({
+            type: 'command',
+            targetId: text,
+            title: 'Save Bodycam to SD Card (GrandPro)',
+            subtitle: text,
+          })
+          showToast('Command copied: GrandPro Save Bodycam', 'success')
+        },
+      },
+      {
+        id: 'cmd-grandpro-save-2',
+        title: 'Insert New SD Card (GrandPro)',
+        subtitle: '/do insert new SD card into GrandPro and it is recording',
+        category: 'Commands',
+        icon: '🔴',
+        keywords: ['grandpro', 'sd card', 'insert', 'recording', 'new'],
+        action: () => {
+          const text = '/do insert new SD card into GrandPro and it is recording'
+          navigator.clipboard.writeText(text)
+          recordRecentItem({
+            type: 'command',
+            targetId: text,
+            title: 'Insert New SD Card (GrandPro)',
+            subtitle: text,
+          })
+          showToast('Command copied: GrandPro Insert SD Card', 'success')
+        },
+      },
+      {
+        id: 'cmd-grandpro-save-3',
+        title: 'Download Bodycam to SD Card (GrandPro)',
+        subtitle: `/do put SD Card into phone, connects to ${org} Cloud Servers, downloads Bodycam on SD Card`,
+        category: 'Commands',
+        icon: '🔴',
+        keywords: ['grandpro', 'sd card', 'phone', 'download', 'bodycam', 'cloud', org.toLowerCase()],
+        action: () => {
+          const currentOrg = (typeof window !== 'undefined' ? localStorage.getItem('leogrp_selected_org') : null) || 'LSPD'
+          const text = `/do put SD Card into phone, connects to ${currentOrg} Cloud Servers, downloads Bodycam on SD Card`
+          navigator.clipboard.writeText(text)
+          recordRecentItem({
+            type: 'command',
+            targetId: text,
+            title: 'Download Bodycam to SD Card (GrandPro)',
+            subtitle: text,
+          })
+          showToast('Command copied: GrandPro Download Bodycam', 'success')
+        },
+      },
       {
         id: 'cmd-attach-uniform',
         title: 'Attach Bodycam (Uniform)',
@@ -208,10 +268,9 @@ export default function CommandPaletteModal() {
           })
           showToast('Command copied: Launch Drone', 'success')
         },
-      },
-    ],
-    [recordRecentItem, showToast]
-  )
+      }
+    ]
+  }, [recordRecentItem, showToast])
 
   // Pages
   const pageItems: PaletteItem[] = useMemo(
