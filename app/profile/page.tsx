@@ -10,6 +10,7 @@ import SimpleBarChart from '@/components/SimpleBarChart'
 import { aiModelProvider, AIModelStatus, RECOMMENDED_LOCAL_MODEL } from '@/utils/aiModelProvider'
 import { getDefaultDepartment, scopedStorage, useServerPack, useFeature } from '@/servers'
 import ServerPicker from '@/components/ServerPicker'
+import { DiscordSettings } from '@/components/DiscordPost'
 
 export default function ProfilePage() {
   const pack = useServerPack()
@@ -561,6 +562,14 @@ export default function ProfilePage() {
             />
           </div>
         </div>
+      </div>
+
+      {/* Discord reports */}
+      <div className="card mb-6 border border-outline-variant bg-surface-container-low">
+        <h2 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2 font-mono">
+          <span>💬</span> Post Reports to Discord
+        </h2>
+        <DiscordSettings />
       </div>
 
       {/* Legislation AI & Local Engine Card */}

@@ -20,6 +20,7 @@ import { ShiftArrestRecord, getAllArrests, DetentionChecklistState, DetentionCha
 import { getActivePack, getDefaultDepartment, getArrestTimerSeconds, isFeatureEnabled } from '@/servers'
 import { calculateTotals } from '@/utils/chargeCalculator'
 import { money } from '@/utils/reports'
+import { DiscordPostButton } from '@/components/DiscordPost'
 
 interface ArrestCommandCenterModalProps {
   isOpen: boolean
@@ -1005,6 +1006,8 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
               >
                 <span>📜</span> Copy Arrest Record
               </button>
+
+              <DiscordPostButton label="Post record" getText={() => formatCompleteArrestRecord()} />
             </div>
 
             <div className="flex items-center gap-2 ml-auto">
@@ -1070,6 +1073,7 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                 >
                   📋 Copy Record
                 </button>
+                <DiscordPostButton label="Post to Discord" getText={() => formatCompleteArrestRecord(selectedHistoricalArrest)} />
               </div>
             </div>
           </div>

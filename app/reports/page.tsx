@@ -8,6 +8,7 @@ import { useProductivity } from '@/contexts/ProductivityContext'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 import { useServerPack } from '@/servers'
 import { renderReport } from '@/utils/reports'
+import { DiscordPostButton } from '@/components/DiscordPost'
 import { ShiftRecord } from '@/utils/db'
 import ShiftSummaryModal from '@/components/modals/ShiftSummaryModal'
 import StartDetentionModal from '@/components/modals/StartDetentionModal'
@@ -83,6 +84,7 @@ export default function ReportsPage() {
   const [allCharges, setAllCharges] = useState<LawEntry[]>([])
 
   const [eventsAttended, setEventsAttended] = useState('')
+  const [lastDutyReport, setLastDutyReport] = useState('')
   const [selectedWeapons, setSelectedWeapons] = useState<{weapon: string, ammo: string}[]>([])
   const [selectedVests, setSelectedVests] = useState<string[]>([])
   const [weaponAmmo, setWeaponAmmo] = useState<{[key: string]: string}>({})
@@ -152,13 +154,12 @@ export default function ReportsPage() {
     setSelectedCharges(selectedCharges.filter((c) => c.code !== code))
   }
 
-  const generateEvidenceReport = () => {
+  const buildEvidenceReport = (): string | null => {
     if (!date || !time || !description) {
       showToast('Please fill in Date, Time, and Description', 'error')
-      return
+      return null
     }
-
-    const report = renderReport('evidenceReport', {
+    return renderReport('evidenceReport', {
       date,
       time,
       description,
@@ -168,7 +169,11 @@ export default function ReportsPage() {
       licensePlates,
       makeup,
     })
+  }
 
+  const generateEvidenceReport = () => {
+    const report = buildEvidenceReport()
+    if (!report) return
     navigator.clipboard.writeText(report)
     showToast('Evidence report copied! Fine count increased', 'success')
   }
@@ -262,6 +267,7 @@ export default function ReportsPage() {
       used: byStatus('used'),
     })
 
+    setLastDutyReport(report)
     navigator.clipboard.writeText(report)
     showToast('Shift report copied and duty ended!', 'success')
   }
@@ -309,6 +315,27 @@ export default function ReportsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
+      {lastDutyReport && (
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border border-secondary/40 bg-secondary/10 text-xs font-mono">
+          <span className="font-bold text-secondary">✅ Duty report copied.</span>
+          <span className="text-on-surface-variant">Paste it where your department collects reports, or:</span>
+          <div className="ml-auto flex items-center gap-2">
+            <DiscordPostButton label="Post duty report to Discord" getText={() => lastDutyReport} />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(lastDutyReport)
+                showToast('Duty report copied again', 'success')
+              }}
+              className="px-3 py-1.5 rounded border border-outline-variant text-on-surface"
+            >
+              Copy again
+            </button>
+            <button onClick={() => setLastDutyReport('')} className="text-on-surface-variant hover:text-on-surface" aria-label="Dismiss">
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       {/* Tactical Arrest Operations Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-container-low border border-outline-variant rounded-lg p-4 shadow-sm">
         <div>
@@ -759,6 +786,9 @@ export default function ReportsPage() {
           </div>
 
           <button onClick={generateEvidenceReport} className="btn btn-primary w-full">Generate & Copy Report</button>
+          <div className="flex justify-end mt-2">
+            <DiscordPostButton label="Post evidence to Discord" getText={() => buildEvidenceReport() || ''} />
+          </div>
         </div>
       </div>
 

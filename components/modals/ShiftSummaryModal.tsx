@@ -9,6 +9,7 @@ import React from 'react'
 import { ShiftRecord } from '@/utils/db'
 import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
+import { DiscordPostButton } from '@/components/DiscordPost'
 import { getDefaultDepartment } from '@/servers'
 
 interface ShiftSummaryModalProps {
@@ -80,6 +81,7 @@ export default function ShiftSummaryModal({ isOpen, onClose, shift }: ShiftSumma
             >
               <span>📋</span> Copy Shift Report
             </button>
+            <DiscordPostButton label="Post to Discord" getText={() => formatShiftReportText(shift)} />
             <button
               onClick={onClose}
               className="text-on-surface-variant hover:text-on-surface p-1.5 rounded transition-colors text-sm"
