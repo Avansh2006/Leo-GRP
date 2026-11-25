@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { cookies } from 'next/headers'
 import { Analytics } from '@vercel/analytics/react'
@@ -19,6 +19,12 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'LEO-GRP — Operations Center',
   description: 'Law Enforcement Operations Center for RP servers - bodycam commands, legislation guide, evidence generator, and duty tracking',
+  icons: { icon: '/icon.svg', apple: '/icon.svg' },
+  appleWebApp: { capable: true, title: 'LEO Toolkit', statusBarStyle: 'black-translucent' },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#131315',
 }
 
 export default function RootLayout({

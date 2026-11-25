@@ -7,6 +7,7 @@ import { useProductivity } from '@/contexts/ProductivityContext'
 import { useToast } from '@/components/ToastProvider'
 import { QuickAccessItem } from '@/utils/db'
 import { useFeature } from '@/servers'
+import PwaSupport from '@/components/PwaSupport'
 
 interface SidebarProps {
   mobileOpen: boolean
@@ -294,6 +295,9 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
 
           {/* Footer Support / Legislation Assistant */}
           <div className="p-3 border-t border-outline-variant bg-surface-container-lowest">
+            <div className={isCollapsed ? 'mb-1' : 'mb-2'}>
+              <PwaSupport compact={isCollapsed} />
+            </div>
             {!isCollapsed ? (
               <div className="flex flex-col gap-2">
                 {assistantEnabled && (
