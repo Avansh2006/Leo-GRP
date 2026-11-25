@@ -6,7 +6,7 @@ import { useDuty } from '@/contexts/DutyContext'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
-import { EVENT_PRESETS } from '@/utils/presets'
+import { useServerPack } from '@/servers'
 import { ShiftRecord } from '@/utils/db'
 import ShiftSummaryModal from '@/components/modals/ShiftSummaryModal'
 import StartDetentionModal from '@/components/modals/StartDetentionModal'
@@ -38,6 +38,7 @@ const WEAPONS = [
 
 export default function ReportsPage() {
   const { showToast } = useToast()
+  const pack = useServerPack()
   const { profile } = useUserProfile()
   const { 
     isOnDuty, 
@@ -580,7 +581,7 @@ ${weaponsReturnedSection}
               <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <p className="text-sm text-blue-800 dark:text-blue-300 mb-2 font-medium">⚡ Quick Events</p>
                 <div className="flex flex-wrap gap-2">
-                  {EVENT_PRESETS.map((preset) => (
+                  {pack.presets.events.map((preset) => (
                     <button
                       key={preset.id}
                       onClick={() => {

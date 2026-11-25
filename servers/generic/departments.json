@@ -1,0 +1,6 @@
+[
+  { "id": "LSPD", "name": "Los Santos Police Department", "icon": "👮‍♂️" },
+  { "id": "BCSO", "name": "Blaine County Sheriff's Office", "icon": "🤠" },
+  { "id": "SASP", "name": "San Andreas State Police", "icon": "🚓" },
+  { "id": "EMS", "name": "Emergency Medical Services", "icon": "🚑" }
+]

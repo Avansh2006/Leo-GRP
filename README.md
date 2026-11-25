@@ -19,6 +19,12 @@ Made with ❤️ by **Avansh Yadav (EN3)** - Server Administrator
 
 ## ✨ Features
 
+### 🌍 Multiple RP Servers
+- Pick your server in onboarding or on the Profile page; each server keeps its own profile, shifts and records
+- Everything server-specific (departments, commands, radio, loadouts, laws, arrest rules) lives in a **server pack** under `servers/`
+- Built-in: Grand RP (EN3) and a generic starter template
+- **Want your server added?** See [CONTRIBUTING.md](CONTRIBUTING.md). Admins can convert their law sheet with the in-app Law Importer
+
 ### 📹 Bodycam Commands
 - **Organization Selector**: Choose from FIB, EMS, NG, SAHP, LSPD, or GOV
 - Pre-written roleplay commands for all police scenarios
@@ -122,18 +128,18 @@ npm start
 
 ### Setting Up Law Data
 
-1. **Export from Google Sheets**: 
-   - Open your law codes spreadsheet
-   - Go to File → Download → Web Page (.html)
-   
-2. **Place HTML files** in `public/data/` directory:
-   - `Penal Code.html` - Penal codes
-   - `Traffic Codes.html` - Traffic regulations
-   - `Article 7.html` - Additional laws
-   - `Arresting Procedure.html`
-   - `Impound Fees.html`
+Each server's laws live in its pack:
 
-3. The app automatically parses these files and makes them searchable
+1. **Export from Google Sheets** (File → Download → Web Page (.html)), or use a CSV/XLSX with a header row
+2. **Put the files** in `servers/<server-id>/sources/` and list them in that pack's `legislation.json`
+3. **Build** the law file the app loads:
+
+   ```bash
+   npm run import-laws
+   ```
+
+   This writes `public/servers/<server-id>/laws.json`. No dev setup? Use the in-app **Law Importer** (`/tools/law-importer`).
+   Full steps: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Starting Your Shift
 
@@ -179,18 +185,18 @@ leo-grp/
 ├── contexts/
 │   ├── ThemeContext.tsx      # Theme state management
 │   └── DutyContext.tsx       # Duty tracking & logs management
-├── data/
-│   └── bodycam-commands.json # Bodycam command templates
-├── public/data/
-│   ├── Penal Code.html       # Official penal codes (HTML)
-│   ├── Traffic Codes.html    # Traffic regulations (HTML)
-│   ├── Article 7.html        # Additional laws (HTML)
-│   ├── Arresting Procedure.html
-│   └── Impound Fees.html
+├── servers/                  # Server packs: one folder per RP server
+│   ├── grandrp-en3/          # departments, commands, presets, legislation + sources/
+│   ├── generic/              # starter template for new servers
+│   └── registry.ts           # list of available servers
+├── public/servers/<id>/
+│   └── laws.json             # compiled laws (built by npm run import-laws)
 ├── utils/
-│   └── htmlParser.ts         # HTML parsing utilities for law data
+│   ├── lawImport.ts          # law importers (Google Sheets HTML, CSV/XLSX, JSON)
+│   └── htmlParser.ts         # loads the active server's laws.json
 └── scripts/
-    └── generateSampleExcel.js # Sample data generator
+    ├── import-laws.mjs       # builds laws.json from each pack's sources
+    └── check-packs.mjs       # validates every server pack
 ```
 
 ## 🎯 Key Features Explained
@@ -228,28 +234,21 @@ Custom CSS variables enable smooth theme transitions:
 
 ## 🎨 Customization
 
-### Adding Bodycam Commands
+### Adding Bodycam Commands, Departments or Loadouts
 
-Edit `data/bodycam-commands.json`:
+Edit the server's pack in `servers/<server-id>/` (`commands.json`, `departments.json`, `presets.json`).
+Use `{dept}` in command text wherever the officer's department belongs. Format: [servers/README.md](servers/README.md).
 
 ```json
 {
-  "categories": [
-    {
-      "id": "category-id",
-      "name": "Category Name",
-      "commands": [
-        {
-          "id": "command-id",
-          "label": "Command Label",
-          "command": "/me does something",
-          "orgs": ["LSPD", "SAHP", "FIB"]
-        }
-      ]
-    }
-  ]
+  "id": "cmd-launch-drone",
+  "label": "WHILE ON DUTY - launch the {dept} drone.",
+  "text": "/me launches {dept} drone",
+  "palette": { "title": "Launch {dept} Drone", "icon": "🚁", "keywords": ["drone"] }
 }
 ```
+
+Run `npm run check-packs` after editing.
 
 ### Modifying Weapons/Vests
 
@@ -271,9 +270,9 @@ const WEAPONS = [
 ## 🐛 Troubleshooting
 
 ### Law data not loading
-- Ensure HTML files are in `public/data/` directory
-- Check browser console for parsing errors
-- Verify HTML files are valid Google Sheets exports
+- Make sure `public/servers/<server-id>/laws.json` exists (run `npm run import-laws`)
+- Run `npm run check-packs` to spot missing or outdated files
+- Check the browser console for errors
 
 ### Theme not persisting
 - Check browser localStorage is enabled
@@ -286,6 +285,8 @@ const WEAPONS = [
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+**Adding a server?** Follow [CONTRIBUTING.md](CONTRIBUTING.md) and run `npm run check-packs` before opening the PR.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)

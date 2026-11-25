@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useToast } from '@/components/ToastProvider'
 import { QuickAccessItem } from '@/utils/db'
+import { useFeature } from '@/servers'
 
 interface SidebarProps {
   mobileOpen: boolean
@@ -13,6 +14,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
+  const assistantEnabled = useFeature('legalAssistant')
   const pathname = usePathname()
   const { showToast } = useToast()
   const {
@@ -294,6 +296,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
           <div className="p-3 border-t border-outline-variant bg-surface-container-lowest">
             {!isCollapsed ? (
               <div className="flex flex-col gap-2">
+                {assistantEnabled && (
                 <button
                   onClick={() => openAssistant()}
                   className="w-full px-2.5 py-2 bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded flex items-center justify-between transition-colors text-left group"
@@ -308,12 +311,13 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
                     Ask
                   </span>
                 </button>
+                )}
                 <div className="flex items-center justify-between px-1 text-[10px] font-mono text-on-surface-variant">
                   <span>LEO-GRP v2.0</span>
                   <span className="text-secondary">● 100% Local</span>
                 </div>
               </div>
-            ) : (
+            ) : assistantEnabled ? (
               <button
                 onClick={() => openAssistant()}
                 className="w-full text-center text-sm p-1 rounded hover:bg-surface-container-high transition-colors"
@@ -321,7 +325,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
               >
                 ⚖️
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </nav>

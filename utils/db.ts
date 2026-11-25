@@ -2,6 +2,7 @@
  * IndexedDB Storage & Local-First Data Layer for LEO-GRP
  * Robust, offline-first, client-side native IndexedDB with schema migration, validation, backup/restore, and safe fallback.
  */
+import { getDefaultDepartment, scopedStorage, getScopedDbName } from '@/servers'
 
 export interface Note {
   id: string
@@ -204,7 +205,7 @@ export interface AppBackup {
   }
 }
 
-const DB_NAME = 'leogrp_productivity_db'
+const DB_BASE_NAME = 'leogrp_productivity_db'
 const DB_VERSION = 4
 
 const STORES = {
@@ -351,7 +352,7 @@ export function openDB(): Promise<IDBDatabase> {
     }
 
     try {
-      const request = indexedDB.open(DB_NAME, DB_VERSION)
+      const request = indexedDB.open(getScopedDbName(DB_BASE_NAME), DB_VERSION)
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
@@ -457,7 +458,7 @@ export async function getAllNotes(): Promise<Note[]> {
       request.onerror = () => reject(request.error)
     })
   } catch (e) {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_notes_fallback') : null
+    const saved = typeof window !== 'undefined' ? scopedStorage.getItem('leogrp_notes_fallback') : null
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
@@ -482,7 +483,7 @@ export async function saveNote(note: Note): Promise<void> {
   } catch (e) {
     memoryFallback.notes[note.id] = note
     if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_notes_fallback', JSON.stringify(Object.values(memoryFallback.notes)))
+      scopedStorage.setItem('leogrp_notes_fallback', JSON.stringify(Object.values(memoryFallback.notes)))
     }
   }
 }
@@ -500,7 +501,7 @@ export async function deleteNote(id: string): Promise<void> {
   } catch (e) {
     delete memoryFallback.notes[id]
     if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_notes_fallback', JSON.stringify(Object.values(memoryFallback.notes)))
+      scopedStorage.setItem('leogrp_notes_fallback', JSON.stringify(Object.values(memoryFallback.notes)))
     }
   }
 }
@@ -551,13 +552,13 @@ export async function getQuickAccessItems(organization?: string): Promise<QuickA
       request.onsuccess = () => {
         const raw = (request.result as any[]) || []
         let items = raw.filter(isValidQuickAccessItem)
-        const isInitialized = typeof window !== 'undefined' ? localStorage.getItem(QA_INITIALIZED_KEY) === 'true' : false
+        const isInitialized = typeof window !== 'undefined' ? scopedStorage.getItem(QA_INITIALIZED_KEY) === 'true' : false
 
         if (!isInitialized && items.length === 0) {
           // First startup: seed default items into IndexedDB and mark initialized
           saveQuickAccessList(DEFAULT_QUICK_ACCESS).catch(console.error)
           if (typeof window !== 'undefined') {
-            localStorage.setItem(QA_INITIALIZED_KEY, 'true')
+            scopedStorage.setItem(QA_INITIALIZED_KEY, 'true')
           }
           items = DEFAULT_QUICK_ACCESS
         }
@@ -576,8 +577,8 @@ export async function getQuickAccessItems(organization?: string): Promise<QuickA
       request.onerror = () => reject(request.error)
     })
   } catch (e) {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_qa_fallback') : null
-    const isInitialized = typeof window !== 'undefined' ? localStorage.getItem(QA_INITIALIZED_KEY) === 'true' : false
+    const saved = typeof window !== 'undefined' ? scopedStorage.getItem('leogrp_qa_fallback') : null
+    const isInitialized = typeof window !== 'undefined' ? scopedStorage.getItem(QA_INITIALIZED_KEY) === 'true' : false
 
     let fallbackItems: QuickAccessItem[] = DEFAULT_QUICK_ACCESS
 
@@ -593,8 +594,8 @@ export async function getQuickAccessItems(organization?: string): Promise<QuickA
     }
 
     if (!isInitialized && typeof window !== 'undefined') {
-      localStorage.setItem(QA_INITIALIZED_KEY, 'true')
-      localStorage.setItem('leogrp_qa_fallback', JSON.stringify(DEFAULT_QUICK_ACCESS))
+      scopedStorage.setItem(QA_INITIALIZED_KEY, 'true')
+      scopedStorage.setItem('leogrp_qa_fallback', JSON.stringify(DEFAULT_QUICK_ACCESS))
     }
 
     if (organization) {
@@ -610,7 +611,7 @@ export async function getQuickAccessItems(organization?: string): Promise<QuickA
 export async function saveQuickAccessList(items: QuickAccessItem[], organization?: string): Promise<void> {
   const validItems = items.filter(isValidQuickAccessItem)
   if (typeof window !== 'undefined') {
-    localStorage.setItem(QA_INITIALIZED_KEY, 'true')
+    scopedStorage.setItem(QA_INITIALIZED_KEY, 'true')
   }
 
   try {
@@ -640,7 +641,7 @@ export async function saveQuickAccessList(items: QuickAccessItem[], organization
     }
 
     if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_qa_fallback', JSON.stringify(merged))
+      scopedStorage.setItem('leogrp_qa_fallback', JSON.stringify(merged))
     }
 
     return new Promise((resolve, reject) => {
@@ -835,7 +836,7 @@ export async function getAllFines(): Promise<FineRecord[]> {
       request.onerror = () => reject(request.error)
     })
   } catch (e) {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_fines_fallback') : null
+    const saved = typeof window !== 'undefined' ? scopedStorage.getItem('leogrp_fines_fallback') : null
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
@@ -860,7 +861,7 @@ export async function saveFine(fine: FineRecord): Promise<void> {
   } catch (e) {
     memoryFallback.fines[fine.id] = fine
     if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_fines_fallback', JSON.stringify(Object.values(memoryFallback.fines)))
+      scopedStorage.setItem('leogrp_fines_fallback', JSON.stringify(Object.values(memoryFallback.fines)))
     }
   }
 }
@@ -890,7 +891,7 @@ export async function getAllArrests(): Promise<ShiftArrestRecord[]> {
       request.onerror = () => reject(request.error)
     })
   } catch (e) {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_arrests_fallback') : null
+    const saved = typeof window !== 'undefined' ? scopedStorage.getItem('leogrp_arrests_fallback') : null
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
@@ -915,7 +916,7 @@ export async function saveArrest(arrest: ShiftArrestRecord): Promise<void> {
   } catch (e) {
     memoryFallback.arrests[arrest.id] = arrest
     if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_arrests_fallback', JSON.stringify(Object.values(memoryFallback.arrests)))
+      scopedStorage.setItem('leogrp_arrests_fallback', JSON.stringify(Object.values(memoryFallback.arrests)))
     }
   }
 }
@@ -934,15 +935,15 @@ export const ACTIVE_DETENTION_KEY = 'leogrp_active_detention'
 export function saveActiveDetention(detention: ActiveDetention | null): void {
   if (typeof window === 'undefined') return
   if (detention && detention.status === 'ACTIVE') {
-    localStorage.setItem(ACTIVE_DETENTION_KEY, JSON.stringify(detention))
+    scopedStorage.setItem(ACTIVE_DETENTION_KEY, JSON.stringify(detention))
   } else {
-    localStorage.removeItem(ACTIVE_DETENTION_KEY)
+    scopedStorage.removeItem(ACTIVE_DETENTION_KEY)
   }
 }
 
 export function getActiveDetention(): ActiveDetention | null {
   if (typeof window === 'undefined') return null
-  const saved = localStorage.getItem(ACTIVE_DETENTION_KEY)
+  const saved = scopedStorage.getItem(ACTIVE_DETENTION_KEY)
   if (!saved) return null
   try {
     const parsed = JSON.parse(saved)
@@ -957,7 +958,7 @@ export function getActiveDetention(): ActiveDetention | null {
 
 export function clearActiveDetention(): void {
   if (typeof window === 'undefined') return
-  localStorage.removeItem(ACTIVE_DETENTION_KEY)
+  scopedStorage.removeItem(ACTIVE_DETENTION_KEY)
 }
 
 // -------------------------------------------------------------
@@ -980,7 +981,7 @@ export async function getAllShifts(): Promise<ShiftRecord[]> {
       request.onerror = () => reject(request.error)
     })
   } catch (e) {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('leogrp_shifts_fallback') : null
+    const saved = typeof window !== 'undefined' ? scopedStorage.getItem('leogrp_shifts_fallback') : null
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
@@ -1005,7 +1006,7 @@ export async function saveShift(shift: ShiftRecord): Promise<void> {
   } catch (e) {
     memoryFallback.shifts[shift.id] = shift
     if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_shifts_fallback', JSON.stringify(Object.values(memoryFallback.shifts)))
+      scopedStorage.setItem('leogrp_shifts_fallback', JSON.stringify(Object.values(memoryFallback.shifts)))
     }
   }
 }
@@ -1050,16 +1051,16 @@ export async function getOfficerProfile(): Promise<OfficerProfile | null> {
 
     // Check localStorage fallback / existing user profile migration
     if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('userProfile') || localStorage.getItem('user_profile')
+      const savedUser = scopedStorage.getItem('userProfile') || scopedStorage.getItem('user_profile')
       if (savedUser) {
         try {
           const parsed = JSON.parse(savedUser)
           if (parsed && (parsed.name || parsed.id)) {
             const org =
-              localStorage.getItem('selectedOrg') ||
-              localStorage.getItem('leogrp_selected_org') ||
-              localStorage.getItem('user_org') ||
-              'LSPD'
+              scopedStorage.getItem('selectedOrg') ||
+              scopedStorage.getItem('leogrp_selected_org') ||
+              scopedStorage.getItem('user_org') ||
+              getDefaultDepartment()
             const migrated: OfficerProfile = {
               id: PROFILE_RECORD_ID,
               name: parsed.name || '',
@@ -1084,7 +1085,7 @@ export async function getOfficerProfile(): Promise<OfficerProfile | null> {
     return memoryFallback.profile
   } catch (e) {
     if (typeof window !== 'undefined') {
-      const fallback = localStorage.getItem('leogrp_profile_fallback')
+      const fallback = scopedStorage.getItem('leogrp_profile_fallback')
       if (fallback) {
         try {
           const parsed = JSON.parse(fallback)
@@ -1111,10 +1112,10 @@ export async function saveOfficerProfile(profile: OfficerProfile): Promise<void>
   }
 
   if (typeof window !== 'undefined') {
-    localStorage.setItem('leogrp_profile_fallback', JSON.stringify(record))
-    localStorage.setItem('officer_name', record.name)
-    localStorage.setItem('user_name', record.name)
-    localStorage.setItem(
+    scopedStorage.setItem('leogrp_profile_fallback', JSON.stringify(record))
+    scopedStorage.setItem('officer_name', record.name)
+    scopedStorage.setItem('user_name', record.name)
+    scopedStorage.setItem(
       'userProfile',
       JSON.stringify({
         name: record.name,
@@ -1125,10 +1126,10 @@ export async function saveOfficerProfile(profile: OfficerProfile): Promise<void>
         loadouts: [],
       })
     )
-    localStorage.setItem('selectedOrg', record.organization)
-    localStorage.setItem('leogrp_selected_org', record.organization)
-    localStorage.setItem('user_org', record.organization)
-    localStorage.setItem('organization', record.organization)
+    scopedStorage.setItem('selectedOrg', record.organization)
+    scopedStorage.setItem('leogrp_selected_org', record.organization)
+    scopedStorage.setItem('user_org', record.organization)
+    scopedStorage.setItem('organization', record.organization)
   }
 
   try {
@@ -1147,10 +1148,10 @@ export async function saveOfficerProfile(profile: OfficerProfile): Promise<void>
 
 export async function deleteOfficerProfile(): Promise<void> {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('leogrp_profile_fallback')
-    localStorage.removeItem('officer_name')
-    localStorage.removeItem('user_name')
-    localStorage.removeItem('userProfile')
+    scopedStorage.removeItem('leogrp_profile_fallback')
+    scopedStorage.removeItem('officer_name')
+    scopedStorage.removeItem('user_name')
+    scopedStorage.removeItem('userProfile')
   }
 
   try {
@@ -1197,7 +1198,7 @@ export async function exportDatabaseBackup(): Promise<AppBackup> {
       shifts,
       profile: profile || null,
       settings: {
-        includeSuspectName: typeof window !== 'undefined' ? localStorage.getItem('leogrp_include_suspect_name') !== 'false' : true,
+        includeSuspectName: typeof window !== 'undefined' ? scopedStorage.getItem('leogrp_include_suspect_name') !== 'false' : true,
       },
     },
   }
@@ -1299,7 +1300,7 @@ export async function importDatabaseBackup(
     }
 
     if (raw.settings?.includeSuspectName !== undefined && typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_include_suspect_name', String(raw.settings.includeSuspectName))
+      scopedStorage.setItem('leogrp_include_suspect_name', String(raw.settings.includeSuspectName))
     }
   } catch (e) {
     // Save to memory fallback & localStorage
@@ -1313,11 +1314,11 @@ export async function importDatabaseBackup(
     if (validProfile) memoryFallback.profile = validProfile
 
     if (typeof window !== 'undefined') {
-      localStorage.setItem('leogrp_notes_fallback', JSON.stringify(validNotes))
-      localStorage.setItem('leogrp_qa_fallback', JSON.stringify(validQA))
-      localStorage.setItem('leogrp_fines_fallback', JSON.stringify(validFines))
-      localStorage.setItem('leogrp_arrests_fallback', JSON.stringify(validArrests))
-      localStorage.setItem('leogrp_shifts_fallback', JSON.stringify(validShifts))
+      scopedStorage.setItem('leogrp_notes_fallback', JSON.stringify(validNotes))
+      scopedStorage.setItem('leogrp_qa_fallback', JSON.stringify(validQA))
+      scopedStorage.setItem('leogrp_fines_fallback', JSON.stringify(validFines))
+      scopedStorage.setItem('leogrp_arrests_fallback', JSON.stringify(validArrests))
+      scopedStorage.setItem('leogrp_shifts_fallback', JSON.stringify(validShifts))
     }
   }
 
@@ -1448,7 +1449,7 @@ export async function clearEmbeddingCache(): Promise<void> {
     if (typeof window !== 'undefined') {
       Object.keys(localStorage)
         .filter((k) => k.startsWith('leogrp_emb_'))
-        .forEach((k) => localStorage.removeItem(k))
+        .forEach((k) => scopedStorage.removeItem(k))
     }
   }
 }

@@ -61,8 +61,8 @@ global.DOMParser = function () {
 }
 
 // Load legislation HTML files
-const penalHtml = fs.readFileSync(path.join(__dirname, '../public/data/Penal Code.html'), 'utf8')
-const trafficHtml = fs.readFileSync(path.join(__dirname, '../public/data/Traffic Codes.html'), 'utf8')
+const penalHtml = fs.readFileSync(path.join(__dirname, '../servers/grandrp-en3/sources/Penal Code.html'), 'utf8')
+const trafficHtml = fs.readFileSync(path.join(__dirname, '../servers/grandrp-en3/sources/Traffic Codes.html'), 'utf8')
 
 // Minimal parser matching htmlParser.ts
 function parseHTMLTable(htmlContent, docType = 'penal', sourceName = 'State Legislation') {

@@ -1,0 +1,21 @@
+{
+  "loadouts": [
+    {
+      "id": "patrol",
+      "name": "🚓 Standard Patrol",
+      "vests": ["Light Vest"],
+      "weapons": [
+        { "weapon": "Taser", "ammo": "1" },
+        { "weapon": "Service Pistol", "ammo": "60" },
+        { "weapon": "Nightstick", "ammo": "1" }
+      ]
+    }
+  ],
+  "chargeTemplates": [],
+  "events": [
+    { "id": "traffic_stop", "name": "Traffic Stop", "icon": "🚗" },
+    { "id": "pursuit", "name": "Pursuit", "icon": "🚓" },
+    { "id": "robbery", "name": "Robbery", "icon": "🏪" },
+    { "id": "medical_call", "name": "Medical Call", "icon": "🚑" }
+  ]
+}

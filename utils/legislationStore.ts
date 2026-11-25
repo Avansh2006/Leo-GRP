@@ -6,6 +6,10 @@
  */
 
 import { LawEntry, loadAllLawData } from './htmlParser'
+import { getActivePack } from '@/servers'
+
+const legislation = getActivePack().legislation
+const sourceByType = (t: string) => legislation.sources.find((src) => src.docType === t)
 
 export interface NormalizedProvision {
   id: string
@@ -42,19 +46,11 @@ export interface ActiveLegislationMetadata {
   excludedSources: string[]
 }
 
-export const ACTIVE_SOURCES = [
-  'Traffic Code (2nd Rendition — 28.07.2025)',
-  'Penal Codes of San Andreas',
-  'Article 7 (Parking Regulations — 28.07.2025)',
-  'Procedures of Detention and Arrest (3rd Rendition)',
-] as const
+export const ACTIVE_SOURCES: readonly string[] = legislation.sources.map((src) => src.name)
 
-export const EXCLUDED_SOURCES = [
-  'Traffic Code of the State of San Andreas 1st Rendition',
-  'Legacy Draft Legislation',
-] as const
+export const EXCLUDED_SOURCES: readonly string[] = legislation.excludedSources
 
-export const ACTIVE_CORPUS_HASH = 'leogrp_legislation_active_v2_28072025'
+export const ACTIVE_CORPUS_HASH = legislation.corpusHash
 
 /**
  * Parse numeric dollar amount from fine string (e.g. "$15,000 + Confiscation" -> 15000)
@@ -162,7 +158,7 @@ export function normalizeLawEntry(entry: LawEntry): NormalizedProvision {
     confiscation,
     revocation,
     sourceDocument: entry.sourceDocument,
-    sourceDate: entry.sourceDocument.includes('28.07.2025') ? '28.07.2025' : 'Active',
+    sourceDate: legislation.sources.find((src) => src.name === entry.sourceDocument)?.date || 'Active',
     keywords: extractProvisionKeywords(entry),
     documentType: entry.documentType,
   }
@@ -223,10 +219,10 @@ export function lookupProvisionSync(code: string): NormalizedProvision | undefin
  */
 export function getActiveLegislationMetadata(): ActiveLegislationMetadata {
   return {
-    trafficCodeVersion: '2nd Rendition — 28.07.2025',
-    penalCodeVersion: 'Penal Codes of San Andreas',
-    article7Version: 'Parking Regulations — 28.07.2025',
-    proceduresVersion: '3rd Rendition',
+    trafficCodeVersion: sourceByType('traffic')?.version || '',
+    penalCodeVersion: sourceByType('penal')?.version || '',
+    article7Version: sourceByType('article7')?.version || '',
+    proceduresVersion: sourceByType('procedure')?.version || '',
     corpusHash: ACTIVE_CORPUS_HASH,
     totalProvisions: normalizedStoreCache ? normalizedStoreCache.length : 0,
     activeSources: [...ACTIVE_SOURCES],

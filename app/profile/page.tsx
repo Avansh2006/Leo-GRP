@@ -8,8 +8,12 @@ import { useUserProfile, WeaponLoadout } from '@/contexts/UserProfileContext'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import SimpleBarChart from '@/components/SimpleBarChart'
 import { aiModelProvider, AIModelStatus, RECOMMENDED_LOCAL_MODEL } from '@/utils/aiModelProvider'
+import { getDefaultDepartment, scopedStorage, useServerPack, useFeature } from '@/servers'
+import ServerPicker from '@/components/ServerPicker'
 
 export default function ProfilePage() {
+  const pack = useServerPack()
+  const assistantEnabled = useFeature('legalAssistant')
   const {
     dutyLogs,
     lifetimeFines,
@@ -177,7 +181,7 @@ export default function ProfilePage() {
 
   const clearLogs = () => {
     if (confirm('Are you sure you want to clear all duty logs?')) {
-      localStorage.removeItem('dutyLogs')
+      scopedStorage.removeItem('dutyLogs')
       location.reload()
       showToast('Duty logs cleared', 'success')
     }
@@ -338,7 +342,7 @@ export default function ProfilePage() {
           <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/60">
             <p className="text-[10px] text-on-surface-variant uppercase font-semibold">Department</p>
             <p className="text-sm font-bold text-primary mt-0.5">
-              {profile.organization || currentOrganization || 'LSPD'}
+              {profile.organization || currentOrganization || getDefaultDepartment()}
             </p>
           </div>
           <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/60">
@@ -436,13 +440,25 @@ export default function ProfilePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+          {/* RP Server */}
+          <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2 md:col-span-2">
+            <div className="text-on-surface-variant font-bold uppercase text-[11px]">
+              RP Server:
+            </div>
+            <ServerPicker compact />
+            <p className="text-[10px] text-on-surface-variant">
+              Server not listed? Admins can convert their law sheet with the{' '}
+              <a href="/tools/law-importer" className="text-primary underline">Law Importer</a>.
+            </p>
+          </div>
+
           {/* Active Agency / Org */}
           <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2">
             <div className="text-on-surface-variant font-bold uppercase text-[11px]">
               Active Organization / Agency:
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {['LSPD', 'BCSO', 'SAHP', 'FIB', 'GOV', 'NG', 'EMS'].map((org) => (
+              {pack.departments.map((d) => d.id).map((org) => (
                 <button
                   key={org}
                   onClick={() => {
@@ -548,6 +564,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Legislation AI & Local Engine Card */}
+      {assistantEnabled && (
       <div className="card mb-6 border border-outline-variant bg-surface-container-low">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2">
@@ -590,7 +607,7 @@ export default function ProfilePage() {
             <div className="p-3 bg-surface-container rounded border border-outline-variant space-y-1">
               <div className="text-on-surface-variant font-bold">ACTIVE LEGISLATION SOURCE:</div>
               <div className="text-on-surface">
-                Traffic Code 2nd Rendition (28.07.2025) & Penal Codes
+                {pack.legislation.summaryLabel}
               </div>
             </div>
           </div>
@@ -626,6 +643,7 @@ export default function ProfilePage() {
             )}
           </div>
         </div>
+      )}
 
       {/* Loadouts Card */}
       <div className="card mb-6">

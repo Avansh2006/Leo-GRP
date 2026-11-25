@@ -18,6 +18,7 @@ import { useToast } from '@/components/ToastProvider'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useDuty } from '@/contexts/DutyContext'
 import { getCanonicalProvision } from '@/utils/legislationStore'
+import { useServerPack } from '@/servers'
 
 interface LegislationAssistantModalProps {
   isOpen: boolean
@@ -41,6 +42,7 @@ export default function LegislationAssistantModal({
   initialQuery,
 }: LegislationAssistantModalProps) {
   const router = useRouter()
+  const pack = useServerPack()
   const { showToast } = useToast()
   const { createNote, setIsRightPanelOpen, setUtilityTab, recordRecentItem } = useProductivity()
   const { currentOrganization, addChargeToDetention, setIsArrestCommandCenterOpen, activeDetention } = useDuty()
@@ -303,7 +305,7 @@ export default function LegislationAssistantModal({
                 </span>
               </div>
               <p className="text-[11px] text-on-surface-variant font-mono">
-                Authoritative Grounding: Traffic Code (2nd Rendition — 28.07.2025) & Penal Codes
+                Authoritative Grounding: {pack.legislation.summaryLabel}
               </p>
             </div>
           </div>
@@ -484,7 +486,7 @@ export default function LegislationAssistantModal({
                   LEO Legislation & Procedure Assistant
                 </h4>
                 <p className="text-xs text-on-surface-variant font-mono leading-relaxed">
-                  Fast, grounded statutory answers based directly on the active Traffic Code (2nd Rendition) and Penal Codes.
+                  Fast, grounded statutory answers based directly on the active {pack.legislation.shortLabel}.
                 </p>
               </div>
 

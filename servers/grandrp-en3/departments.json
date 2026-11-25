@@ -1,0 +1,9 @@
+[
+  { "id": "LSPD", "name": "Los Santos Police Department", "icon": "👮‍♂️" },
+  { "id": "BCSO", "name": "Blaine County Sheriff's Office", "icon": "🤠" },
+  { "id": "SAHP", "name": "San Andreas Highway Patrol", "icon": "🚓" },
+  { "id": "FIB", "name": "Federal Investigation Bureau", "icon": "🕵️‍♂️" },
+  { "id": "GOV", "name": "Government of San Andreas", "icon": "🏛️" },
+  { "id": "NG", "name": "National Guard", "icon": "🪖" },
+  { "id": "EMS", "name": "Emergency Medical Services", "icon": "🚑" }
+]

@@ -1,0 +1,15 @@
+{
+  "id": "generic",
+  "name": "Generic Server (starter template)",
+  "shortName": "GEN",
+  "description": "Neutral commands and departments. Copy this pack to set up a new server.",
+  "defaultDepartment": "LSPD",
+  "rules": {
+    "arrestTimerMinutes": 20
+  },
+  "features": {
+    "arrestTimer": true,
+    "lawyerPause": false,
+    "legalAssistant": false
+  }
+}

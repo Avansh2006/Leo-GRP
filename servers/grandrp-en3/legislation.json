@@ -1,0 +1,15 @@
+{
+  "corpusHash": "leogrp_legislation_active_v2_28072025",
+  "summaryLabel": "Traffic Code 2nd Rendition (28.07.2025) & Penal Codes",
+  "shortLabel": "Traffic Code (2nd Rendition) and Penal Codes",
+  "sources": [
+    { "docType": "penal", "file": "sources/Penal Code.html", "format": "gsheet-html", "name": "Penal Codes of San Andreas", "version": "Penal Codes of San Andreas", "label": "Penal Code" },
+    { "docType": "traffic", "file": "sources/Traffic Codes.html", "format": "gsheet-html", "name": "Traffic Code (2nd Rendition — 28.07.2025)", "version": "2nd Rendition — 28.07.2025", "date": "28.07.2025", "label": "Traffic Code (2nd Rendition)" },
+    { "docType": "article7", "file": "sources/Article 7.html", "format": "gsheet-html", "name": "Article 7 (Parking Regulations — 28.07.2025)", "version": "Parking Regulations — 28.07.2025", "date": "28.07.2025", "label": "Article 7 (Parking)" },
+    { "docType": "procedure", "file": "sources/arrest-procedures.json", "format": "json", "name": "Procedures of Detention and Arrest (3rd Rendition)", "version": "3rd Rendition" }
+  ],
+  "excludedSources": [
+    "Traffic Code of the State of San Andreas 1st Rendition",
+    "Legacy Draft Legislation"
+  ]
+}

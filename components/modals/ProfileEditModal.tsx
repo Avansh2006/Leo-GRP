@@ -9,24 +9,17 @@ import React, { useState, useEffect } from 'react'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
-
-const ORGANIZATIONS = [
-  { id: 'LSPD', name: 'LSPD — Los Santos Police Department', icon: '👮‍♂️' },
-  { id: 'BCSO', name: 'BCSO — Blaine County Sheriff\'s Office', icon: '🤠' },
-  { id: 'SAHP', name: 'SAHP — San Andreas Highway Patrol', icon: '🚓' },
-  { id: 'FIB', name: 'FIB — Federal Investigation Bureau', icon: '🕵️‍♂️' },
-  { id: 'GOV', name: 'GOV — Government of San Andreas', icon: '🏛️' },
-  { id: 'NG', name: 'NG — National Guard', icon: '🪖' },
-  { id: 'EMS', name: 'EMS — Emergency Medical Services', icon: '🚑' },
-]
+import { useServerPack } from '@/servers'
 
 export default function ProfileEditModal() {
+  const pack = useServerPack()
+  const ORGANIZATIONS = pack.departments.map((d) => ({ id: d.id, name: `${d.id} — ${d.name}`, icon: d.icon, short: d.id }))
   const { profile, updateProfile, isProfileEditModalOpen, setIsProfileEditModalOpen } = useUserProfile()
   const { setCurrentOrganization } = useDuty()
   const { showToast } = useToast()
 
   const [name, setName] = useState(profile.name || '')
-  const [organization, setOrganization] = useState(profile.organization || 'LSPD')
+  const [organization, setOrganization] = useState(profile.organization || pack.server.defaultDepartment)
   const [passportNumber, setPassportNumber] = useState(profile.passportNumber || '')
   const [badgeNumber, setBadgeNumber] = useState(profile.badgeNumber || '')
   const [rank, setRank] = useState(profile.rank || '')
@@ -36,7 +29,7 @@ export default function ProfileEditModal() {
   useEffect(() => {
     if (isProfileEditModalOpen) {
       setName(profile.name || '')
-      setOrganization(profile.organization || 'LSPD')
+      setOrganization(profile.organization || pack.server.defaultDepartment)
       setPassportNumber(profile.passportNumber || '')
       setBadgeNumber(profile.badgeNumber || '')
       setRank(profile.rank || '')

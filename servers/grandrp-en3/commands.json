@@ -1,0 +1,384 @@
+{
+  "categories": [
+    {
+      "id": "saving_grandpro",
+      "name": "🔴 SAVING BODYCAM — GRANDPRO",
+      "icon": "🔴",
+      "expanded": true,
+      "commands": [
+        {
+          "id": "cmd-grandpro-save-1",
+          "text": "/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to {dept} Cloud Servers.",
+          "palette": { "title": "Save Bodycam to SD Card (GrandPro)", "icon": "🔴", "keywords": ["grandpro", "sd card", "save", "saving", "bodycam", "cloud", "upload"], "toast": "GrandPro Save Bodycam" }
+        },
+        {
+          "id": "cmd-grandpro-save-2",
+          "text": "/do insert new SD card into GrandPro and it is recording",
+          "palette": { "title": "Insert New SD Card (GrandPro)", "icon": "🔴", "keywords": ["grandpro", "sd card", "insert", "recording", "new"], "toast": "GrandPro Insert SD Card" }
+        },
+        {
+          "id": "cmd-grandpro-save-3",
+          "text": "/do put SD Card into phone, connects to {dept} Cloud Servers, downloads Bodycam on SD Card",
+          "palette": { "title": "Download Bodycam to SD Card (GrandPro)", "icon": "🔴", "keywords": ["grandpro", "sd card", "phone", "download", "bodycam", "cloud"], "toast": "GrandPro Download Bodycam" }
+        }
+      ]
+    },
+    {
+      "id": "attaching",
+      "name": "📹 Attaching Bodycam",
+      "icon": "📹",
+      "expanded": true,
+      "commands": [
+        {
+          "id": "cmd-attach-uniform",
+          "label": "ATTACHING BODYCAM (Uniform) - Must be done: in offices, next to NPCs at HQ, locker rooms, armory, or next to {dept} vehicle. Re-attach after Bad Dream, Code A, Change of Clothes, or every 4 hours.",
+          "text": "/me Takes out bodycam, attaches it to chest, checks its ballistic, water proof",
+          "palette": { "title": "Attach Bodycam (Uniform)", "icon": "📹", "keywords": ["bodycam", "attach", "uniform", "recording", "vest"], "toast": "Attach Bodycam (Uniform)" }
+        },
+        { "id": "attach-uniform-2", "text": "/me makes sure it is recording and checks for the red light" },
+        { "id": "attach-uniform-3", "text": "/do It is recording, is ballistic and water proof" },
+        {
+          "id": "cmd-attach-undercover",
+          "label": "ATTACHING BODYCAM UNDERCOVER - Must be done: in offices, next to NPCs at HQ, locker rooms, armory, or next to {dept} vehicle. Re-attach after Bad Dream, Code A, Change of Clothes, or every 4 hours.",
+          "text": "/me takes out bodycam and attaches it to belt, hides it, checks its ballistic and water proof",
+          "palette": { "title": "Attach Bodycam (Undercover)", "icon": "🕵️", "keywords": ["bodycam", "undercover", "belt", "hide", "covert"], "toast": "Attach Bodycam (Undercover)" }
+        },
+        { "id": "attach-undercover-2", "text": "/me makes sure it is recording and checks for the red light" },
+        { "id": "attach-undercover-3", "text": "/do It is recording, is ballistic and water proof." },
+        { "id": "attach-id", "label": "Optional:", "text": "/me puts the ID in the car / on desk / in the closet" }
+      ]
+    },
+    {
+      "id": "refreshing",
+      "name": "🔄 Refreshing Bodycam",
+      "icon": "🔄",
+      "commands": [
+        {
+          "id": "cmd-refresh-bodycam",
+          "label": "REFRESHING BODYCAM - POV must start before refreshing bodycam, so refresh can be visible in POV. Exception: Refresh not required if POV starts with attaching bodycam.",
+          "text": "/me refreshing bodycam",
+          "palette": { "title": "Refresh Bodycam", "icon": "🔄", "keywords": ["refresh", "bodycam", "restart", "pov"], "text": "/me refreshing bodycam\n/do It is recording.", "toast": "Refresh Bodycam" }
+        },
+        { "id": "refresh-2", "text": "/do It is recording." }
+      ]
+    },
+    {
+      "id": "saving",
+      "name": "💾 Saving a Situation",
+      "icon": "💾",
+      "commands": [
+        {
+          "id": "cmd-save-situation",
+          "label": "SAVING A SITUATION - Bodycam needs to be uploaded to the {dept} cloud to be valid.",
+          "text": "/me saves bodycam, uploads it to the {dept} Cloud and continues recording",
+          "palette": { "title": "Save Situation ({dept} Cloud)", "icon": "💾", "keywords": ["save", "cloud", "bodycam", "situation"], "toast": "Save Situation" }
+        },
+        { "id": "saving-2", "text": "/do It is recording." }
+      ]
+    },
+    {
+      "id": "unconscious",
+      "name": "🏥 After Getting Patched Up",
+      "icon": "🏥",
+      "commands": [
+        {
+          "id": "unconscious-1",
+          "label": "IF YOU WERE UNCONSCIOUS AND GOT PATCHED UP - Must ensure bodycam is still recording after you get patched up.",
+          "text": "/me checks that the bodycam is still recording"
+        },
+        { "id": "unconscious-2", "text": "/do It is recording." }
+      ]
+    },
+    {
+      "id": "pda",
+      "name": "📱 PDA Commands",
+      "icon": "📱",
+      "commands": [
+        {
+          "id": "cmd-connect-pda",
+          "label": "CONNECT PDA - PDA needs to be connected to the nearest {dept} cell tower to look up information.",
+          "text": "/me connects PDA to the nearest {dept} cell tower",
+          "palette": { "title": "Connect PDA to {dept} Tower", "icon": "📱", "keywords": ["pda", "tower", "connect", "lookup", "mdc"], "toast": "Connect PDA" }
+        }
+      ]
+    },
+    {
+      "id": "drone",
+      "name": "🚁 Drone Commands",
+      "icon": "🚁",
+      "commands": [
+        {
+          "id": "cmd-launch-drone",
+          "label": "WHILE ON DUTY - If in duty clothes, launch the {dept} drone.",
+          "text": "/me launches {dept} drone",
+          "palette": { "title": "Launch {dept} Drone", "icon": "🚁", "keywords": ["drone", "launch", "recon", "aerial"], "toast": "Launch Drone" }
+        },
+        {
+          "id": "drone-undercover-1",
+          "label": "WHILE UNDERCOVER - Take drone from {dept} car (or lockers) and put in backpack. Cannot launch 2 drones in a row unless you picked it up off the ground.",
+          "text": "/me takes the {dept} drone from the trunk and puts it in the backpack"
+        },
+        { "id": "drone-undercover-2", "label": "Later:", "text": "/me takes the {dept} drone from the backpack and launches it" },
+        { "id": "drone-undercover-3", "label": "After situation recorded:", "text": "/me takes the {dept} drone from the ground and puts it in the backpack" }
+      ]
+    },
+    {
+      "id": "vehicle",
+      "name": "🚗 Checking Vehicle Owner",
+      "icon": "🚗",
+      "commands": [
+        {
+          "id": "vehicle-1",
+          "label": "LEARN THE OWNER OF A VEHICLE WITHOUT A LICENSE PLATE",
+          "text": "/me feels the edges of the vehicle for VIN and checks for ownership"
+        },
+        { "id": "vehicle-2", "label": "OR", "text": "/me looks up the VIN in the database for license plate and owner information" }
+      ]
+    },
+    {
+      "id": "searching",
+      "name": "🔍 Searching the Trunk",
+      "icon": "🔍",
+      "commands": [
+        {
+          "id": "searching-1",
+          "label": "ℹ️ All bodycam commands must be done outside of vehicle, with clothes visible and without holding weapons or PDA! Commands can be modified as long as they are realistic, fit the situation and comply with RP rules.",
+          "text": "/me breaks the trunk of vehicle with crowbar"
+        }
+      ]
+    },
+    {
+      "id": "lawyer",
+      "name": "⚖️ Handing SSD to Lawyer",
+      "icon": "⚖️",
+      "commands": [
+        {
+          "id": "cmd-lawyer-ssd",
+          "label": "Option 1:",
+          "text": "/do saves bodycam onto an SSD Card and uploads into PDA to {dept} Cloud servers and continues recording",
+          "palette": { "title": "Hand SSD to Lawyer ({dept} Cloud)", "icon": "⚖️", "keywords": ["lawyer", "ssd", "usb", "attorney"], "toast": "Hand SSD to Lawyer" }
+        },
+        { "id": "lawyer-2", "text": "/me downloads bodycam onto USB stick using PDA and then hands over USB stick to Attorney" },
+        { "id": "lawyer-3", "label": "OR Option 2:", "text": "/me Takes SSD out of the Bodycam" },
+        { "id": "lawyer-4", "text": "/me Hands over bodycam SSD to the lawyer" }
+      ]
+    },
+    {
+      "id": "contracts",
+      "name": "📝 {dept} Employment & Code of Conduct",
+      "icon": "📝",
+      "commands": [
+        {
+          "id": "cmd-employment-contract",
+          "label": "{dept} CONTRACTS:",
+          "text": "/me Signs the {dept} Employment Contract on the desk",
+          "palette": { "title": "Sign {dept} Employment Contract", "icon": "📝", "keywords": ["contract", "employment", "sign"], "toast": "Sign Contract" }
+        },
+        { "id": "contracts-2", "text": "/me Signs the {dept} Code of Conduct" }
+      ]
+    },
+    {
+      "id": "cuffing",
+      "name": "🔗 Cuffing Person Under a Car",
+      "icon": "🔗",
+      "commands": [
+        { "id": "cuffing-1", "label": "CUFFING PERSON UNDER A CAR:", "text": "/try reaches under the car and cuffs the person underneath it" }
+      ]
+    },
+    {
+      "id": "jumpsuit",
+      "name": "👔 Jumpsuit Commands",
+      "icon": "👔",
+      "commands": [
+        { "id": "jumpsuit-1", "text": "/me grabs the detainee by left arm" },
+        { "id": "jumpsuit-2", "text": "/me takes a universal size jumpsuit from behind the counter." },
+        { "id": "jumpsuit-3", "text": "/me grabs the detainee by right arm" },
+        { "id": "jumpsuit-4", "text": "/me drops the jumpsuit on the bed" }
+      ]
+    },
+    {
+      "id": "palette_only",
+      "name": "⚡ Quick Commands",
+      "icon": "⚡",
+      "showOnPage": false,
+      "commands": [
+        {
+          "id": "cmd-miranda-rights",
+          "text": "/me reads Miranda Rights: You have the right to remain silent. Anything you say can and will be used against you in a court of law. You have the right to an attorney. If you cannot afford one, one will be provided for you. Do you understand these rights as they have been read to you?",
+          "palette": { "title": "Miranda Rights Warning", "icon": "⚖️", "keywords": ["miranda", "rights", "arrest", "warning", "lawyer", "silent"], "toast": "Miranda Rights" }
+        },
+        {
+          "id": "cmd-show-badge",
+          "text": "/me reaches into pocket, shows badge and official identification",
+          "palette": { "title": "Show Official Badge & ID", "icon": "🛡️", "keywords": ["badge", "id", "show", "identification", "officer"], "toast": "Show Badge & ID" }
+        }
+      ]
+    }
+  ],
+  "radio": [
+    {
+      "id": "doj",
+      "name": "⚖️ DOJ Related",
+      "icon": "⚖️",
+      "messages": [
+        {
+          "id": "cmd-radio-doj",
+          "text": "{dept} to DOJ: How copy?",
+          "palette": { "title": "{dept} to DOJ Radio Traffic", "icon": "📻", "keywords": ["radio", "doj", "dispatch"], "toast": "Radio DOJ" }
+        },
+        { "id": "doj-2", "text": "{dept} to DOJ: Good copy, send traffic!" },
+        { "id": "doj-3", "text": "{dept} to DOJ: Bad copy!" },
+        { "id": "doj-4", "text": "{dept} to DOJ: Bad copy, we're currently in a situation!" },
+        { "id": "doj-5", "text": "{dept} to DOJ: We have a 10-15 at DOC requesting a lawyer, Are there any available?" },
+        { "id": "doj-6", "text": "{dept} to DOJ: 10-4, much appreciated!" }
+      ]
+    },
+    {
+      "id": "lspd",
+      "name": "👮‍♂️ LSPD Related",
+      "icon": "👮‍♂️",
+      "hideForDepartment": "LSPD",
+      "messages": [
+        { "id": "lspd-1", "text": "{dept} to LSPD: How copy?" },
+        { "id": "lspd-2", "text": "{dept} to LSPD: Good copy, send traffic!" },
+        { "id": "lspd-3", "text": "{dept} to LSPD: Bad copy!" },
+        { "id": "lspd-4", "text": "{dept} to LSPD: Bad copy, we're currently in a situation!" },
+        { "id": "lspd-5", "text": "{dept} to LSPD: Can we have a quick meeting at your HQ?" },
+        { "id": "lspd-6", "text": "{dept} to LSPD: Requesting permission to land at your helipad." },
+        { "id": "lspd-7", "text": "{dept} to LSPD: We are entering your jurisdiction in chase of a car hijacker, help would be appreciated." },
+        { "id": "lspd-8", "text": "{dept} to LSPD: We have one of your units in custody, could you 10-17 to DOC?" },
+        { "id": "lspd-9", "text": "{dept} to LSPD: We're currently enroute!" },
+        { "id": "lspd-10", "text": "{dept} to LSPD: 10-4, much appreciated!" },
+        { "id": "lspd-11", "text": "{dept} to LSPD: Permission Granted!" }
+      ]
+    },
+    {
+      "id": "bcso",
+      "name": "🤠 BCSO Related",
+      "icon": "🤠",
+      "hideForDepartment": "BCSO",
+      "messages": [
+        { "id": "bcso-1", "text": "{dept} to BCSO: How copy?" },
+        { "id": "bcso-2", "text": "{dept} to BCSO: Good copy, send traffic!" },
+        { "id": "bcso-3", "text": "{dept} to BCSO: Bad copy!" },
+        { "id": "bcso-4", "text": "{dept} to BCSO: Bad copy, we're currently in a situation!" },
+        { "id": "bcso-5", "text": "{dept} to BCSO: Can we have a quick meeting at Sandy Shores station?" },
+        { "id": "bcso-6", "text": "{dept} to BCSO: Requesting permission to land at your helipad." },
+        { "id": "bcso-7", "text": "{dept} to BCSO: We have one of your deputies in custody, could you 10-17 to DOC?" },
+        { "id": "bcso-8", "text": "{dept} to BCSO: Deputies enroute!" },
+        { "id": "bcso-9", "text": "{dept} to BCSO: 10-4, much appreciated!" },
+        { "id": "bcso-10", "text": "{dept} to BCSO: Permission Granted!" }
+      ]
+    },
+    {
+      "id": "sahp",
+      "name": "🚓 SAHP Related",
+      "icon": "🚓",
+      "hideForDepartment": "SAHP",
+      "messages": [
+        { "id": "sahp-1", "text": "{dept} to SAHP: Good copy, send traffic!" },
+        { "id": "sahp-2", "text": "{dept} to SAHP: Bad copy!" },
+        { "id": "sahp-3", "text": "{dept} to SAHP: Bad copy, we're currently in a situation!" },
+        { "id": "sahp-4", "text": "{dept} to SAHP: Can we have a quick meeting at your hall?" },
+        { "id": "sahp-5", "text": "{dept} to SAHP: Requesting permission to land at your helipad." },
+        { "id": "sahp-6", "text": "{dept} to SAHP: We have one of your agents in custody, could you 10-17 to DOC?" },
+        { "id": "sahp-7", "text": "{dept} to SAHP: We're currently enroute!" },
+        { "id": "sahp-8", "text": "{dept} to SAHP: Troopers enroute!" },
+        { "id": "sahp-9", "text": "{dept} to SAHP: 10-4, much appreciated!" },
+        { "id": "sahp-10", "text": "{dept} to SAHP: Permission Granted!" }
+      ]
+    },
+    {
+      "id": "fib",
+      "name": "🕵️ FIB Related",
+      "icon": "🕵️",
+      "hideForDepartment": "FIB",
+      "messages": [
+        { "id": "fib-1", "text": "{dept} to FIB: How copy?" },
+        { "id": "fib-2", "text": "{dept} to FIB: Good copy, send traffic!" },
+        { "id": "fib-3", "text": "{dept} to FIB: Bad copy!" },
+        { "id": "fib-4", "text": "{dept} to FIB: Bad copy, we're currently in a situation!" },
+        { "id": "fib-5", "text": "{dept} to FIB: Can we have a quick meeting at your HQ?" },
+        { "id": "fib-6", "text": "{dept} to FIB: Requesting permission to land at your roof helipad." },
+        { "id": "fib-7", "text": "{dept} to FIB: We have one of your agents in custody, could you 10-17 to DOC?" },
+        { "id": "fib-8", "text": "{dept} to FIB: Agents enroute!" },
+        { "id": "fib-9", "text": "{dept} to FIB: 10-4, much appreciated!" },
+        { "id": "fib-10", "text": "{dept} to FIB: Permission Granted!" }
+      ]
+    },
+    {
+      "id": "gov",
+      "name": "🚔 Government Related",
+      "icon": "🚔",
+      "hideForDepartment": "GOV",
+      "messages": [
+        { "id": "gov-1", "text": "{dept} to GOV: How copy?" },
+        { "id": "gov-2", "text": "{dept} to GOV: Good copy, send traffic!" },
+        { "id": "gov-3", "text": "{dept} to GOV: Bad copy!" },
+        { "id": "gov-4", "text": "{dept} to GOV: Bad copy, we're currently in a situation!" },
+        { "id": "gov-5", "text": "{dept} to GOV: Agents enroute!" },
+        { "id": "gov-6", "text": "{dept} to GOV: Can we have a quick meeting at capitol?" },
+        { "id": "gov-7", "text": "{dept} to GOV: Requesting permission to land on your lawn." },
+        { "id": "gov-8", "text": "{dept} to GOV: We have one of your units in custody, could you 10-17 to DOC?" },
+        { "id": "gov-9", "text": "{dept} to GOV: 10-4, much appreciated!" }
+      ]
+    },
+    {
+      "id": "ng",
+      "name": "🎖️ National Guard Related",
+      "icon": "🎖️",
+      "hideForDepartment": "NG",
+      "messages": [
+        { "id": "ng-1", "text": "{dept} to NG: How copy?" },
+        { "id": "ng-2", "text": "{dept} to NG: Good copy, send traffic!" },
+        { "id": "ng-3", "text": "{dept} to NG: Bad copy!" },
+        { "id": "ng-4", "text": "{dept} to NG: Bad copy, we're currently in a situation!" },
+        { "id": "ng-5", "text": "{dept} to NG: Can we have a quick meeting at your main barracks?" },
+        { "id": "ng-6", "text": "{dept} to NG: Requesting permission to land at your main barracks." },
+        { "id": "ng-7", "text": "{dept} to NG: We have one of your soldiers in custody, could you 10-17 to DOC?" },
+        { "id": "ng-8", "text": "{dept} to NG: We're currently enroute!" },
+        { "id": "ng-9", "text": "{dept} to NG: 10-4, much appreciated!" },
+        { "id": "ng-10", "text": "{dept} to NG: Permission Granted!" }
+      ]
+    },
+    {
+      "id": "ems",
+      "name": "👨‍⚕️ EMS Related",
+      "icon": "👨‍⚕️",
+      "hideForDepartment": "EMS",
+      "messages": [
+        { "id": "ems-1", "text": "{dept} to EMS: How copy?" },
+        { "id": "ems-2", "text": "{dept} to EMS: Good copy, send traffic!" },
+        { "id": "ems-3", "text": "{dept} to EMS: Bad copy!" },
+        { "id": "ems-4", "text": "{dept} to EMS: Bad copy, we're currently in a situation!" },
+        { "id": "ems-5", "text": "{dept} to EMS: Ghetto is off limits for the next 25 minutes, please inform all your units." },
+        { "id": "ems-6", "text": "{dept} to EMS: Can we have a quick meeting at Pillbox Hospital?" },
+        { "id": "ems-7", "text": "{dept} to EMS: Requesting permission to land at your helipad." },
+        { "id": "ems-8", "text": "{dept} to EMS: We have one of your employees in custody, could you 10-17 to DOC?" },
+        { "id": "ems-9", "text": "{dept} to EMS: We're currently enroute!" },
+        { "id": "ems-10", "text": "{dept} to EMS: Clean!" },
+        { "id": "ems-11", "text": "{dept} to EMS: 10-4, much appreciated!" },
+        { "id": "ems-12", "text": "{dept} to EMS: Permission Granted!" }
+      ]
+    },
+    {
+      "id": "global",
+      "name": "🚨 Global Broadcasts",
+      "icon": "🚨",
+      "messages": [
+        { "id": "global-1", "text": "{dept} to GLOBAL: What's the situation?" },
+        { "id": "global-2", "text": "{dept} to ALL: Global is for Regroupping for latest Store Robbery. Please Dispatch Max units" },
+        {
+          "id": "cmd-radio-global-1010",
+          "text": "{dept} to ALL: Global is for heavy 10-10s, send all available units!",
+          "palette": { "title": "{dept} Global Broadcast (Heavy 10-10s)", "icon": "🚨", "keywords": ["radio", "global", "10-10", "backup"], "toast": "Global 10-10 Broadcast" }
+        },
+        { "id": "global-4", "text": "{dept} to ALL: Federals is getting robbed at global, send all available units!" },
+        { "id": "global-5", "text": "{dept} to ALL: Global is for a hood watch, send all available units!" },
+        { "id": "global-6", "text": "{dept} to ALL: Global is for a checkpoint, everyone is invited!" },
+        { "id": "global-7", "text": "{dept} to ALL: Be on standby for a possible hostage situation!" },
+        { "id": "global-8", "text": "{dept} to ALL: The Global is 10-99." }
+      ]
+    }
+  ]
+}
