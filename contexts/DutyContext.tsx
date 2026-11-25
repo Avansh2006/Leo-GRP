@@ -8,8 +8,9 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useUserProfile } from '@/contexts/UserProfileContext'
-import { getDefaultDepartment, getArrestTimerSeconds, getArrestTimerLabel, scopedStorage, useServerPack } from '@/servers'
+import { getActivePack, getDefaultDepartment, getArrestTimerSeconds, getArrestTimerLabel, scopedStorage, useServerPack } from '@/servers'
 import { renderReport, money, getReportDefault } from '@/utils/reports'
+import { calculateTotals, parseFineAmount, parseSentenceMonths } from '@/utils/chargeCalculator'
 import {
   FineRecord,
   ShiftArrestRecord,
@@ -498,17 +499,8 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       bail?: string
       sourceDocument?: string
     }) => {
-      let fineAmount = 0
-      if (lawEntry.fine && lawEntry.fine !== '-') {
-        const num = parseInt(lawEntry.fine.replace(/[^0-9]/g, ''), 10)
-        if (!isNaN(num)) fineAmount = num
-      }
-
-      let sentenceMonths = 0
-      if (lawEntry.sentence && lawEntry.sentence !== '-') {
-        const num = parseInt(lawEntry.sentence.replace(/[^0-9]/g, ''), 10)
-        if (!isNaN(num)) sentenceMonths = num
-      }
+      const fineAmount = parseFineAmount(lawEntry.fine)
+      const sentenceMonths = parseSentenceMonths(lawEntry.sentence)
 
       const fineStatus: 'NOT_ISSUED' | 'NOT_APPLICABLE' = fineAmount > 0 ? 'NOT_ISSUED' : 'NOT_APPLICABLE'
 
@@ -762,21 +754,11 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         throw new Error(`${unissued.length} fine(s) still need to be issued before finalizing arrest.`)
       }
 
-      let totalFine = 0
-      let totalSentenceMonths = 0
-      let maxStars = ''
-      let hasNoBail = false
-      let hasBail = false
-
-      activeDetention.charges.forEach((c) => {
-        totalFine += c.fineAmount || 0
-        totalSentenceMonths += c.sentenceMonths || 0
-        if (c.stars && c.stars.length > maxStars.length) maxStars = c.stars
-        if (c.bail?.toLowerCase().includes('no bail')) hasNoBail = true
-        else if (c.bail) hasBail = true
-      })
-
-      const bailStatus = hasNoBail ? 'NO BAIL' : hasBail ? 'Bail Eligible' : '-'
+      const totals = calculateTotals(activeDetention.charges, getActivePack().server.rules)
+      const totalFine = totals.fineTotal
+      const totalSentenceMonths = totals.sentenceMonths
+      const maxStars = totals.maxStars
+      const bailStatus = totals.bailStatus
 
       // Final timer calculation
       const remainingSec = calculateRemainingArrestTimerSeconds(activeDetention)
@@ -913,10 +895,9 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       let totalFine = 0
       let totalSentence = 0
       if (isDetention) {
-        ;(r as ActiveDetention).charges.forEach((c) => {
-          totalFine += c.fineAmount || 0
-          totalSentence += c.sentenceMonths || 0
-        })
+        const totals = calculateTotals((r as ActiveDetention).charges, getActivePack().server.rules)
+        totalFine = totals.fineTotal
+        totalSentence = totals.sentenceMonths
       } else {
         totalFine = (r as ShiftArrestRecord).totalFineAmount || 0
         totalSentence = (r as ShiftArrestRecord).totalSentenceMonths || 0

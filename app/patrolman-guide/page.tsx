@@ -13,6 +13,8 @@ import {
   deleteCustomChargeTemplate,
 } from '@/utils/presets'
 import { useServerPack, useFeature } from '@/servers'
+import { calculateTotals as calculateChargeTotals, parseFineAmount, parseSentenceMonths, starCount } from '@/utils/chargeCalculator'
+import { money } from '@/utils/reports'
 import IssueFineModal from '@/components/modals/IssueFineModal'
 import IssueArrestModal from '@/components/modals/IssueArrestModal'
 import StartDetentionModal from '@/components/modals/StartDetentionModal'
@@ -234,39 +236,24 @@ function PatrolmanGuideContent() {
     showToast(`Copied ${selectedCharges.length} charges to clipboard`, 'success')
   }
 
-  const calculateTotals = () => {
-    let totalFine = 0
-    let totalSentenceMonths = 0
-    let maxStars = 0
-    let hasNoBail = false
-
-    selectedCharges.forEach((c) => {
-      // Parse fine
-      const fineMatch = c.fine.match(/\$?([\d,]+)/)
-      if (fineMatch) {
-        totalFine += parseInt(fineMatch[1].replace(/,/g, ''), 10)
-      }
-
-      // Parse sentence
-      const sentenceMatch = c.sentence.match(/(\d+)\s*months/i)
-      if (sentenceMatch) {
-        totalSentenceMonths += parseInt(sentenceMatch[1], 10)
-      }
-
-      // Parse stars
-      const starCount = (c.stars.match(/⭐/g) || []).length
-      if (starCount > maxStars) maxStars = starCount
-
-      // Parse bail
-      if (c.bail && c.bail.toLowerCase().includes('no bail')) {
-        hasNoBail = true
-      }
-    })
-
-    return { totalFine, totalSentenceMonths, maxStars, hasNoBail }
+  // Charge calculator: follows this server's sentence stacking rules (server.json → rules)
+  const calc = calculateChargeTotals(
+    selectedCharges.map((c) => ({
+      fineAmount: parseFineAmount(c.fine),
+      sentenceMonths: parseSentenceMonths(c.sentence),
+      stars: c.stars,
+      bail: c.bail,
+    })),
+    pack.server.rules
+  )
+  const totals = {
+    totalFine: calc.fineTotal,
+    totalSentenceMonths: calc.sentenceMonths,
+    sentenceCapped: calc.sentenceCapped,
+    uncappedSentenceMonths: calc.uncappedSentenceMonths,
+    maxStars: starCount(calc.maxStars),
+    hasNoBail: calc.bailStatus === 'NO BAIL',
   }
-
-  const totals = calculateTotals()
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto">
@@ -430,10 +417,15 @@ function PatrolmanGuideContent() {
               <span>⚡</span> {selectedCharges.length} Charges Selected
             </span>
             <span className="text-on-surface">
-              Fine: <strong className="text-secondary">${totals.totalFine.toLocaleString()}</strong>
+              Fine: <strong className="text-secondary">{money(totals.totalFine)}</strong>
             </span>
             <span className="text-on-surface">
               Sentence: <strong className="text-amber-400">{totals.totalSentenceMonths} months</strong>
+              {totals.sentenceCapped && (
+                <span className="text-on-surface-variant" title={`Server maximum; charges add up to ${totals.uncappedSentenceMonths} months`}>
+                  {' '}(max)
+                </span>
+              )}
             </span>
             {totals.maxStars > 0 && (
               <span className="text-red-400">

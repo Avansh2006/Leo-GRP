@@ -17,7 +17,9 @@ import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 import { ShiftArrestRecord, getAllArrests, DetentionChecklistState, DetentionChargeItem } from '@/utils/db'
-import { getDefaultDepartment, getArrestTimerSeconds, isFeatureEnabled } from '@/servers'
+import { getActivePack, getDefaultDepartment, getArrestTimerSeconds, isFeatureEnabled } from '@/servers'
+import { calculateTotals } from '@/utils/chargeCalculator'
+import { money } from '@/utils/reports'
 
 interface ArrestCommandCenterModalProps {
   isOpen: boolean
@@ -224,39 +226,20 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
       }
     }
 
-    let totalFineAmount = 0
-    let totalSentenceMonths = 0
-    let maxStars = ''
-    let hasNoBail = false
-    let hasBail = false
-    let totalFinesRequiredCount = 0
-    let finesIssuedCount = 0
-
-    activeDetention.charges.forEach((c) => {
-      totalFineAmount += c.fineAmount || 0
-      totalSentenceMonths += c.sentenceMonths || 0
-      if (c.fineAmount > 0) {
-        totalFinesRequiredCount++
-        if (c.fineStatus === 'ISSUED') {
-          finesIssuedCount++
-        }
-      }
-      if (c.stars && c.stars.length > maxStars.length) maxStars = c.stars
-      if (c.bail?.toLowerCase().includes('no bail')) hasNoBail = true
-      else if (c.bail) hasBail = true
-    })
-
-    const unissuedCount = totalFinesRequiredCount - finesIssuedCount
-    const bailStatus = hasNoBail ? 'NO BAIL' : hasBail ? 'Bail Eligible' : '-'
+    // Fines and sentence follow this server's stacking rules (server.json → rules)
+    const totals = calculateTotals(activeDetention.charges, getActivePack().server.rules)
+    const totalFinesRequiredCount = activeDetention.charges.filter((c) => c.fineAmount > 0).length
+    const finesIssuedCount = activeDetention.charges.filter((c) => c.fineAmount > 0 && c.fineStatus === 'ISSUED').length
 
     return {
       totalFinesRequiredCount,
       finesIssuedCount,
-      unissuedCount,
-      totalFineAmount,
-      totalSentenceMonths,
-      maxStars: maxStars || '-',
-      bailStatus,
+      unissuedCount: totalFinesRequiredCount - finesIssuedCount,
+      totalFineAmount: totals.fineTotal,
+      totalSentenceMonths: totals.sentenceMonths,
+      sentenceCapped: totals.sentenceCapped,
+      maxStars: totals.maxStars || '-',
+      bailStatus: totals.bailStatus,
     }
   }, [activeDetention])
 
@@ -741,12 +724,12 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                   </div>
                   <div>
                     <div className="text-[10px] uppercase text-on-surface-variant">Total Fines</div>
-                    <div className="font-bold text-amber-400">${detentionTotals.totalFineAmount.toLocaleString()}</div>
+                    <div className="font-bold text-amber-400">{money(detentionTotals.totalFineAmount)}</div>
                   </div>
                   <div>
                     <div className="text-[10px] uppercase text-on-surface-variant">Total Sentence</div>
                     <div className="font-bold text-blue-400">
-                      {detentionTotals.totalSentenceMonths > 0 ? `${detentionTotals.totalSentenceMonths}m` : '-'}
+                      {detentionTotals.totalSentenceMonths > 0 ? `${detentionTotals.totalSentenceMonths}m${detentionTotals.sentenceCapped ? " (max)" : ""}` : "-"}
                     </div>
                   </div>
                 </div>

@@ -25,7 +25,7 @@ import genReports from './generic/reports.json'
 export * from './types'
 
 const grandRpEn3: ServerPack = {
-  server: grpServer,
+  server: grpServer as ServerPack['server'],
   departments: grpDepartments,
   commands: grpCommands as ServerPack['commands'],
   presets: grpPresets,
@@ -34,7 +34,7 @@ const grandRpEn3: ServerPack = {
 }
 
 const generic: ServerPack = {
-  server: genServer,
+  server: genServer as ServerPack['server'],
   departments: genDepartments,
   commands: genCommands as ServerPack['commands'],
   presets: genPresets,
