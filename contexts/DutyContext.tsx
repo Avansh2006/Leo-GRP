@@ -9,6 +9,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { getDefaultDepartment, getArrestTimerSeconds, getArrestTimerLabel, scopedStorage, useServerPack } from '@/servers'
+import { renderReport, money, getReportDefault } from '@/utils/reports'
 import {
   FineRecord,
   ShiftArrestRecord,
@@ -30,13 +31,9 @@ import {
   generateId,
 } from '@/utils/db'
 
-// Helper function to get GMT+1 time
-export const getGMT1Time = () => {
-  const now = new Date()
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000
-  const gmt1 = new Date(utc + 3600000 * 1) // GMT+1
-  return gmt1.toISOString()
-}
+// Shift timestamps are stored as real UTC instants; report templates format them in the
+// server's time zone (servers/<id>/server.json → rules.timeZone).
+export const getShiftTimestamp = () => new Date().toISOString()
 
 export interface WeaponStatus {
   name: string
@@ -47,14 +44,6 @@ export interface EventCounter {
   name: string
   count: number
 }
-
-export const DEFAULT_DOC_STATEMENT =
-  'Please be advised that these are the charges currently being applied to you. Additional charges may be added during processing at DOC if further violations are discovered. You will also be searched and processed at DOC in accordance with applicable procedure.'
-
-export const DEFAULT_MIRANDA_RIGHTS = `You have the right to remain silent.
-Anything you say can and will be used against you in a court of law.
-You have the right to an attorney.
-If you cannot afford an attorney, one will be appointed to you by the state if available.`
 
 export const calculateRemainingArrestTimerSeconds = (detention?: ActiveDetention | null): number => {
   if (!detention) return getArrestTimerSeconds()
@@ -205,8 +194,8 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   const [isArrestCommandCenterOpen, setIsArrestCommandCenterOpen] = useState(false)
 
   // Configurable Templates
-  const [docStatementTemplate, setDocStatementTemplateState] = useState(DEFAULT_DOC_STATEMENT)
-  const [rightsScriptTemplate, setRightsScriptTemplateState] = useState(DEFAULT_MIRANDA_RIGHTS)
+  const [docStatementTemplate, setDocStatementTemplateState] = useState(() => getReportDefault('docStatement'))
+  const [rightsScriptTemplate, setRightsScriptTemplateState] = useState(() => getReportDefault('rightsScript'))
 
   // Current shift counters & lists
   const [currentShiftFines, setCurrentShiftFines] = useState(0)
@@ -847,25 +836,22 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   // ARREST SCRIPT & RECORD FORMATTERS
   // -------------------------------------------------------------
 
-  const formatSingleChargeText = useCallback((charge: DetentionChargeItem | ArrestChargeItem): string => {
-    let text = `§ ${charge.code} — ${charge.title}\n`
-    if (charge.fine && charge.fine !== '-') text += `Fine: ${charge.fine}\n`
-    if (charge.sentence && charge.sentence !== '-') text += `Sentence: ${charge.sentence}\n`
-    return text.trim()
-  }, [])
+  const chargeView = (c: any) => ({
+    code: c.code,
+    title: c.title || c.description || '',
+    fine: c.fine || '',
+    sentence: c.sentence || '',
+  })
+
+  const formatSingleChargeText = useCallback(
+    (charge: DetentionChargeItem | ArrestChargeItem): string => renderReport('chargeSingle', chargeView(charge)).trim(),
+    []
+  )
 
   const formatAllChargesText = useCallback(
     (charges?: (DetentionChargeItem | ArrestChargeItem)[]): string => {
       const list = charges || activeDetention?.charges || []
-      if (list.length === 0) return 'No charges selected.'
-
-      let text = `Current Charges:\n\n`
-      list.forEach((c, idx) => {
-        text += `${idx + 1}. § ${c.code} — ${c.title}\n`
-        if (c.fine && c.fine !== '-') text += `   Fine: ${c.fine}\n`
-        if (c.sentence && c.sentence !== '-') text += `   Sentence: ${c.sentence}\n`
-      })
-      return text.trim()
+      return renderReport('chargesList', { charges: list.map(chargeView) }).trim()
     },
     [activeDetention]
   )
@@ -873,19 +859,13 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   const formatIssuedFinesText = useCallback(
     (detention?: ActiveDetention | null): string => {
       const d = detention || activeDetention
-      if (!d || d.charges.length === 0) return 'No fines issued.'
-
-      const issued = d.charges.filter((c) => c.fineStatus === 'ISSUED')
-      if (issued.length === 0) return 'No fines have been issued yet.'
-
-      let total = 0
-      let text = `Fines Issued:\n\n`
-      issued.forEach((c, idx) => {
-        text += `${idx + 1}. § ${c.code} — ${c.title} — ${c.fine || `$${c.fineAmount.toLocaleString()}`}\n`
-        total += c.fineAmount
-      })
-      text += `\nTotal Fines: $${total.toLocaleString()}`
-      return text.trim()
+      const all = d?.charges || []
+      const issued = all.filter((c) => c.fineStatus === 'ISSUED')
+      return renderReport('finesIssued', {
+        hasCharges: all.length > 0,
+        fines: issued.map((c) => ({ ...chargeView(c), fine: c.fine || money(c.fineAmount) })),
+        total: money(issued.reduce((sum, c) => sum + (c.fineAmount || 0), 0)),
+      }).trim()
     },
     [activeDetention]
   )
@@ -901,38 +881,22 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       const officerTitle = cleanOfficer ? `Officer ${cleanOfficer}` : 'an Officer'
       const org = d.organization || profile?.organization || currentOrganization || getDefaultDepartment()
       const passport = d.passportNumber ? `Passport ${d.passportNumber}` : 'Passport N/A'
-      
-      let suspectReference = ''
-      if (includeSuspectName && d.suspectName?.trim()) {
-        suspectReference = `${d.suspectName.trim()}, ${passport}`
-      } else {
-        suspectReference = passport
+      const suspectReference =
+        includeSuspectName && d.suspectName?.trim() ? `${d.suspectName.trim()}, ${passport}` : passport
+
+      let rights = rightsScriptTemplate.trim()
+      if (!rights.toLowerCase().includes('do you understand the rights')) {
+        rights += '\n\nDo you understand the rights I just read to you?'
       }
 
-      let chargesBlock = ''
-      if (d.charges.length === 0) {
-        chargesBlock = 'No charges currently added.'
-      } else {
-        d.charges.forEach((c, idx) => {
-          chargesBlock += `${idx + 1}. § ${c.code} — ${c.title}\n`
-          if (c.fine && c.fine !== '-') chargesBlock += `   Fine: ${c.fine}\n`
-          if (c.sentence && c.sentence !== '-') chargesBlock += `   Sentence: ${c.sentence}\n`
-        })
-      }
-
-      let rightsBlock = rightsScriptTemplate.trim()
-      if (!rightsBlock.toLowerCase().includes('do you understand the rights')) {
-        rightsBlock += '\n\nDo you understand the rights I just read to you?'
-      }
-
-      let script = `I am ${officerTitle} with the ${org}.\n\n`
-      script += `${suspectReference}, you are being placed under arrest for the following current charges:\n\n`
-      script += `${chargesBlock.trim()}\n\n`
-      script += `You are being informed of your required rights:\n\n`
-      script += `${rightsBlock}\n\n`
-      script += `${docStatementTemplate.trim()}`
-
-      return script
+      return renderReport('arrestScript', {
+        officerTitle,
+        org,
+        suspectReference,
+        charges: d.charges.map(chargeView),
+        rights,
+        docStatement: docStatementTemplate.trim(),
+      })
     },
     [activeDetention, currentOrganization, profile?.name, profile?.organization, includeSuspectName, rightsScriptTemplate, docStatementTemplate]
   )
@@ -944,74 +908,40 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
       const isDetention = 'charges' in r && r.charges.length > 0 && 'fineStatus' in r.charges[0]
       const rawOfficer = ('officerName' in r ? r.officerName : '') || ''
-      const cleanOfficer = rawOfficer.replace(/^Officer\s+/i, '').trim()
-      const officerTitle = cleanOfficer || 'Officer'
-      const org = r.organization || currentOrganization || getDefaultDepartment()
-      const passport = r.passportNumber || 'N/A'
-      const name = includeSuspectName && r.suspectName ? r.suspectName : undefined
-
-      const formatTime = (iso: string) => {
-        try {
-          const d = new Date(iso)
-          return (
-            d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-            ' ' +
-            d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-          )
-        } catch {
-          return iso
-        }
-      }
+      const officerTitle = rawOfficer.replace(/^Officer\s+/i, '').trim() || 'Officer'
 
       let totalFine = 0
       let totalSentence = 0
-
       if (isDetention) {
-        const det = r as ActiveDetention
-        det.charges.forEach((c) => {
+        ;(r as ActiveDetention).charges.forEach((c) => {
           totalFine += c.fineAmount || 0
           totalSentence += c.sentenceMonths || 0
         })
       } else {
-        const arr = r as ShiftArrestRecord
-        totalFine = arr.totalFineAmount || 0
-        totalSentence = arr.totalSentenceMonths || 0
+        totalFine = (r as ShiftArrestRecord).totalFineAmount || 0
+        totalSentence = (r as ShiftArrestRecord).totalSentenceMonths || 0
       }
 
-      let text = `ARREST\n\n`
-      text += `Officer: ${officerTitle}\n`
-      text += `Organization: ${org}\n\n`
-      if (name) text += `Suspect: ${name}\n`
-      text += `Passport: ${passport}\n\n`
+      const lawyerRequested = 'lawyerRequested' in r && !!r.lawyerRequested
+      let timerPaused = ''
+      if (lawyerRequested) {
+        if ('timerPausedAtFormatted' in r && r.timerPausedAtFormatted) timerPaused = r.timerPausedAtFormatted
+        else if (isDetention) timerPaused = formatTimerDisplay(calculateRemainingArrestTimerSeconds(r as ActiveDetention))
+      }
 
-      text += `Current Charges:\n\n`
-      r.charges.forEach((c: any, idx: number) => {
-        text += `${idx + 1}. § ${c.code} — ${c.title || c.description}\n`
-        if (c.fine && c.fine !== '-') text += `   Fine: ${c.fine}\n`
-        if (c.sentence && c.sentence !== '-') text += `   Sentence: ${c.sentence}\n`
+      return renderReport('arrestRecord', {
+        officerTitle,
+        org: r.organization || currentOrganization || getDefaultDepartment(),
+        suspectName: includeSuspectName && r.suspectName ? r.suspectName : '',
+        passport: r.passportNumber || 'N/A',
+        charges: r.charges.map(chargeView),
+        totalFine: money(totalFine),
+        totalSentenceMonths: totalSentence,
+        lawyerRequested,
+        timerPaused,
+        docStatement: docStatementTemplate.trim(),
+        completedAt: isDetention ? (r as ActiveDetention).startTime : (r as ShiftArrestRecord).timestamp,
       })
-      text += `\n`
-
-      text += `Total Fine: $${totalFine.toLocaleString()}\n`
-      text += `Total Sentence: ${totalSentence} months\n\n`
-
-      const lawyerReq = 'lawyerRequested' in r && r.lawyerRequested
-      if (lawyerReq) {
-        text += `Lawyer Requested: Yes\n`
-        if ('timerPausedAtFormatted' in r && r.timerPausedAtFormatted) {
-          text += `Timer Paused: ${r.timerPausedAtFormatted}\n`
-        } else if (isDetention) {
-          const remaining = calculateRemainingArrestTimerSeconds(r as ActiveDetention)
-          text += `Timer Paused: ${formatTimerDisplay(remaining)}\n`
-        }
-        text += `\n`
-      }
-
-      text += `${docStatementTemplate.trim()}\n\n`
-
-      text += `Arrest completed:\n${formatTime(isDetention ? (r as ActiveDetention).startTime : (r as ShiftArrestRecord).timestamp)}`
-
-      return text
     },
     [activeDetention, currentOrganization, includeSuspectName, docStatementTemplate]
   )
@@ -1022,7 +952,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
   const startDuty = useCallback((weapons: string[]) => {
     const newShiftId = `shift-${Date.now()}`
-    const startTime = getGMT1Time()
+    const startTime = getShiftTimestamp()
 
     setIsOnDuty(true)
     setCurrentShiftId(newShiftId)
@@ -1044,7 +974,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         id: currentShiftId || `shift-${Date.now()}`,
         organization: currentOrganization,
         onDutyTime: currentDutyStart,
-        offDutyTime: getGMT1Time(),
+        offDutyTime: getShiftTimestamp(),
         fines: currentShiftFinesList,
         arrests: currentShiftArrestsList,
         totalFinesAmount: currentShiftFinesAmount,
@@ -1114,65 +1044,33 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const formatShiftReportText = useCallback(
-    (shift: ShiftRecord): string => {
-      const formatTime = (iso: string) => {
-        try {
-          const d = new Date(iso)
-          return (
-            d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) +
-            ' ' +
-            d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-          )
-        } catch {
-          return iso
-        }
-      }
-
-      let text = `END OF SHIFT REPORT\n`
-      text += `────────────────────────\n`
-      text += `Organization: ${shift.organization || getDefaultDepartment()}\n`
-      text += `Shift: ${formatTime(shift.onDutyTime)} → ${shift.offDutyTime ? formatTime(shift.offDutyTime) : 'Ongoing'}\n\n`
-
-      text += `FINES ISSUED (${shift.totalFinesCount})\n`
-      text += `────────────────────────\n`
-      if (shift.fines.length === 0) {
-        text += `No fines issued during this shift.\n`
-      } else {
-        shift.fines.forEach((f, idx) => {
-          text += `#${idx + 1}\n`
-          text += `Fine: ${f.fineFormatted || `$${f.fineAmount.toLocaleString()}`}\n`
-          if (f.passportNumber) text += `Passport No: ${f.passportNumber}\n`
-          if (includeSuspectName && f.suspectName) text += `Name: ${f.suspectName}\n`
-          text += `Charge: § ${f.provisionCode} — ${f.provisionTitle}\n\n`
-        })
-      }
-      text += `Total Fines: $${shift.totalFinesAmount.toLocaleString()}\n\n`
-
-      text += `ARRESTS (${shift.totalArrestsCount})\n`
-      text += `────────────────────────\n`
-      if (shift.arrests.length === 0) {
-        text += `No arrests made during this shift.\n`
-      } else {
-        shift.arrests.forEach((a, idx) => {
-          text += `#${idx + 1}\n`
-          if (a.passportNumber) text += `Passport No: ${a.passportNumber}\n`
-          if (includeSuspectName && a.suspectName) text += `Name: ${a.suspectName}\n`
-          text += `Status: ${a.status}\n`
-          text += `Charges: (${a.charges.length})\n`
-          a.charges.forEach((c) => {
-            text += `- § ${c.code} — ${c.title}\n`
-          })
-          if (a.totalSentenceMonths > 0) text += `Sentence: ${a.totalSentenceMonths} months\n`
-          text += `Fine: $${a.totalFineAmount.toLocaleString()}\n`
-          if (a.stars) text += `Wanted: ${a.stars}\n`
-          if (a.bailStatus) text += `Bail: ${a.bailStatus}\n`
-          text += `\n`
-        })
-      }
-      text += `Total Arrests: ${shift.totalArrestsCount}\n`
-
-      return text
-    },
+    (shift: ShiftRecord): string =>
+      renderReport('shiftSummary', {
+        org: shift.organization || getDefaultDepartment(),
+        start: shift.onDutyTime,
+        end: shift.offDutyTime || '',
+        finesCount: shift.totalFinesCount,
+        fines: shift.fines.map((f) => ({
+          fine: f.fineFormatted || money(f.fineAmount),
+          passport: f.passportNumber || '',
+          suspectName: includeSuspectName && f.suspectName ? f.suspectName : '',
+          code: f.provisionCode,
+          title: f.provisionTitle,
+        })),
+        finesTotal: money(shift.totalFinesAmount),
+        arrestsCount: shift.totalArrestsCount,
+        arrests: shift.arrests.map((a) => ({
+          passport: a.passportNumber || '',
+          suspectName: includeSuspectName && a.suspectName ? a.suspectName : '',
+          status: a.status,
+          chargeCount: a.charges.length,
+          charges: a.charges.map(chargeView),
+          sentenceMonths: a.totalSentenceMonths || 0,
+          fine: money(a.totalFineAmount),
+          stars: a.stars || '',
+          bail: a.bailStatus || '',
+        })),
+      }),
     [includeSuspectName]
   )
 

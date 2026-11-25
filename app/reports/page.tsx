@@ -7,6 +7,7 @@ import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 import { useServerPack } from '@/servers'
+import { renderReport } from '@/utils/reports'
 import { ShiftRecord } from '@/utils/db'
 import ShiftSummaryModal from '@/components/modals/ShiftSummaryModal'
 import StartDetentionModal from '@/components/modals/StartDetentionModal'
@@ -157,23 +158,16 @@ export default function ReportsPage() {
       return
     }
 
-    const chargesList = selectedCharges
-      .map((charge) => `- ${charge.code} ${charge.description}`)
-      .join('\n')
-
-    const report = `Date: ${date}
-Time: ${time}
-Description:
-${description}
-
-Charges: (Below are most common ones for you to copy from here simply)
-${chargesList || '- No charges added'}
-
-- Bodycam Footage: [${bodycamFootage}]
-- Bodycam Proof: [${bodycamProof}]
-- License Plates: [${licensePlates}]
-- Makeup: ${makeup || 'Take screenshot from makeup log of your log and attach here. (Can also post on imgur and attach link)'}
-`
+    const report = renderReport('evidenceReport', {
+      date,
+      time,
+      description,
+      charges: selectedCharges.map((c) => ({ code: c.code, description: c.description || '' })),
+      bodycamFootage,
+      bodycamProof,
+      licensePlates,
+      makeup,
+    })
 
     navigator.clipboard.writeText(report)
     showToast('Evidence report copied! Fine count increased', 'success')
@@ -247,67 +241,26 @@ ${chargesList || '- No charges added'}
   }
 
   const generateShiftReport = (weaponStatusArray: {name: string, status: string}[]) => {
-    // Get GMT+0 server time
-    const getGMT0Time = () => {
-      const now = new Date()
-      const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
-      const gmt0 = new Date(utc) // GMT+0
-      return gmt0
-    }
+    const byStatus = (status: string) =>
+      weaponStatusArray.filter((w) => w.status === status).map((w) => ({ name: w.name }))
 
-    const onDutyTime = new Date(currentDutyStart || '')
-    const offDutyTime = getGMT0Time()
-    
-    const formatTime = (date: Date) => date.toLocaleString('en-US', { 
-      month: '2-digit', 
-      day: '2-digit', 
-      year: 'numeric', 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false 
+    // Times are formatted in the server's time zone by the template (servers/<id>/server.json)
+    const report = renderReport('shiftReport', {
+      name: profile.name || 'Not set',
+      id: profile.id || 'Not set',
+      rank: profile.rank || 'Not set',
+      badgeNumber: profile.badgeNumber || 'Not set',
+      onDuty: currentDutyStart || '',
+      offDuty: new Date().toISOString(),
+      weaponsTaken: weaponsTaken.map((name) => ({ name })),
+      eventsAttended,
+      arrestsCount: currentShiftArrests,
+      finesCount: currentShiftFines,
+      returned: byStatus('returned'),
+      lost: byStatus('lost'),
+      broken: byStatus('broken'),
+      used: byStatus('used'),
     })
-
-    const weaponsTakenList = weaponsTaken.join('\n')
-    
-    const returnedWeapons = weaponStatusArray.filter(w => w.status === 'returned')
-    const lostWeapons = weaponStatusArray.filter(w => w.status === 'lost')
-    const brokenWeapons = weaponStatusArray.filter(w => w.status === 'broken')
-    const usedWeapons = weaponStatusArray.filter(w => w.status === 'used')
-    
-    let weaponsReturnedSection = returnedWeapons.map(w => w.name).join('\n')
-    if (lostWeapons.length > 0) {
-      weaponsReturnedSection += '\n\n🔴 LOST:\n' + lostWeapons.map(w => w.name).join('\n')
-    }
-    if (brokenWeapons.length > 0) {
-      weaponsReturnedSection += '\n\n💔 BROKEN:\n' + brokenWeapons.map(w => w.name).join('\n')
-    }
-    if (usedWeapons.length > 0) {
-      weaponsReturnedSection += '\n\n⚡ USED:\n' + usedWeapons.map(w => w.name).join('\n')
-    }
-
-    const report = `----------------------------------------------------------------
-Name: ${profile.name || 'Not set'}
-ID: ${profile.id || 'Not set'}
-----------------------------------------------------------------
-Rank: ${profile.rank || 'Not set'}
-Badge Number: ${profile.badgeNumber || 'Not set'}
-----------------------------------------------------------------
-ON DUTY: ${formatTime(onDutyTime)}
-----------------------------------------------------------------
-Weapons Taken: ( with Ammunation )
-${weaponsTakenList}
-----------------------------------------------------------------
-Events Attended: ${eventsAttended}
-----------------------------------------------------------------
-Total Arrests: ${currentShiftArrests}
-----------------------------------------------------------------
-Total Fines: ${currentShiftFines}
-----------------------------------------------------------------
-OFF DUTY: ${formatTime(offDutyTime)}
-----------------------------------------------------------------
-Weapons Returned: ( with Ammunation )
-${weaponsReturnedSection}
-----------------------------------------------------------------`
 
     navigator.clipboard.writeText(report)
     showToast('Shift report copied and duty ended!', 'success')

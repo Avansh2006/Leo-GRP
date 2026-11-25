@@ -13,12 +13,14 @@ import grpDepartments from './grandrp-en3/departments.json'
 import grpCommands from './grandrp-en3/commands.json'
 import grpPresets from './grandrp-en3/presets.json'
 import grpLegislation from './grandrp-en3/legislation.json'
+import grpReports from './grandrp-en3/reports.json'
 
 import genServer from './generic/server.json'
 import genDepartments from './generic/departments.json'
 import genCommands from './generic/commands.json'
 import genPresets from './generic/presets.json'
 import genLegislation from './generic/legislation.json'
+import genReports from './generic/reports.json'
 
 export * from './types'
 
@@ -28,6 +30,7 @@ const grandRpEn3: ServerPack = {
   commands: grpCommands as ServerPack['commands'],
   presets: grpPresets,
   legislation: grpLegislation as ServerPack['legislation'],
+  reports: grpReports,
 }
 
 const generic: ServerPack = {
@@ -36,6 +39,7 @@ const generic: ServerPack = {
   commands: genCommands as ServerPack['commands'],
   presets: genPresets,
   legislation: genLegislation as ServerPack['legislation'],
+  reports: genReports,
 }
 
 /** All built-in packs, in the order shown in the server picker. */

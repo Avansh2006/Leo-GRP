@@ -5,11 +5,16 @@
   "description": "Grand RP English 3: GrandPro bodycam, San Andreas law, fine-first arrests.",
   "defaultDepartment": "LSPD",
   "rules": {
-    "arrestTimerMinutes": 25
+    "arrestTimerMinutes": 25,
+    "timeZone": "UTC",
+    "locale": "en-GB",
+    "currencySymbol": "$",
+    "sentenceStacking": "sum"
   },
   "features": {
     "arrestTimer": true,
     "lawyerPause": true,
     "legalAssistant": true
-  }
+  },
+  "defaultLanguage": "en"
 }

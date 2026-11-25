@@ -16,7 +16,8 @@ import { validateLawsFile } from '../utils/lawImport.ts'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const serversDir = path.join(root, 'servers')
 const registrySrc = fs.readFileSync(path.join(serversDir, 'registry.ts'), 'utf8')
-const PACK_FILES = ['server.json', 'departments.json', 'commands.json', 'presets.json', 'legislation.json']
+const PACK_FILES = ['server.json', 'departments.json', 'commands.json', 'presets.json', 'legislation.json', 'reports.json']
+const REPORT_TEMPLATES = ['chargeSingle', 'chargesList', 'finesIssued', 'arrestScript', 'arrestRecord', 'shiftSummary', 'shiftReport', 'evidenceReport']
 
 const packs = fs.readdirSync(serversDir).filter((d) => fs.statSync(path.join(serversDir, d)).isDirectory())
 let errorCount = 0
@@ -34,12 +35,36 @@ for (const id of packs) {
     }
   }
 
-  const [server, departments, commands, presets, legislation] = PACK_FILES.map(read)
+  const [server, departments, commands, presets, legislation, reports] = PACK_FILES.map(read)
+
+  if (reports) {
+    for (const k of REPORT_TEMPLATES) {
+      const tpl = reports.templates?.[k]
+      if (tpl === undefined) errors.push(`reports.json: missing template "${k}"`)
+      else {
+        const text = Array.isArray(tpl) ? tpl.join('\n') : String(tpl)
+        const opens = [...text.matchAll(/\{[#?^]([\w.]+)\}/g)].length
+        const closes = [...text.matchAll(/\{\/([\w.]+)\}/g)].length
+        if (opens !== closes) errors.push(`reports.json: template "${k}" has ${opens} opening block tag(s) but ${closes} closing`)
+      }
+    }
+    for (const k of ['docStatement', 'rightsScript']) if (!reports.defaults?.[k]) errors.push(`reports.json: missing defaults.${k}`)
+  }
 
   if (server) {
     if (server.id !== id) errors.push(`server.json: "id" is "${server.id}" but the folder is "${id}"`)
     if (!server.name) errors.push('server.json: "name" is required')
     if (!(server.rules?.arrestTimerMinutes > 0)) errors.push('server.json: rules.arrestTimerMinutes must be a positive number')
+    if (server.rules?.timeZone) {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: server.rules.timeZone })
+      } catch {
+        errors.push(`server.json: rules.timeZone "${server.rules.timeZone}" is not a valid IANA time zone (e.g. "UTC", "Europe/Berlin")`)
+      }
+    }
+    if (server.rules?.sentenceStacking && !['sum', 'max'].includes(server.rules.sentenceStacking)) {
+      errors.push('server.json: rules.sentenceStacking must be "sum" or "max"')
+    }
     const known = ['arrestTimer', 'lawyerPause', 'legalAssistant']
     Object.keys(server.features || {}).forEach((k) => {
       if (!known.includes(k)) warnings.push(`server.json: unknown feature "${k}" (known: ${known.join(', ')})`)
