@@ -189,4 +189,8 @@ export interface ServerPack {
   presets: PresetsFile
   legislation: LegislationFile
   reports: ReportsFile
+  /** "installed" = added by the officer from a pack file; laws then come from `laws` below */
+  source?: 'built-in' | 'installed'
+  /** Inline laws for installed packs (built-in packs load public/servers/<id>/laws.json) */
+  laws?: import('../utils/lawImport').LawEntry[]
 }

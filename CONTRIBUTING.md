@@ -4,7 +4,22 @@ This toolkit works for any GTA RP server. Everything specific to a server (depar
 radio commands, loadouts, laws, arrest rules) lives in a **server pack**, so adding a server means
 adding data, not changing code.
 
-There are two ways to get your server in.
+There are three ways to get your server in.
+
+## Fastest: share a pack file with your department
+
+A whole server (commands, rules, report templates and laws) fits in one `.pack.json` file.
+
+1. In the app, open Profile → RP Server → **➕ Add** → "Download <server-id>.pack.json" to get a starting file
+   (pick the Generic server first for a clean template).
+2. Edit the JSON (same format as the files in `servers/<id>/`, plus a `laws` array; build laws with the Law Importer).
+   Give it your own `server.id` (lowercase letters, numbers, dashes).
+3. Officers install it with **➕ Add → Install a pack file**. It works right away and stays in their browser.
+
+To list it for everyone, put the file in `public/community/<id>.pack.json`, add it to
+`public/community/directory.json` (`{ "id", "name", "description", "file" }`), run `npm run check-packs`
+and open a pull request. No code changes needed; it shows up under **➕ Add → Community servers**.
+From a pack folder you can generate the file with `npm run bundle-pack -- <id>`.
 
 ## Option A: no coding (server admins)
 

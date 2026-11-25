@@ -4,7 +4,7 @@
  * Laws come from public/servers/<serverId>/laws.json, which `npm run import-laws` builds from
  * the source files listed in servers/<serverId>/legislation.json (see utils/lawImport.ts).
  */
-import { getActiveServerId } from '@/servers'
+import { getActiveServerId, getActivePack } from '@/servers'
 import type { LawEntry, LawsFile } from './lawImport'
 
 export type { LawEntry } from './lawImport'
@@ -38,7 +38,11 @@ let cache: { serverId: string; promise: Promise<AllLawData> } | null = null
 
 async function fetchLaws(serverId: string): Promise<AllLawData> {
   let entries: LawEntry[] = []
-  try {
+  const pack = getActivePack()
+  if (pack.source === 'installed') {
+    // Installed packs carry their laws inline
+    entries = pack.laws || []
+  } else try {
     const res = await fetch(`/servers/${encodeURIComponent(serverId)}/laws.json`)
     if (res.ok) {
       const file = (await res.json()) as LawsFile

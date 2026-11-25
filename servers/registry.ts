@@ -42,11 +42,16 @@ const generic: ServerPack = {
   reports: genReports,
 }
 
-/** All built-in packs, in the order shown in the server picker. */
+/**
+ * All available packs, in the order shown in the server picker: built-in packs first, then
+ * packs the officer installed in this browser (registered at runtime by registerInstalledPack).
+ */
 export const SERVER_PACKS: Record<string, ServerPack> = {
   [grandRpEn3.server.id]: grandRpEn3,
   [generic.server.id]: generic,
 }
+
+const BUILT_IN_IDS = new Set(Object.keys(SERVER_PACKS))
 
 /** The original server. Its data keeps the old (unprefixed) storage names. */
 export const DEFAULT_SERVER_ID = grandRpEn3.server.id
@@ -57,10 +62,28 @@ export function isKnownServerId(id: string | undefined | null): id is string {
   return !!id && Object.prototype.hasOwnProperty.call(SERVER_PACKS, id)
 }
 
-function readServerCookie(): string | undefined {
+export function isBuiltInServerId(id: string | undefined | null): boolean {
+  return !!id && BUILT_IN_IDS.has(id)
+}
+
+/** Make an installed pack available (it never replaces a built-in one). */
+export function registerInstalledPack(pack: ServerPack) {
+  if (BUILT_IN_IDS.has(pack.server.id)) return
+  SERVER_PACKS[pack.server.id] = { ...pack, source: 'installed' }
+}
+
+export function unregisterInstalledPack(id: string) {
+  if (!BUILT_IN_IDS.has(id)) delete SERVER_PACKS[id]
+}
+
+/** Value of the server cookie in the browser (undefined on the server). */
+export function readServerCookie(): string | undefined {
   if (typeof document === 'undefined') return undefined
-  const match = document.cookie.match(new RegExp(`(?:^|;\s*)${SERVER_COOKIE}=([^;]+)`))
-  return match ? decodeURIComponent(match[1]) : undefined
+  for (const part of document.cookie.split(';')) {
+    const eq = part.indexOf('=')
+    if (eq > 0 && part.slice(0, eq).trim() === SERVER_COOKIE) return decodeURIComponent(part.slice(eq + 1).trim())
+  }
+  return undefined
 }
 
 let activeServerId: string = (() => {

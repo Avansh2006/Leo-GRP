@@ -4,114 +4,59 @@
  *
  *   npm run check-packs
  *
- * Catches the mistakes that break the app at runtime: a default department that doesn't exist,
- * duplicate command ids, radio channels hidden for a department that isn't defined, missing
- * law sources, an out-of-date or invalid laws.json, or a pack not registered in registry.ts.
+ * Checks built-in packs (servers/<id>/) and community pack files (public/community/*.pack.json):
+ * a default department that doesn't exist, duplicate command ids, broken report templates,
+ * missing law sources, an out-of-date or invalid laws.json, an unregistered pack, or a
+ * community pack missing from the directory.
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { validateLawsFile } from '../utils/lawImport.ts'
+import { validatePackParts, validatePackBundle } from '../utils/packValidation.ts'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const serversDir = path.join(root, 'servers')
 const registrySrc = fs.readFileSync(path.join(serversDir, 'registry.ts'), 'utf8')
-const PACK_FILES = ['server.json', 'departments.json', 'commands.json', 'presets.json', 'legislation.json', 'reports.json']
-const REPORT_TEMPLATES = ['chargeSingle', 'chargesList', 'finesIssued', 'arrestScript', 'arrestRecord', 'shiftSummary', 'shiftReport', 'evidenceReport']
+const PARTS = ['server', 'departments', 'commands', 'presets', 'legislation', 'reports']
 
-const packs = fs.readdirSync(serversDir).filter((d) => fs.statSync(path.join(serversDir, d)).isDirectory())
 let errorCount = 0
+let packCount = 0
 
-for (const id of packs) {
+function report(label, errors, warnings) {
+  packCount++
+  console.log(`${errors.length ? '✗' : '✓'} ${label}`)
+  errors.forEach((e) => console.log(`    error: ${e}`))
+  warnings.forEach((w) => console.log(`    warning: ${w}`))
+  errorCount += errors.length
+}
+
+// ---- built-in packs -------------------------------------------------------
+for (const id of fs.readdirSync(serversDir).filter((d) => fs.statSync(path.join(serversDir, d)).isDirectory())) {
   const dir = path.join(serversDir, id)
-  const errors = []
+  const fileErrors = []
   const warnings = []
-  const read = (f) => {
+  const parts = {}
+  for (const p of PARTS) {
+    const f = path.join(dir, `${p}.json`)
     try {
-      return JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))
+      parts[p] = JSON.parse(fs.readFileSync(f, 'utf8'))
     } catch (e) {
-      errors.push(`${f}: ${fs.existsSync(path.join(dir, f)) ? 'invalid JSON (' + e.message + ')' : 'missing'}`)
-      return null
+      fileErrors.push(`${p}.json: ${fs.existsSync(f) ? 'invalid JSON (' + e.message + ')' : 'missing'}`)
     }
   }
+  const res = validatePackParts(parts, { expectedId: id })
+  const errors = [...fileErrors, ...res.errors.filter((e) => !fileErrors.some((fe) => e.startsWith(fe.split(':')[0])))]
+  warnings.push(...res.warnings)
 
-  const [server, departments, commands, presets, legislation, reports] = PACK_FILES.map(read)
-
-  if (reports) {
-    for (const k of REPORT_TEMPLATES) {
-      const tpl = reports.templates?.[k]
-      if (tpl === undefined) errors.push(`reports.json: missing template "${k}"`)
-      else {
-        const text = Array.isArray(tpl) ? tpl.join('\n') : String(tpl)
-        const opens = [...text.matchAll(/\{[#?^]([\w.]+)\}/g)].length
-        const closes = [...text.matchAll(/\{\/([\w.]+)\}/g)].length
-        if (opens !== closes) errors.push(`reports.json: template "${k}" has ${opens} opening block tag(s) but ${closes} closing`)
-      }
-    }
-    for (const k of ['docStatement', 'rightsScript']) if (!reports.defaults?.[k]) errors.push(`reports.json: missing defaults.${k}`)
-  }
-
-  if (server) {
-    if (server.id !== id) errors.push(`server.json: "id" is "${server.id}" but the folder is "${id}"`)
-    if (!server.name) errors.push('server.json: "name" is required')
-    if (!(server.rules?.arrestTimerMinutes > 0)) errors.push('server.json: rules.arrestTimerMinutes must be a positive number')
-    if (server.rules?.timeZone) {
-      try {
-        new Intl.DateTimeFormat('en', { timeZone: server.rules.timeZone })
-      } catch {
-        errors.push(`server.json: rules.timeZone "${server.rules.timeZone}" is not a valid IANA time zone (e.g. "UTC", "Europe/Berlin")`)
-      }
-    }
-    if (server.rules?.sentenceStacking && !['sum', 'max'].includes(server.rules.sentenceStacking)) {
-      errors.push('server.json: rules.sentenceStacking must be "sum" or "max"')
-    }
-    const known = ['arrestTimer', 'lawyerPause', 'legalAssistant']
-    Object.keys(server.features || {}).forEach((k) => {
-      if (!known.includes(k)) warnings.push(`server.json: unknown feature "${k}" (known: ${known.join(', ')})`)
-    })
-  }
-
-  const deptIds = new Set()
-  if (departments) {
-    if (!Array.isArray(departments) || departments.length === 0) errors.push('departments.json: needs at least one department')
-    else
-      departments.forEach((d, i) => {
-        if (!d.id || !d.name) errors.push(`departments.json[${i}]: "id" and "name" are required`)
-        if (deptIds.has(d.id)) errors.push(`departments.json: duplicate id "${d.id}"`)
-        deptIds.add(d.id)
-      })
-    if (server && !deptIds.has(server.defaultDepartment)) errors.push(`server.json: defaultDepartment "${server.defaultDepartment}" is not in departments.json`)
-  }
-
-  if (commands) {
-    const ids = new Set()
-    const check = (c, where) => {
-      if (!c.id || !c.text) errors.push(`commands.json ${where}: every command needs "id" and "text"`)
-      if (ids.has(c.id)) errors.push(`commands.json: duplicate command id "${c.id}"`)
-      ids.add(c.id)
-      const unknown = [...`${c.text} ${c.label || ''} ${c.palette?.title || ''}`.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((k) => k !== 'dept')
-      if (unknown.length) warnings.push(`commands.json ${c.id}: unknown placeholder(s) ${unknown.map((u) => `{${u}}`).join(', ')} (only {dept} is filled in)`)
-    }
-    ;(commands.categories || []).forEach((cat) => (cat.commands || []).forEach((c) => check(c, `category "${cat.id}"`)))
-    ;(commands.radio || []).forEach((ch) => {
-      if (ch.hideForDepartment && !deptIds.has(ch.hideForDepartment)) warnings.push(`commands.json radio "${ch.id}": hideForDepartment "${ch.hideForDepartment}" is not a department`)
-      ;(ch.messages || []).forEach((m) => check(m, `radio "${ch.id}"`))
-    })
-  }
-
-  if (presets) {
-    for (const k of ['loadouts', 'chargeTemplates', 'events']) if (!Array.isArray(presets[k])) errors.push(`presets.json: "${k}" must be an array`)
-  }
-
+  const legislation = parts.legislation
   if (legislation) {
-    if (!legislation.corpusHash) errors.push('legislation.json: "corpusHash" is required')
     const sources = legislation.sources || []
     let newestSource = 0
     sources.forEach((s) => {
       const f = path.join(dir, s.file || '')
       if (!s.file || !fs.existsSync(f)) errors.push(`legislation.json: source file "${s.file}" not found in servers/${id}/`)
       else newestSource = Math.max(newestSource, fs.statSync(f).mtimeMs)
-      if (!['gsheet-html', 'table', 'json'].includes(s.format)) errors.push(`legislation.json: source "${s.file}" has unknown format "${s.format}"`)
     })
     const lawsPath = path.join(root, 'public', 'servers', id, 'laws.json')
     if (!fs.existsSync(lawsPath)) {
@@ -128,17 +73,46 @@ for (const id of packs) {
     }
   }
 
-  if (!registrySrc.includes(`./${id}/server.json`)) errors.push(`not registered: import its files in servers/registry.ts and add it to SERVER_PACKS`)
+  if (!registrySrc.includes(`./${id}/server.json`)) errors.push('not registered: import its files in servers/registry.ts and add it to SERVER_PACKS')
+  report(`${id}${parts.server?.name ? ` (${parts.server.name})` : ''}`, errors, warnings)
+}
 
-  const status = errors.length ? '✗' : '✓'
-  console.log(`${status} ${id}${server?.name ? ` (${server.name})` : ''}`)
-  errors.forEach((e) => console.log(`    error: ${e}`))
-  warnings.forEach((w) => console.log(`    warning: ${w}`))
-  errorCount += errors.length
+// ---- community pack files -------------------------------------------------
+const communityDir = path.join(root, 'public', 'community')
+const directoryPath = path.join(communityDir, 'directory.json')
+let directory = { servers: [] }
+if (fs.existsSync(directoryPath)) {
+  try {
+    directory = JSON.parse(fs.readFileSync(directoryPath, 'utf8'))
+  } catch (e) {
+    report('public/community/directory.json', [`invalid JSON (${e.message})`], [])
+  }
+}
+const listed = new Map((directory.servers || []).map((s) => [s.file, s]))
+const files = fs.existsSync(communityDir) ? fs.readdirSync(communityDir).filter((f) => f.endsWith('.pack.json')) : []
+for (const file of files) {
+  let bundle
+  try {
+    bundle = JSON.parse(fs.readFileSync(path.join(communityDir, file), 'utf8'))
+  } catch (e) {
+    report(`community/${file}`, [`invalid JSON (${e.message})`], [])
+    continue
+  }
+  const { errors, warnings } = validatePackBundle(bundle)
+  const id = bundle.server?.id
+  if (id && file !== `${id}.pack.json`) errors.push(`file should be named "${id}.pack.json"`)
+  if (id && registrySrc.includes(`./${id}/server.json`)) errors.push(`id "${id}" is already used by a built-in server`)
+  const entry = listed.get(file)
+  if (!entry) errors.push('not listed in public/community/directory.json')
+  else if (entry.id !== id) errors.push(`directory.json lists id "${entry.id}" but the pack's id is "${id}"`)
+  report(`community/${file}${bundle.server?.name ? ` (${bundle.server.name})` : ''}`, errors, warnings)
+}
+for (const [file] of listed) {
+  if (!files.includes(file)) report(`community/${file}`, ['listed in directory.json but the file does not exist'], [])
 }
 
 if (errorCount) {
   console.log(`\n${errorCount} error(s). Fix them before publishing.`)
   process.exit(1)
 }
-console.log(`\nAll ${packs.length} server pack(s) OK.`)
+console.log(`\nAll ${packCount} server pack(s) OK.`)

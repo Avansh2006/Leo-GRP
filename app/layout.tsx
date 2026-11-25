@@ -11,7 +11,8 @@ import { UserProfileProvider } from '@/contexts/UserProfileContext'
 import { ProductivityProvider } from '@/contexts/ProductivityContext'
 import AppShell from '@/components/shell/AppShell'
 import { SequenceProvider } from '@/contexts/SequenceContext'
-import { SERVER_COOKIE, DEFAULT_SERVER_ID, isKnownServerId } from '@/servers/registry'
+import { SERVER_COOKIE, DEFAULT_SERVER_ID } from '@/servers/registry'
+import { PACK_ID_RE } from '@/utils/packValidation'
 import { ServerProvider } from '@/servers/ServerContext'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -34,7 +35,8 @@ export default function RootLayout({
 }) {
   // The chosen RP server is kept in a cookie so the first render already uses its pack.
   const cookieServer = cookies().get(SERVER_COOKIE)?.value
-  const serverId = isKnownServerId(cookieServer) ? cookieServer : DEFAULT_SERVER_ID
+  // Built-in ids render on the server; ids of packs installed in the browser are resolved client-side
+  const serverId = cookieServer && PACK_ID_RE.test(cookieServer) ? cookieServer : DEFAULT_SERVER_ID
 
   return (
     <html lang="en" className="dark">
