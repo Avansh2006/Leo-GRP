@@ -5,6 +5,7 @@ import { useProductivity } from '@/contexts/ProductivityContext'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
 import { getDefaultDepartment } from '@/servers'
+import { markBackupDone } from '@/components/shell/NoticeBanners'
 import {
   exportAllData,
   validateBackupJson,
@@ -44,6 +45,8 @@ export default function DataBackupModal({ isOpen, onClose }: DataBackupModalProp
       downloadAnchor.click()
       downloadAnchor.remove()
       URL.revokeObjectURL(url)
+      markBackupDone()
+      window.dispatchEvent(new Event('leogrp:backup-done'))
       showToast('Backup JSON exported successfully!', 'success')
     } catch (e) {
       showToast('Failed to export data backup', 'error')
