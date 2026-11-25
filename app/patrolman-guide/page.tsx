@@ -12,11 +12,14 @@ import {
   saveCustomChargeTemplate,
   deleteCustomChargeTemplate,
 } from '@/utils/presets'
+import { useServerPack, useFeature } from '@/servers'
 import IssueFineModal from '@/components/modals/IssueFineModal'
 import IssueArrestModal from '@/components/modals/IssueArrestModal'
 import StartDetentionModal from '@/components/modals/StartDetentionModal'
 
 function PatrolmanGuideContent() {
+  const pack = useServerPack()
+  const assistantEnabled = useFeature('legalAssistant')
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
@@ -69,7 +72,7 @@ function PatrolmanGuideContent() {
       type: 'page',
       targetId: '/patrolman-guide',
       title: 'Patrolman Law Guide',
-      subtitle: 'Traffic Code (2nd Rendition) & Penal Code',
+      subtitle: pack.legislation.shortLabel,
       url: '/patrolman-guide',
     })
   }, [recordRecentItem])
@@ -272,7 +275,7 @@ function PatrolmanGuideContent() {
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-primary/10 text-primary border border-primary/30">
-              Active Source: Traffic Code 2nd Rendition (28.07.2025)
+              Active Source: {pack.legislation.summaryLabel}
             </span>
             <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-secondary/10 text-secondary border border-secondary/30">
               Penal Codes of San Andreas
@@ -393,9 +396,12 @@ function PatrolmanGuideContent() {
           <span className="text-[11px] font-mono uppercase text-on-surface-variant mr-1">Filter:</span>
           {[
             { id: 'all', label: 'All Documents' },
-            { id: 'traffic', label: 'Traffic Code (2nd Rendition)' },
-            { id: 'penal', label: 'Penal Code' },
-            { id: 'article7', label: 'Article 7 (Parking)' },
+            // One tab per law document this server has (procedures are listed under All)
+            ...(['traffic', 'penal', 'article7'] as const).flatMap((docType) => {
+              const src = pack.legislation.sources.find((s) => s.docType === docType)
+              const fallback = { traffic: 'Traffic Code', penal: 'Penal Code', article7: 'Parking' }[docType]
+              return src ? [{ id: docType, label: src.label || fallback }] : []
+            }),
           ].map((tab) => (
             <button
               key={tab.id}
@@ -517,6 +523,7 @@ function PatrolmanGuideContent() {
                     </div>
 
                     <div className="flex items-center gap-1">
+                      {assistantEnabled && (
                       <button
                         onClick={() => openAssistant(`Explain § ${entry.code} — ${entry.description}`)}
                         className="p-1 rounded text-xs text-on-surface-variant hover:text-primary transition-colors"
@@ -524,6 +531,7 @@ function PatrolmanGuideContent() {
                       >
                         ⚖️
                       </button>
+                      )}
                       <button
                         onClick={() => handleTogglePinLaw(entry)}
                         className={`p-1 rounded text-xs transition-colors ${
@@ -822,6 +830,7 @@ function PatrolmanGuideContent() {
               </div>
 
               <div className="flex flex-wrap gap-2 pt-2 border-t border-outline-variant">
+                {assistantEnabled && (
                 <button
                   onClick={() => {
                     openAssistant(`Explain § ${activeDetailEntry.code} — ${activeDetailEntry.description}`)
@@ -831,6 +840,7 @@ function PatrolmanGuideContent() {
                 >
                   <span>⚖️</span> Ask Assistant
                 </button>
+                )}
                 <button
                   onClick={() => handleCopyProvision(activeDetailEntry)}
                   className="px-3 py-1.5 bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-mono font-semibold rounded border border-outline-variant flex items-center gap-1.5"

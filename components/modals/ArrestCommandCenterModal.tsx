@@ -17,6 +17,7 @@ import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 import { ShiftArrestRecord, getAllArrests, DetentionChecklistState, DetentionChargeItem } from '@/utils/db'
+import { getDefaultDepartment, getArrestTimerSeconds, isFeatureEnabled } from '@/servers'
 
 interface ArrestCommandCenterModalProps {
   isOpen: boolean
@@ -42,7 +43,7 @@ function ArrestProcessingTimer({
 
   useEffect(() => {
     if (!detention) {
-      setRemainingSec(1500)
+      setRemainingSec(getArrestTimerSeconds())
       return
     }
 
@@ -81,8 +82,8 @@ function ArrestProcessingTimer({
 
   return (
     <div className="flex items-center gap-2 font-mono">
-      {/* Lawyer Button / State */}
-      {isPaused ? (
+      {/* Lawyer Button / State (if this server allows pausing for a lawyer) */}
+      {!isFeatureEnabled('lawyerPause') && !isPaused ? null : isPaused ? (
         <div className="flex items-center gap-2">
           <span className="px-2.5 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded text-xs font-bold flex items-center gap-1.5 animate-pulse">
             <span>⏸</span> {isLawyer ? 'LAWYER REQUESTED' : 'TIMER PAUSED'}
@@ -426,8 +427,8 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {/* 25-Minute Isolated Arrest Timer & Lawyer State */}
-            {activeDetention && (
+            {/* Arrest Timer & Lawyer State (if this server uses an arrest timer) */}
+            {activeDetention && isFeatureEnabled('arrestTimer') && (
               <ArrestProcessingTimer
                 detention={activeDetention}
                 onRequestLawyer={requestLawyer}
@@ -964,7 +965,7 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-bold text-primary">#{arrest.id.slice(-6)}</span>
                           <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-[10px] font-bold rounded">
-                            {arrest.organization || 'LSPD'}
+                            {arrest.organization || getDefaultDepartment()}
                           </span>
                         </div>
                         {arrest.suspectName && (

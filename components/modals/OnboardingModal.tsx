@@ -9,25 +9,19 @@ import React, { useState, useEffect } from 'react'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
-
-const ORGANIZATIONS = [
-  { id: 'LSPD', name: 'LSPD — Los Santos Police Department', icon: '👮‍♂️', short: 'LSPD' },
-  { id: 'BCSO', name: 'BCSO — Blaine County Sheriff\'s Office', icon: '🤠', short: 'BCSO' },
-  { id: 'SAHP', name: 'SAHP — San Andreas Highway Patrol', icon: '🚓', short: 'SAHP' },
-  { id: 'FIB', name: 'FIB — Federal Investigation Bureau', icon: '🕵️‍♂️', short: 'FIB' },
-  { id: 'GOV', name: 'GOV — Government of San Andreas', icon: '🏛️', short: 'GOV' },
-  { id: 'NG', name: 'NG — National Guard', icon: '🪖', short: 'NG' },
-  { id: 'EMS', name: 'EMS — Emergency Medical Services', icon: '🚑', short: 'EMS' },
-]
+import { useServerPack } from '@/servers'
+import ServerPicker from '@/components/ServerPicker'
 
 export default function OnboardingModal() {
+  const pack = useServerPack()
+  const ORGANIZATIONS = pack.departments.map((d) => ({ id: d.id, name: `${d.id} — ${d.name}`, icon: d.icon, short: d.id }))
   const { profile, completeOnboarding, isOnboardingModalOpen, setIsOnboardingModalOpen } = useUserProfile()
   const { setCurrentOrganization } = useDuty()
   const { showToast } = useToast()
 
   const [step, setStep] = useState<'form' | 'confirm'>('form')
   const [name, setName] = useState(profile.name || '')
-  const [organization, setOrganization] = useState(profile.organization || 'LSPD')
+  const [organization, setOrganization] = useState(profile.organization || pack.server.defaultDepartment)
   const [passportNumber, setPassportNumber] = useState(profile.passportNumber || '')
   const [badgeNumber, setBadgeNumber] = useState(profile.badgeNumber || '')
   const [rank, setRank] = useState(profile.rank || '')
@@ -139,6 +133,9 @@ export default function OnboardingModal() {
             )}
 
             <div className="space-y-4">
+              {/* RP Server */}
+              <ServerPicker />
+
               {/* Officer Name */}
               <div>
                 <label className="block text-xs font-mono font-semibold text-on-surface mb-1.5 uppercase tracking-wider">

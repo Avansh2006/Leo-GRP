@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "import-laws": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/import-laws.mjs",
+    "check-packs": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-packs.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",

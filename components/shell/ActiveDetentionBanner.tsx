@@ -13,6 +13,7 @@ import {
   formatTimerDisplay,
 } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
+import { getArrestTimerSeconds, isFeatureEnabled } from '@/servers'
 
 export default function ActiveDetentionBanner() {
   const { activeDetention, setIsArrestCommandCenterOpen, abandonDetention, includeSuspectName } = useDuty()
@@ -24,7 +25,7 @@ export default function ActiveDetentionBanner() {
 
   useEffect(() => {
     if (!activeDetention) {
-      setRemainingSec(1500)
+      setRemainingSec(getArrestTimerSeconds())
       return
     }
 
@@ -98,8 +99,8 @@ export default function ActiveDetentionBanner() {
           Org: <span className="text-secondary font-bold">{activeDetention.organization}</span>
         </span>
 
-        {/* 25-Min Timer / Lawyer Status */}
-        {isPaused ? (
+        {/* Arrest Timer / Lawyer Status (if this server uses an arrest timer) */}
+        {!isFeatureEnabled('arrestTimer') ? null : isPaused ? (
           <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 font-bold rounded border border-amber-500/40 text-[11px] flex items-center gap-1">
             <span>⏸</span> {isLawyer ? 'LAWYER PAUSED' : 'TIMER PAUSED'} ({formatTimerDisplay(remainingSec)})
           </span>

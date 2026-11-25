@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { scopedStorage } from '@/servers'
 
 interface Achievement {
   id: string
@@ -53,8 +54,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Load from localStorage
-    const savedNotifications = localStorage.getItem('notifications')
-    const savedAchievements = localStorage.getItem('achievements')
+    const savedNotifications = scopedStorage.getItem('notifications')
+    const savedAchievements = scopedStorage.getItem('achievements')
     
     if (savedNotifications) {
       setNotifications(JSON.parse(savedNotifications))
@@ -66,7 +67,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       // Initialize achievements
       const initialAchievements = ACHIEVEMENTS.map(a => ({ ...a, unlocked: false }))
       setAchievements(initialAchievements)
-      localStorage.setItem('achievements', JSON.stringify(initialAchievements))
+      scopedStorage.setItem('achievements', JSON.stringify(initialAchievements))
     }
   }, [])
 
@@ -82,24 +83,24 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     
     const updated = [newNotification, ...notifications].slice(0, 50) // Keep last 50
     setNotifications(updated)
-    localStorage.setItem('notifications', JSON.stringify(updated))
+    scopedStorage.setItem('notifications', JSON.stringify(updated))
   }
 
   const markAsRead = (id: string) => {
     const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n)
     setNotifications(updated)
-    localStorage.setItem('notifications', JSON.stringify(updated))
+    scopedStorage.setItem('notifications', JSON.stringify(updated))
   }
 
   const markAllAsRead = () => {
     const updated = notifications.map(n => ({ ...n, read: true }))
     setNotifications(updated)
-    localStorage.setItem('notifications', JSON.stringify(updated))
+    scopedStorage.setItem('notifications', JSON.stringify(updated))
   }
 
   const clearNotifications = () => {
     setNotifications([])
-    localStorage.removeItem('notifications')
+    scopedStorage.removeItem('notifications')
   }
 
   const checkAchievements = (arrests: number, fines: number, shifts: number, hours: number) => {
@@ -132,7 +133,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     if (hasNewAchievement) {
       setAchievements(updated)
-      localStorage.setItem('achievements', JSON.stringify(updated))
+      scopedStorage.setItem('achievements', JSON.stringify(updated))
     }
   }
 

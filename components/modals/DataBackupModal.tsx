@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
+import { getDefaultDepartment } from '@/servers'
 import {
   exportAllData,
   validateBackupJson,
@@ -139,7 +140,7 @@ export default function DataBackupModal({ isOpen, onClose }: DataBackupModalProp
                 <span>Local-First Storage</span>
               </div>
               <p className="text-[11px] text-on-surface-variant mt-0.5 font-mono">
-                {notes.length} Notes • {quickAccessItems.length} Shortcuts • {pinnedItems.length} Pinned • Profile: {profile.name ? `Officer ${profile.name} (${profile.organization || 'LSPD'})` : 'Default'}
+                {notes.length} Notes • {quickAccessItems.length} Shortcuts • {pinnedItems.length} Pinned • Profile: {profile.name ? `Officer ${profile.name} (${profile.organization || getDefaultDepartment()})` : 'Default'}
               </p>
             </div>
             <span className="text-[10px] font-mono uppercase bg-secondary/10 text-secondary px-2 py-0.5 rounded border border-secondary/30">

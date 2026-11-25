@@ -14,6 +14,7 @@ import OnboardingModal from '@/components/modals/OnboardingModal'
 import ProfileEditModal from '@/components/modals/ProfileEditModal'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useDuty } from '@/contexts/DutyContext'
+import { useFeature } from '@/servers'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -26,6 +27,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   } = useProductivity()
 
   const { isArrestCommandCenterOpen, setIsArrestCommandCenterOpen } = useDuty()
+  const assistantEnabled = useFeature('legalAssistant')
 
   return (
     <div className="flex h-screen w-full bg-background text-on-surface overflow-hidden font-sans">
@@ -62,7 +64,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         onClose={() => setIsBackupModalOpen(false)}
       />
       <LegislationAssistantModal
-        isOpen={isAssistantOpen}
+        isOpen={assistantEnabled && isAssistantOpen}
         onClose={() => setIsAssistantOpen(false)}
         initialQuery={assistantInitialQuery}
       />

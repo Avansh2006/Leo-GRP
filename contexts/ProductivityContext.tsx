@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
 import { useUserProfile } from '@/contexts/UserProfileContext'
+import { getDefaultDepartment } from '@/servers'
 import {
   Note,
   QuickAccessItem,
@@ -73,7 +74,7 @@ const ProductivityContext = createContext<ProductivityContextType | undefined>(u
 
 export function ProductivityProvider({ children }: { children: ReactNode }) {
   const { profile } = useUserProfile()
-  const activeOrg = profile?.organization || 'LSPD'
+  const activeOrg = profile?.organization || getDefaultDepartment()
 
   const [notes, setNotes] = useState<Note[]>([])
   const [activeNote, setActiveNote] = useState<Note | null>(null)

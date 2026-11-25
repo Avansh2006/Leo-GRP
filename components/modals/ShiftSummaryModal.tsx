@@ -9,6 +9,7 @@ import React from 'react'
 import { ShiftRecord } from '@/utils/db'
 import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
+import { getDefaultDepartment } from '@/servers'
 
 interface ShiftSummaryModalProps {
   isOpen: boolean
@@ -66,7 +67,7 @@ export default function ShiftSummaryModal({ isOpen, onClose, shift }: ShiftSumma
                 End of Shift Report
               </h3>
               <p className="text-[11px] font-mono text-on-surface-variant">
-                Organization: <strong className="text-secondary">{shift.organization || 'LSPD'}</strong>
+                Organization: <strong className="text-secondary">{shift.organization || getDefaultDepartment()}</strong>
               </p>
             </div>
           </div>

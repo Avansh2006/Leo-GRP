@@ -8,6 +8,7 @@ import { useDuty } from '@/contexts/DutyContext'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
+import { useServerPack, useFeature, resolvePaletteCommands } from '@/servers'
 
 interface PaletteItem {
   id: string
@@ -82,297 +83,34 @@ export default function CommandPaletteModal() {
     }
   }, [isCommandPaletteOpen, lawEntries.length])
 
-  // Real commands from the application dynamically built for current organization
+  // Commands flagged for the palette in the active server pack, filled in for the current organization
+  const pack = useServerPack()
+  const assistantEnabled = useFeature('legalAssistant')
   const appCommands: PaletteItem[] = useMemo(() => {
-    const org = currentOrganization || 'LSPD'
-    return [
-      {
-        id: 'cmd-grandpro-save-1',
-        title: 'Save Bodycam to SD Card (GrandPro)',
-        subtitle: `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${org} Cloud Servers.`,
-        category: 'Commands',
-        icon: '🔴',
-        keywords: ['grandpro', 'sd card', 'save', 'saving', 'bodycam', 'cloud', 'upload', org.toLowerCase()],
+    const org = currentOrganization || pack.server.defaultDepartment
+    return resolvePaletteCommands(pack, org).map((cmd) => {
+      const meta = cmd.palette!
+      const text = meta.text ?? cmd.text
+      return {
+        id: cmd.id,
+        title: meta.title,
+        subtitle: text,
+        category: 'Commands' as const,
+        icon: meta.icon,
+        keywords: [...(meta.keywords ?? []), org.toLowerCase()],
         action: () => {
-          const text = `/me saves bodycam to SD Card, ejects from GrandPro, inserts it into phone, uploads to ${org} Cloud Servers.`
           navigator.clipboard.writeText(text)
           recordRecentItem({
             type: 'command',
             targetId: text,
-            title: 'Save Bodycam to SD Card (GrandPro)',
+            title: meta.title,
             subtitle: text,
           })
-          showToast('Command copied: GrandPro Save Bodycam', 'success')
+          showToast(`Command copied: ${meta.toast ?? meta.title}`, 'success')
         },
-      },
-      {
-        id: 'cmd-grandpro-save-2',
-        title: 'Insert New SD Card (GrandPro)',
-        subtitle: '/do insert new SD card into GrandPro and it is recording',
-        category: 'Commands',
-        icon: '🔴',
-        keywords: ['grandpro', 'sd card', 'insert', 'recording', 'new'],
-        action: () => {
-          const text = '/do insert new SD card into GrandPro and it is recording'
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Insert New SD Card (GrandPro)',
-            subtitle: text,
-          })
-          showToast('Command copied: GrandPro Insert SD Card', 'success')
-        },
-      },
-      {
-        id: 'cmd-grandpro-save-3',
-        title: 'Download Bodycam to SD Card (GrandPro)',
-        subtitle: `/do put SD Card into phone, connects to ${org} Cloud Servers, downloads Bodycam on SD Card`,
-        category: 'Commands',
-        icon: '🔴',
-        keywords: ['grandpro', 'sd card', 'phone', 'download', 'bodycam', 'cloud', org.toLowerCase()],
-        action: () => {
-          const text = `/do put SD Card into phone, connects to ${org} Cloud Servers, downloads Bodycam on SD Card`
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Download Bodycam to SD Card (GrandPro)',
-            subtitle: text,
-          })
-          showToast('Command copied: GrandPro Download Bodycam', 'success')
-        },
-      },
-      {
-        id: 'cmd-attach-uniform',
-        title: 'Attach Bodycam (Uniform)',
-        subtitle: '/me Takes out bodycam, attaches it to chest, checks its ballistic, water proof',
-        category: 'Commands',
-        icon: '📹',
-        keywords: ['bodycam', 'attach', 'uniform', 'recording', 'vest'],
-        action: () => {
-          const text = '/me Takes out bodycam, attaches it to chest, checks its ballistic, water proof'
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Attach Bodycam (Uniform)',
-            subtitle: text,
-          })
-          showToast('Command copied: Attach Bodycam (Uniform)', 'success')
-        },
-      },
-      {
-        id: 'cmd-attach-undercover',
-        title: 'Attach Bodycam (Undercover)',
-        subtitle: '/me takes out bodycam and attaches it to belt, hides it, checks its ballistic and water proof',
-        category: 'Commands',
-        icon: '🕵️',
-        keywords: ['bodycam', 'undercover', 'belt', 'hide', 'covert'],
-        action: () => {
-          const text = '/me takes out bodycam and attaches it to belt, hides it, checks its ballistic and water proof'
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Attach Bodycam (Undercover)',
-            subtitle: text,
-          })
-          showToast('Command copied: Attach Bodycam (Undercover)', 'success')
-        },
-      },
-      {
-        id: 'cmd-refresh-bodycam',
-        title: 'Refresh Bodycam',
-        subtitle: '/me refreshing bodycam (POV restart)',
-        category: 'Commands',
-        icon: '🔄',
-        keywords: ['refresh', 'bodycam', 'restart', 'pov'],
-        action: () => {
-          const text = '/me refreshing bodycam\n/do It is recording.'
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Refresh Bodycam',
-            subtitle: text,
-          })
-          showToast('Command copied: Refresh Bodycam', 'success')
-        },
-      },
-      {
-        id: 'cmd-save-situation',
-        title: `Save Situation (${org} Cloud)`,
-        subtitle: `/me saves bodycam, uploads it to the ${org} Cloud and continues recording`,
-        category: 'Commands',
-        icon: '💾',
-        keywords: ['save', 'cloud', 'bodycam', 'situation', org.toLowerCase()],
-        action: () => {
-          const text = `/me saves bodycam, uploads it to the ${org} Cloud and continues recording`
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: `Save Situation (${org})`,
-            subtitle: text,
-          })
-          showToast('Command copied: Save Situation', 'success')
-        },
-      },
-      {
-        id: 'cmd-miranda-rights',
-        title: 'Miranda Rights Warning',
-        subtitle: '/me reads Miranda Rights: You have the right to remain silent...',
-        category: 'Commands',
-        icon: '⚖️',
-        keywords: ['miranda', 'rights', 'arrest', 'warning', 'lawyer', 'silent'],
-        action: () => {
-          const text = '/me reads Miranda Rights: You have the right to remain silent. Anything you say can and will be used against you in a court of law. You have the right to an attorney. If you cannot afford one, one will be provided for you. Do you understand these rights as they have been read to you?'
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Miranda Rights',
-            subtitle: text,
-          })
-          showToast('Command copied: Miranda Rights', 'success')
-        },
-      },
-      {
-        id: 'cmd-show-badge',
-        title: 'Show Official Badge & ID',
-        subtitle: '/me reaches into pocket, shows badge and official identification',
-        category: 'Commands',
-        icon: '🛡️',
-        keywords: ['badge', 'id', 'show', 'identification', 'officer'],
-        action: () => {
-          const text = '/me reaches into pocket, shows badge and official identification'
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Show Badge & ID',
-            subtitle: text,
-          })
-          showToast('Command copied: Show Badge & ID', 'success')
-        },
-      },
-      {
-        id: 'cmd-connect-pda',
-        title: `Connect PDA to ${org} Tower`,
-        subtitle: `/me connects PDA to the nearest ${org} cell tower`,
-        category: 'Commands',
-        icon: '📱',
-        keywords: ['pda', 'tower', 'connect', 'lookup', 'mdc', org.toLowerCase()],
-        action: () => {
-          const text = `/me connects PDA to the nearest ${org} cell tower`
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Connect PDA',
-            subtitle: text,
-          })
-          showToast('Command copied: Connect PDA', 'success')
-        },
-      },
-      {
-        id: 'cmd-launch-drone',
-        title: `Launch ${org} Drone`,
-        subtitle: `/me launches ${org} drone`,
-        category: 'Commands',
-        icon: '🚁',
-        keywords: ['drone', 'launch', 'recon', 'aerial', org.toLowerCase()],
-        action: () => {
-          const text = `/me launches ${org} drone`
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Launch Drone',
-            subtitle: text,
-          })
-          showToast('Command copied: Launch Drone', 'success')
-        },
-      },
-      {
-        id: 'cmd-lawyer-ssd',
-        title: `Hand SSD to Lawyer (${org} Cloud)`,
-        subtitle: `/do saves bodycam onto an SSD Card and uploads into PDA to ${org} Cloud servers and continues recording`,
-        category: 'Commands',
-        icon: '⚖️',
-        keywords: ['lawyer', 'ssd', 'usb', 'attorney', org.toLowerCase()],
-        action: () => {
-          const text = `/do saves bodycam onto an SSD Card and uploads into PDA to ${org} Cloud servers and continues recording`
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: 'Hand SSD to Lawyer',
-            subtitle: text,
-          })
-          showToast('Command copied: Hand SSD to Lawyer', 'success')
-        },
-      },
-      {
-        id: 'cmd-employment-contract',
-        title: `Sign ${org} Employment Contract`,
-        subtitle: `/me Signs the ${org} Employment Contract on the desk`,
-        category: 'Commands',
-        icon: '📝',
-        keywords: ['contract', 'employment', 'sign', org.toLowerCase()],
-        action: () => {
-          const text = `/me Signs the ${org} Employment Contract on the desk`
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: `Sign ${org} Contract`,
-            subtitle: text,
-          })
-          showToast('Command copied: Sign Contract', 'success')
-        },
-      },
-      {
-        id: 'cmd-radio-doj',
-        title: `${org} to DOJ Radio Traffic`,
-        subtitle: `${org} to DOJ: How copy?`,
-        category: 'Commands',
-        icon: '📻',
-        keywords: ['radio', 'doj', 'dispatch', org.toLowerCase()],
-        action: () => {
-          const text = `${org} to DOJ: How copy?`
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: `${org} to DOJ`,
-            subtitle: text,
-          })
-          showToast('Command copied: Radio DOJ', 'success')
-        },
-      },
-      {
-        id: 'cmd-radio-global-1010',
-        title: `${org} Global Broadcast (Heavy 10-10s)`,
-        subtitle: `${org} to ALL: Global is for heavy 10-10s, send all available units!`,
-        category: 'Commands',
-        icon: '🚨',
-        keywords: ['radio', 'global', '10-10', 'backup', org.toLowerCase()],
-        action: () => {
-          const text = `${org} to ALL: Global is for heavy 10-10s, send all available units!`
-          navigator.clipboard.writeText(text)
-          recordRecentItem({
-            type: 'command',
-            targetId: text,
-            title: `${org} Global 10-10s`,
-            subtitle: text,
-          })
-          showToast('Command copied: Global 10-10 Broadcast', 'success')
-        },
-      },
-    ]
-  }, [currentOrganization, recordRecentItem, showToast])
+      }
+    })
+  }, [pack, currentOrganization, recordRecentItem, showToast])
 
   // Pages
   const pageItems: PaletteItem[] = useMemo(
@@ -422,6 +160,15 @@ export default function CommandPaletteModal() {
         keywords: ['profile', 'badge', 'loadouts', 'stats', 'achievements', 'settings'],
         action: () => router.push('/profile'),
       },
+      {
+        id: 'page-law-importer',
+        title: 'Law Importer (server admins)',
+        subtitle: 'Convert your server law sheet (Google Sheets, CSV, XLSX) into laws.json',
+        category: 'Pages',
+        icon: '🗂️',
+        keywords: ['import', 'laws', 'legislation', 'admin', 'server', 'csv', 'xlsx', 'sheet'],
+        action: () => router.push('/tools/law-importer'),
+      },
     ],
     [router]
   )
@@ -429,6 +176,19 @@ export default function CommandPaletteModal() {
   // Quick Actions
   const actionItems: PaletteItem[] = useMemo(
     () => {
+      const departmentSwitchItems: PaletteItem[] = pack.departments.map((dept) => ({
+        id: `action-switch-org-${dept.id.toLowerCase()}`,
+        title: `Switch Department: ${dept.id}`,
+        subtitle: `Active department → ${dept.name}`,
+        category: 'Actions' as const,
+        icon: dept.icon,
+        keywords: ['switch', 'organization', 'department', 'org', dept.id.toLowerCase(), ...dept.name.toLowerCase().split(/\s+/)],
+        action: () => {
+          setCurrentOrganization(dept.id)
+          showToast(`Active department set to ${dept.id}`, 'success')
+        },
+      }))
+
       const items: PaletteItem[] = [
         {
           id: 'action-arrest-center',
@@ -441,17 +201,17 @@ export default function CommandPaletteModal() {
             setIsArrestCommandCenterOpen(true)
           },
         },
-        {
+        ...(assistantEnabled ? [{
           id: 'action-assistant',
           title: 'Open Legislation Assistant',
-          subtitle: 'Ask questions about Traffic Code (2nd Rendition) and Penal Codes',
+          subtitle: `Ask questions about ${pack.legislation.shortLabel}`,
           category: 'Actions',
           icon: '⚖️',
           keywords: ['assistant', 'ai', 'legislation', 'help', 'explain', 'law'],
           action: () => {
             openAssistant()
           },
-        },
+        } as PaletteItem] : []),
         {
           id: 'action-new-note',
           title: 'Create New Note',
@@ -487,90 +247,7 @@ export default function CommandPaletteModal() {
             setIsProfileEditModalOpen(true)
           },
         },
-        {
-          id: 'action-switch-org-lspd',
-          title: 'Switch Department: LSPD',
-          subtitle: 'Active department → Los Santos Police Department',
-          category: 'Actions',
-          icon: '👮‍♂️',
-          keywords: ['switch', 'organization', 'department', 'lspd', 'police', 'org'],
-          action: () => {
-            setCurrentOrganization('LSPD')
-            showToast('Active department set to LSPD', 'success')
-          },
-        },
-        {
-          id: 'action-switch-org-bcso',
-          title: 'Switch Department: BCSO',
-          subtitle: 'Active department → Blaine County Sheriff\'s Office',
-          category: 'Actions',
-          icon: '🤠',
-          keywords: ['switch', 'organization', 'department', 'bcso', 'sheriff', 'org'],
-          action: () => {
-            setCurrentOrganization('BCSO')
-            showToast('Active department set to BCSO', 'success')
-          },
-        },
-        {
-          id: 'action-switch-org-sahp',
-          title: 'Switch Department: SAHP',
-          subtitle: 'Active department → San Andreas Highway Patrol',
-          category: 'Actions',
-          icon: '🚓',
-          keywords: ['switch', 'organization', 'department', 'sahp', 'highway', 'patrol', 'org'],
-          action: () => {
-            setCurrentOrganization('SAHP')
-            showToast('Active department set to SAHP', 'success')
-          },
-        },
-        {
-          id: 'action-switch-org-fib',
-          title: 'Switch Department: FIB',
-          subtitle: 'Active department → Federal Investigation Bureau',
-          category: 'Actions',
-          icon: '🕵️‍♂️',
-          keywords: ['switch', 'organization', 'department', 'fib', 'federal', 'bureau', 'org'],
-          action: () => {
-            setCurrentOrganization('FIB')
-            showToast('Active department set to FIB', 'success')
-          },
-        },
-        {
-          id: 'action-switch-org-gov',
-          title: 'Switch Department: GOV',
-          subtitle: 'Active department → Government of San Andreas',
-          category: 'Actions',
-          icon: '🏛️',
-          keywords: ['switch', 'organization', 'department', 'gov', 'government', 'usss', 'org'],
-          action: () => {
-            setCurrentOrganization('GOV')
-            showToast('Active department set to GOV', 'success')
-          },
-        },
-        {
-          id: 'action-switch-org-ng',
-          title: 'Switch Department: NG',
-          subtitle: 'Active department → National Guard / Military',
-          category: 'Actions',
-          icon: '🪖',
-          keywords: ['switch', 'organization', 'department', 'ng', 'national', 'guard', 'military', 'org'],
-          action: () => {
-            setCurrentOrganization('NG')
-            showToast('Active department set to NG', 'success')
-          },
-        },
-        {
-          id: 'action-switch-org-ems',
-          title: 'Switch Department: EMS',
-          subtitle: 'Active department → Emergency Medical Services',
-          category: 'Actions',
-          icon: '🚑',
-          keywords: ['switch', 'organization', 'department', 'ems', 'medical', 'hospital', 'org'],
-          action: () => {
-            setCurrentOrganization('EMS')
-            showToast('Active department set to EMS', 'success')
-          },
-        },
+        ...departmentSwitchItems,
         {
           id: 'action-backup',
           title: 'Backup & Storage Manager',
@@ -629,6 +306,7 @@ export default function CommandPaletteModal() {
       currentOrganization,
       isRightPanelOpen,
       openAssistant,
+      assistantEnabled,
       profile.name,
       profile.organization,
       profile.passportNumber,

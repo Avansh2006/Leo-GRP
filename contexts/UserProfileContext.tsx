@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { getDefaultDepartment, scopedStorage, useServerPack } from '@/servers'
 import {
   OfficerProfile,
   PROFILE_RECORD_ID,
@@ -46,7 +47,7 @@ interface UserProfileContextType {
 const defaultProfile: UserProfileState = {
   id: PROFILE_RECORD_ID,
   name: '',
-  organization: 'LSPD',
+  organization: getDefaultDepartment(),
   passportNumber: '',
   badgeNumber: '',
   rank: '',
@@ -60,7 +61,8 @@ const defaultProfile: UserProfileState = {
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined)
 
 export function UserProfileProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<UserProfileState>(defaultProfile)
+  const serverPack = useServerPack()
+  const [profile, setProfile] = useState<UserProfileState>(() => ({ ...defaultProfile, organization: serverPack.server.defaultDepartment }))
   const [isLoaded, setIsLoaded] = useState(false)
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false)
   const [isProfileEditModalOpen, setIsProfileEditModalOpen] = useState(false)
@@ -76,7 +78,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
         // Load weapon loadouts from localStorage
         let savedLoadouts: WeaponLoadout[] = []
         if (typeof window !== 'undefined') {
-          const rawUser = localStorage.getItem('userProfile')
+          const rawUser = scopedStorage.getItem('userProfile')
           if (rawUser) {
             try {
               const parsed = JSON.parse(rawUser)
@@ -98,10 +100,10 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
             // First time or incomplete profile
             const currentOrg =
               (typeof window !== 'undefined' &&
-                (localStorage.getItem('selectedOrg') ||
-                  localStorage.getItem('leogrp_selected_org') ||
-                  localStorage.getItem('user_org'))) ||
-              'LSPD'
+                (scopedStorage.getItem('selectedOrg') ||
+                  scopedStorage.getItem('leogrp_selected_org') ||
+                  scopedStorage.getItem('user_org'))) ||
+              getDefaultDepartment()
 
             setProfile({
               ...defaultProfile,
@@ -148,7 +150,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
       const newProfileRecord: OfficerProfile = {
         id: PROFILE_RECORD_ID,
         name: data.name.trim(),
-        organization: data.organization.trim() || 'LSPD',
+        organization: data.organization.trim() || getDefaultDepartment(),
         passportNumber: data.passportNumber.trim(),
         badgeNumber: data.badgeNumber?.trim() || undefined,
         rank: data.rank?.trim() || undefined,
@@ -178,15 +180,19 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(
     async (updates: Partial<UserProfileState>) => {
       const now = Date.now()
+      // Merge onto the latest saved record, not this callback's `profile`, which can be stale
+      // (e.g. onboarding saves the profile and then immediately changes the organization).
+      const saved = await getOfficerProfile().catch(() => null)
+      const base: UserProfileState = saved ? { ...profile, ...saved, loadouts: profile.loadouts } : profile
       const updatedProfile: UserProfileState = {
-        ...profile,
+        ...base,
         ...updates,
-        name: updates.name !== undefined ? updates.name.trim() : profile.name,
-        organization: updates.organization !== undefined ? updates.organization.trim() : profile.organization,
-        passportNumber: updates.passportNumber !== undefined ? updates.passportNumber.trim() : profile.passportNumber,
-        badgeNumber: updates.badgeNumber !== undefined ? updates.badgeNumber?.trim() : profile.badgeNumber,
-        rank: updates.rank !== undefined ? updates.rank?.trim() : profile.rank,
-        callsign: updates.callsign !== undefined ? updates.callsign?.trim() : profile.callsign,
+        name: updates.name !== undefined ? updates.name.trim() : base.name,
+        organization: updates.organization !== undefined ? updates.organization.trim() : base.organization,
+        passportNumber: updates.passportNumber !== undefined ? updates.passportNumber.trim() : base.passportNumber,
+        badgeNumber: updates.badgeNumber !== undefined ? updates.badgeNumber?.trim() : base.badgeNumber,
+        rank: updates.rank !== undefined ? updates.rank?.trim() : base.rank,
+        callsign: updates.callsign !== undefined ? updates.callsign?.trim() : base.callsign,
         updatedAt: now,
         onboardingCompleted: updates.onboardingCompleted !== undefined ? updates.onboardingCompleted : true,
       }
@@ -196,7 +202,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
 
       // Save loadouts if changed
       if (typeof window !== 'undefined') {
-        localStorage.setItem(
+        scopedStorage.setItem(
           'userProfile',
           JSON.stringify({
             name: updatedProfile.name,
@@ -240,9 +246,9 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     setProfile((prev) => {
       const nextLoadouts = [...prev.loadouts, loadout]
       if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('userProfile')
+        const saved = scopedStorage.getItem('userProfile')
         const parsed = saved ? JSON.parse(saved) : {}
-        localStorage.setItem('userProfile', JSON.stringify({ ...parsed, loadouts: nextLoadouts }))
+        scopedStorage.setItem('userProfile', JSON.stringify({ ...parsed, loadouts: nextLoadouts }))
       }
       return { ...prev, loadouts: nextLoadouts }
     })
@@ -252,9 +258,9 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     setProfile((prev) => {
       const nextLoadouts = prev.loadouts.filter((l) => l.id !== id)
       if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('userProfile')
+        const saved = scopedStorage.getItem('userProfile')
         const parsed = saved ? JSON.parse(saved) : {}
-        localStorage.setItem('userProfile', JSON.stringify({ ...parsed, loadouts: nextLoadouts }))
+        scopedStorage.setItem('userProfile', JSON.stringify({ ...parsed, loadouts: nextLoadouts }))
       }
       return { ...prev, loadouts: nextLoadouts }
     })
@@ -264,9 +270,9 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     setProfile((prev) => {
       const nextLoadouts = prev.loadouts.map((l) => (l.id === id ? { ...l, ...updates } : l))
       if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('userProfile')
+        const saved = scopedStorage.getItem('userProfile')
         const parsed = saved ? JSON.parse(saved) : {}
-        localStorage.setItem('userProfile', JSON.stringify({ ...parsed, loadouts: nextLoadouts }))
+        scopedStorage.setItem('userProfile', JSON.stringify({ ...parsed, loadouts: nextLoadouts }))
       }
       return { ...prev, loadouts: nextLoadouts }
     })

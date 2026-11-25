@@ -1,0 +1,70 @@
+{
+  "categories": [
+    {
+      "id": "bodycam",
+      "name": "📹 Bodycam",
+      "icon": "📹",
+      "expanded": true,
+      "commands": [
+        {
+          "id": "gen-bodycam-on",
+          "text": "/me clips the {dept} bodycam to their chest and presses record",
+          "palette": { "title": "Start Bodycam", "icon": "📹", "keywords": ["bodycam", "record", "start"] }
+        },
+        { "id": "gen-bodycam-check", "text": "/do The bodycam's red light is on; it is recording." },
+        {
+          "id": "gen-bodycam-save",
+          "text": "/me stops the recording and uploads the footage to the {dept} evidence server",
+          "palette": { "title": "Save Bodycam Footage", "icon": "💾", "keywords": ["bodycam", "save", "upload", "evidence"] }
+        }
+      ]
+    },
+    {
+      "id": "traffic",
+      "name": "🚗 Traffic Stop",
+      "icon": "🚗",
+      "commands": [
+        { "id": "gen-ts-1", "text": "/me runs the plate through the {dept} MDT" },
+        { "id": "gen-ts-2", "text": "/me approaches the driver's window and asks for license and registration" }
+      ]
+    },
+    {
+      "id": "arrest",
+      "name": "🔗 Arrest",
+      "icon": "🔗",
+      "commands": [
+        { "id": "gen-arrest-1", "text": "/me places the suspect in handcuffs and double-locks them" },
+        {
+          "id": "gen-miranda",
+          "text": "/me reads the suspect their rights: You have the right to remain silent. Anything you say can and will be used against you. You have the right to an attorney.",
+          "palette": { "title": "Read Rights", "icon": "⚖️", "keywords": ["miranda", "rights", "arrest"] }
+        }
+      ]
+    }
+  ],
+  "radio": [
+    {
+      "id": "dispatch",
+      "name": "📻 Dispatch",
+      "icon": "📻",
+      "messages": [
+        { "id": "gen-r-1", "text": "{dept} to Dispatch: 10-8, available for calls." },
+        { "id": "gen-r-2", "text": "{dept} to Dispatch: Requesting backup at my location." }
+      ]
+    },
+    {
+      "id": "lspd",
+      "name": "👮‍♂️ LSPD",
+      "icon": "👮‍♂️",
+      "hideForDepartment": "LSPD",
+      "messages": [{ "id": "gen-lspd-1", "text": "{dept} to LSPD: How copy?" }]
+    },
+    {
+      "id": "ems",
+      "name": "🚑 EMS",
+      "icon": "🚑",
+      "hideForDepartment": "EMS",
+      "messages": [{ "id": "gen-ems-1", "text": "{dept} to EMS: Requesting medical at my location." }]
+    }
+  ]
+}

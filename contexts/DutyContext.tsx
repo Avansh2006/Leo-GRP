@@ -8,6 +8,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useUserProfile } from '@/contexts/UserProfileContext'
+import { getDefaultDepartment, getArrestTimerSeconds, getArrestTimerLabel, scopedStorage, useServerPack } from '@/servers'
 import {
   FineRecord,
   ShiftArrestRecord,
@@ -56,8 +57,8 @@ You have the right to an attorney.
 If you cannot afford an attorney, one will be appointed to you by the state if available.`
 
 export const calculateRemainingArrestTimerSeconds = (detention?: ActiveDetention | null): number => {
-  if (!detention) return 1500
-  const total = detention.timerTotalSeconds || 1500
+  if (!detention) return getArrestTimerSeconds()
+  const total = detention.timerTotalSeconds || getArrestTimerSeconds()
   if (detention.isTimerPaused && typeof detention.timerRemainingAtPause === 'number') {
     return Math.max(0, detention.timerRemainingAtPause)
   }
@@ -183,11 +184,12 @@ const DOC_STATEMENT_KEY = 'leogrp_doc_statement_template'
 const RIGHTS_SCRIPT_KEY = 'leogrp_rights_script_template'
 
 export function DutyProvider({ children }: { children: ReactNode }) {
+  const serverPack = useServerPack()
   const { profile, updateProfile } = useUserProfile()
   const [isOnDuty, setIsOnDuty] = useState(false)
   const [currentShiftId, setCurrentShiftId] = useState<string | null>(null)
   const [currentDutyStart, setCurrentDutyStart] = useState<string | null>(null)
-  const [currentOrganization, setCurrentOrgState] = useState(profile?.organization || 'LSPD')
+  const [currentOrganization, setCurrentOrgState] = useState(profile?.organization || serverPack.server.defaultDepartment)
   const [includeSuspectName, setIncludeSuspectNameState] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
 
@@ -230,22 +232,22 @@ export function DutyProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       // Organization
       const savedOrg =
-        localStorage.getItem('leogrp_selected_org') ||
-        localStorage.getItem(CURRENT_ORG_KEY) ||
-        localStorage.getItem('user_org') ||
-        localStorage.getItem('organization')
+        scopedStorage.getItem('leogrp_selected_org') ||
+        scopedStorage.getItem(CURRENT_ORG_KEY) ||
+        scopedStorage.getItem('user_org') ||
+        scopedStorage.getItem('organization')
       if (savedOrg) setCurrentOrgState(savedOrg)
 
       // Suspect Name preference
-      const savedNamePref = localStorage.getItem(INCLUDE_NAME_KEY)
+      const savedNamePref = scopedStorage.getItem(INCLUDE_NAME_KEY)
       if (savedNamePref !== null) {
         setIncludeSuspectNameState(savedNamePref === 'true')
       }
 
       // Templates
-      const savedDoc = localStorage.getItem(DOC_STATEMENT_KEY)
+      const savedDoc = scopedStorage.getItem(DOC_STATEMENT_KEY)
       if (savedDoc) setDocStatementTemplateState(savedDoc)
-      const savedRights = localStorage.getItem(RIGHTS_SCRIPT_KEY)
+      const savedRights = scopedStorage.getItem(RIGHTS_SCRIPT_KEY)
       if (savedRights) setRightsScriptTemplateState(savedRights)
 
       // Active Detention Restore
@@ -255,7 +257,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       }
 
       // Active Shift Restore
-      const savedShift = localStorage.getItem(ACTIVE_SHIFT_KEY)
+      const savedShift = scopedStorage.getItem(ACTIVE_SHIFT_KEY)
       if (savedShift) {
         try {
           const parsed = JSON.parse(savedShift)
@@ -263,7 +265,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
             setIsOnDuty(true)
             setCurrentShiftId(parsed.shiftId)
             setCurrentDutyStart(parsed.onDutyTime)
-            setCurrentOrgState(parsed.organization || savedOrg || 'LSPD')
+            setCurrentOrgState(parsed.organization || savedOrg || getDefaultDepartment())
             setWeaponsTaken(parsed.weaponsTaken || [])
             setCurrentShiftFines(parsed.currentShiftFines || 0)
             setCurrentShiftFinesAmount(parsed.currentShiftFinesAmount || 0)
@@ -314,9 +316,9 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         currentShiftArrestsList,
         currentEventCounters,
       }
-      localStorage.setItem(ACTIVE_SHIFT_KEY, JSON.stringify(activeData))
+      scopedStorage.setItem(ACTIVE_SHIFT_KEY, JSON.stringify(activeData))
     } else {
-      localStorage.removeItem(ACTIVE_SHIFT_KEY)
+      scopedStorage.removeItem(ACTIVE_SHIFT_KEY)
     }
   }, [
     isInitialized,
@@ -337,10 +339,10 @@ export function DutyProvider({ children }: { children: ReactNode }) {
     (org: string) => {
       setCurrentOrgState(org)
       if (typeof window !== 'undefined') {
-        localStorage.setItem(CURRENT_ORG_KEY, org)
-        localStorage.setItem('leogrp_selected_org', org)
-        localStorage.setItem('user_org', org)
-        localStorage.setItem('organization', org)
+        scopedStorage.setItem(CURRENT_ORG_KEY, org)
+        scopedStorage.setItem('leogrp_selected_org', org)
+        scopedStorage.setItem('user_org', org)
+        scopedStorage.setItem('organization', org)
         window.dispatchEvent(new CustomEvent('leogrp:org-changed', { detail: org }))
       }
       if (profile?.organization !== org) {
@@ -360,21 +362,21 @@ export function DutyProvider({ children }: { children: ReactNode }) {
   const setIncludeSuspectName = useCallback((val: boolean) => {
     setIncludeSuspectNameState(val)
     if (typeof window !== 'undefined') {
-      localStorage.setItem(INCLUDE_NAME_KEY, String(val))
+      scopedStorage.setItem(INCLUDE_NAME_KEY, String(val))
     }
   }, [])
 
   const setDocStatementTemplate = useCallback((template: string) => {
     setDocStatementTemplateState(template)
     if (typeof window !== 'undefined') {
-      localStorage.setItem(DOC_STATEMENT_KEY, template)
+      scopedStorage.setItem(DOC_STATEMENT_KEY, template)
     }
   }, [])
 
   const setRightsScriptTemplate = useCallback((template: string) => {
     setRightsScriptTemplateState(template)
     if (typeof window !== 'undefined') {
-      localStorage.setItem(RIGHTS_SCRIPT_KEY, template)
+      scopedStorage.setItem(RIGHTS_SCRIPT_KEY, template)
     }
   }, [])
 
@@ -386,7 +388,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
     (data: { passportNumber: string; suspectName?: string; officerName?: string; notes?: string }): ActiveDetention => {
       let officer = data.officerName?.trim() || profile?.name?.trim()
       if (!officer && typeof window !== 'undefined') {
-        officer = localStorage.getItem('officer_name') || localStorage.getItem('user_name') || 'Officer'
+        officer = scopedStorage.getItem('officer_name') || scopedStorage.getItem('user_name') || 'Officer'
       }
 
       const caseNum = Math.floor(1000 + Math.random() * 9000)
@@ -396,7 +398,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         caseId: `CASE-${caseNum}`,
         startTime: nowIso,
         officerName: officer || 'Officer',
-        organization: currentOrganization || profile?.organization || 'LSPD',
+        organization: currentOrganization || profile?.organization || getDefaultDepartment(),
         passportNumber: data.passportNumber.trim(),
         suspectName: data.suspectName?.trim() || undefined,
         charges: [],
@@ -414,7 +416,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         status: 'ACTIVE',
 
         // 25-Minute Timer & Lawyer State
-        timerTotalSeconds: 1500, // 25:00
+        timerTotalSeconds: getArrestTimerSeconds(),
         timerStartedAt: nowIso,
         isTimerPaused: false,
         totalPausedDurationSeconds: 0,
@@ -539,7 +541,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         if (!prev) {
           // If no active detention, create a provisional one
           const officer =
-            (typeof window !== 'undefined' && (localStorage.getItem('officer_name') || localStorage.getItem('user_name'))) ||
+            (typeof window !== 'undefined' && (scopedStorage.getItem('officer_name') || scopedStorage.getItem('user_name'))) ||
             'Officer'
           const caseNum = Math.floor(1000 + Math.random() * 9000)
           return {
@@ -735,7 +737,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         docStatementIncluded: true,
 
         // Timer & Lawyer Audit Fields
-        initialTimerFormatted: data.initialTimerFormatted || '25:00',
+        initialTimerFormatted: data.initialTimerFormatted || getArrestTimerLabel(),
         finalTimerRemainingSeconds: data.finalTimerRemainingSeconds,
         finalTimerRemainingFormatted: data.finalTimerRemainingFormatted,
         lawyerRequested: data.lawyerRequested,
@@ -823,7 +825,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
         notes: options?.notes || activeDetention.notes,
 
         // Timer & Lawyer Fields
-        initialTimerFormatted: '25:00',
+        initialTimerFormatted: getArrestTimerLabel(),
         finalTimerRemainingSeconds: remainingSec,
         finalTimerRemainingFormatted: timerFormatted,
         lawyerRequested: activeDetention.lawyerRequested || false,
@@ -897,7 +899,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       const rawOfficer = d.officerName?.trim() || profile?.name?.trim() || ''
       const cleanOfficer = rawOfficer.replace(/^Officer\s+/i, '').trim()
       const officerTitle = cleanOfficer ? `Officer ${cleanOfficer}` : 'an Officer'
-      const org = d.organization || profile?.organization || currentOrganization || 'LSPD'
+      const org = d.organization || profile?.organization || currentOrganization || getDefaultDepartment()
       const passport = d.passportNumber ? `Passport ${d.passportNumber}` : 'Passport N/A'
       
       let suspectReference = ''
@@ -944,7 +946,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       const rawOfficer = ('officerName' in r ? r.officerName : '') || ''
       const cleanOfficer = rawOfficer.replace(/^Officer\s+/i, '').trim()
       const officerTitle = cleanOfficer || 'Officer'
-      const org = r.organization || currentOrganization || 'LSPD'
+      const org = r.organization || currentOrganization || getDefaultDepartment()
       const passport = r.passportNumber || 'N/A'
       const name = includeSuspectName && r.suspectName ? r.suspectName : undefined
 
@@ -1075,7 +1077,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
       setCurrentEventCounters([])
 
       if (typeof window !== 'undefined') {
-        localStorage.removeItem(ACTIVE_SHIFT_KEY)
+        scopedStorage.removeItem(ACTIVE_SHIFT_KEY)
       }
 
       return shiftRecord
@@ -1128,7 +1130,7 @@ export function DutyProvider({ children }: { children: ReactNode }) {
 
       let text = `END OF SHIFT REPORT\n`
       text += `────────────────────────\n`
-      text += `Organization: ${shift.organization || 'LSPD'}\n`
+      text += `Organization: ${shift.organization || getDefaultDepartment()}\n`
       text += `Shift: ${formatTime(shift.onDutyTime)} → ${shift.offDutyTime ? formatTime(shift.offDutyTime) : 'Ongoing'}\n\n`
 
       text += `FINES ISSUED (${shift.totalFinesCount})\n`
