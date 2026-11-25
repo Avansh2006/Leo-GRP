@@ -10,6 +10,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useToast } from '@/components/ToastProvider'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useDuty } from '@/contexts/DutyContext'
+import { useSequence } from '@/contexts/SequenceContext'
 import { useServerPack, resolveCommandCategories, resolveRadioChannels } from '@/servers'
 
 interface Command {
@@ -29,6 +30,7 @@ export default function BodycamCommandsPage() {
   const { currentOrganization, setCurrentOrganization } = useDuty()
   const { recordRecentItem, pinItem, unpinItem, isItemPinned } = useProductivity()
   const pack = useServerPack()
+  const { startSequence } = useSequence()
   const organizations = pack.departments.map((d) => d.id)
   const [expandedCategories, setExpandedCategories] = useState<string[]>(() =>
     pack.commands.categories.filter((c) => c.expanded).map((c) => c.id)
@@ -154,9 +156,22 @@ export default function BodycamCommandsPage() {
             
             return (
               <div key={category.id} className="card overflow-hidden border border-outline-variant rounded-lg">
+                <div className="flex items-stretch bg-surface-container-low">
+                {category.commands.length > 1 && (
+                  <button
+                    onClick={() => {
+                      startSequence({ title: category.name, steps: category.commands.map((c) => c.text) })
+                      showToast('Step 1 copied. Press N for the next line.', 'success')
+                    }}
+                    className="px-3 text-[11px] font-mono font-bold text-primary hover:bg-primary/10 border-r border-outline-variant/60 flex-shrink-0"
+                    title="Copy these commands one at a time"
+                  >
+                    ▶ Step through
+                  </button>
+                )}
                 <button
                   onClick={() => toggleCategory(category.id)}
-                  className="w-full px-5 py-3 flex items-center justify-between bg-surface-container-low hover:bg-surface-container transition-colors"
+                  className="flex-1 px-5 py-3 flex items-center justify-between hover:bg-surface-container transition-colors"
                 >
                   <h3 className="text-sm font-semibold text-on-surface flex items-center gap-2 font-mono">
                     <span>{category.name}</span>
@@ -177,6 +192,7 @@ export default function BodycamCommandsPage() {
                     />
                   </svg>
                 </button>
+                </div>
 
                 {isExpanded && (
                   <div className="px-5 pb-4 pt-2 space-y-2.5 bg-surface-container-lowest border-t border-outline-variant/60">

@@ -8,7 +8,8 @@ import { useDuty } from '@/contexts/DutyContext'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
-import { useServerPack, useFeature, resolvePaletteCommands } from '@/servers'
+import { useServerPack, useFeature, resolvePaletteCommands, resolveCommandCategories } from '@/servers'
+import { useSequence } from '@/contexts/SequenceContext'
 
 interface PaletteItem {
   id: string
@@ -452,6 +453,23 @@ export default function CommandPaletteModal() {
   )
 
   // Filter and Score results
+  // Step-through sequences: one per multi-line command category
+  const { startSequence } = useSequence()
+  const sequenceItems: PaletteItem[] = useMemo(() => {
+    const org = currentOrganization || pack.server.defaultDepartment
+    return resolveCommandCategories(pack, org)
+      .filter((c) => c.showOnPage !== false && c.commands.length > 1)
+      .map((c) => ({
+        id: `seq-${c.id}`,
+        title: `Step through: ${c.name}`,
+        subtitle: `${c.commands.length} commands, copied one at a time (press N for the next)`,
+        category: 'Commands' as const,
+        icon: '▶',
+        keywords: ['step', 'sequence', 'through', ...c.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)],
+        action: () => startSequence({ title: c.name, steps: c.commands.map((cmd) => cmd.text) }),
+      }))
+  }, [pack, currentOrganization, startSequence])
+
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) {
@@ -463,6 +481,7 @@ export default function CommandPaletteModal() {
       ...actionItems,
       ...pageItems,
       ...appCommands,
+      ...sequenceItems,
       ...legislationPaletteItems,
       ...pinnedPaletteItems,
       ...qaPaletteItems,
@@ -508,6 +527,7 @@ export default function CommandPaletteModal() {
     actionItems,
     pageItems,
     appCommands,
+    sequenceItems,
     pinnedPaletteItems,
     qaPaletteItems,
     noteItems,

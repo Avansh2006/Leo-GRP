@@ -15,6 +15,7 @@ import ProfileEditModal from '@/components/modals/ProfileEditModal'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useDuty } from '@/contexts/DutyContext'
 import { useFeature } from '@/servers'
+import SequenceBar from './SequenceBar'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -53,6 +54,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <UtilityPanel />
         </div>
       </div>
+
+      {/* Step-through command sequence */}
+      <SequenceBar />
 
       {/* Global Modals */}
       <OnboardingModal />

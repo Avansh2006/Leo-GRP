@@ -10,6 +10,7 @@ import { NotificationProvider } from '@/contexts/NotificationContext'
 import { UserProfileProvider } from '@/contexts/UserProfileContext'
 import { ProductivityProvider } from '@/contexts/ProductivityContext'
 import AppShell from '@/components/shell/AppShell'
+import { SequenceProvider } from '@/contexts/SequenceContext'
 import { SERVER_COOKIE, DEFAULT_SERVER_ID, isKnownServerId } from '@/servers/registry'
 import { ServerProvider } from '@/servers/ServerContext'
 
@@ -39,9 +40,11 @@ export default function RootLayout({
                 <DutyProvider>
                   <ProductivityProvider>
                     <ToastProvider>
-                      <AppShell>
-                        {children}
-                      </AppShell>
+                      <SequenceProvider>
+                        <AppShell>
+                          {children}
+                        </AppShell>
+                      </SequenceProvider>
                     </ToastProvider>
                   </ProductivityProvider>
                 </DutyProvider>
