@@ -5,11 +5,16 @@
   "description": "Neutral commands and departments. Copy this pack to set up a new server.",
   "defaultDepartment": "LSPD",
   "rules": {
-    "arrestTimerMinutes": 20
+    "arrestTimerMinutes": 20,
+    "timeZone": "UTC",
+    "locale": "en-GB",
+    "currencySymbol": "$",
+    "sentenceStacking": "sum"
   },
   "features": {
     "arrestTimer": true,
     "lawyerPause": false,
     "legalAssistant": false
-  }
+  },
+  "defaultLanguage": "en"
 }

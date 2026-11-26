@@ -8,12 +8,14 @@ import { useNotifications } from '@/contexts/NotificationContext'
 import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import DutyHeaderStatus from './DutyHeaderStatus'
+import { useT } from '@/i18n/I18nProvider'
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void
 }
 
 export default function Header({ onToggleMobileSidebar }: HeaderProps) {
+  const t = useT()
   const pathname = usePathname()
   const { theme, setTheme, colorScheme, setColorScheme, toggleTheme } = useTheme()
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
@@ -42,17 +44,17 @@ export default function Header({ onToggleMobileSidebar }: HeaderProps) {
   }
 
   const themeOptions = [
-    { value: 'dark' as const, label: 'Dark', icon: '🌙' },
-    { value: 'light' as const, label: 'Light', icon: '☀️' },
-    { value: 'auto' as const, label: 'Auto', icon: '🌓' },
+    { value: 'dark' as const, label: t('theme.dark'), icon: '🌙' },
+    { value: 'light' as const, label: t('theme.light'), icon: '☀️' },
+    { value: 'auto' as const, label: t('theme.auto'), icon: '🌓' },
   ]
 
   const colorSchemes = [
-    { value: 'blue' as const, label: 'Blue', color: 'bg-blue-500' },
-    { value: 'purple' as const, label: 'Purple', color: 'bg-purple-500' },
-    { value: 'green' as const, label: 'Green', color: 'bg-green-500' },
-    { value: 'red' as const, label: 'Red', color: 'bg-red-500' },
-    { value: 'orange' as const, label: 'Orange', color: 'bg-orange-500' },
+    { value: 'blue' as const, label: t('color.blue'), color: 'bg-blue-500' },
+    { value: 'purple' as const, label: t('color.purple'), color: 'bg-purple-500' },
+    { value: 'green' as const, label: t('color.green'), color: 'bg-green-500' },
+    { value: 'red' as const, label: t('color.red'), color: 'bg-red-500' },
+    { value: 'orange' as const, label: t('color.orange'), color: 'bg-orange-500' },
   ]
 
   return (
@@ -81,16 +83,16 @@ export default function Header({ onToggleMobileSidebar }: HeaderProps) {
         <button
           onClick={() => setIsCommandPaletteOpen(true)}
           className="flex items-center gap-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant hover:border-outline rounded px-2.5 sm:px-3 py-1.5 text-on-surface-variant transition-colors group"
-          title="Search or press Ctrl+K"
+          title={t('header.searchHint')}
         >
           <svg className="w-4 h-4 text-outline group-hover:text-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <span className="text-xs font-mono hidden md:inline-block">
-            Search or Command Palette
+            {t('header.searchLong')}
           </span>
           <span className="text-xs font-mono md:hidden">
-            Search
+            {t('header.searchShort')}
           </span>
           <kbd className="hidden sm:inline-block font-mono text-[10px] bg-surface-variant px-1.5 py-0.5 rounded border border-outline-variant text-on-surface-variant">
             Ctrl K
@@ -108,8 +110,8 @@ export default function Header({ onToggleMobileSidebar }: HeaderProps) {
           <button
             onClick={() => setShowNotifications(!showNotifications)}
             className="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors relative"
-            aria-label="Notifications"
-            title="Notifications"
+            aria-label={t('header.notifications')}
+            title={t('header.notifications')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -176,7 +178,7 @@ export default function Header({ onToggleMobileSidebar }: HeaderProps) {
             onClick={() => setShowThemeMenu(!showThemeMenu)}
             className="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors"
             aria-label="Theme settings"
-            title="Theme Settings"
+            title={t('header.themeSettings')}
           >
             <span className="text-sm">
               {theme === 'dark' ? '🌙' : theme === 'light' ? '☀️' : '🌓'}
@@ -190,7 +192,7 @@ export default function Header({ onToggleMobileSidebar }: HeaderProps) {
               </span>
               <div className="space-y-3">
                 <div>
-                  <label className="text-[11px] font-mono text-on-surface-variant mb-1.5 block">Mode</label>
+                  <label className="text-[11px] font-mono text-on-surface-variant mb-1.5 block">{t('header.mode')}</label>
                   <div className="grid grid-cols-3 gap-1.5">
                     {themeOptions.map((opt) => (
                       <button
@@ -209,7 +211,7 @@ export default function Header({ onToggleMobileSidebar }: HeaderProps) {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-mono text-on-surface-variant mb-1.5 block">Accent Color</label>
+                  <label className="text-[11px] font-mono text-on-surface-variant mb-1.5 block">{t('header.accent')}</label>
                   <div className="grid grid-cols-5 gap-1.5">
                     {colorSchemes.map((scheme) => (
                       <button
@@ -232,7 +234,7 @@ export default function Header({ onToggleMobileSidebar }: HeaderProps) {
         <Link
           href="/profile"
           className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-outline-variant hover:bg-surface-container py-1 px-2 rounded transition-colors group"
-          title="View Profile"
+          title={t('header.viewProfile')}
         >
           <div className="text-right hidden sm:block">
             <div className="text-xs font-semibold text-on-surface truncate max-w-[120px]">

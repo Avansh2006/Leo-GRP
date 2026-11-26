@@ -17,112 +17,20 @@ import { useUserProfile } from '@/contexts/UserProfileContext'
 import { useToast } from '@/components/ToastProvider'
 import { loadAllLawData, LawEntry } from '@/utils/htmlParser'
 import { ShiftArrestRecord, getAllArrests, DetentionChecklistState, DetentionChargeItem } from '@/utils/db'
-import { getDefaultDepartment, getArrestTimerSeconds, isFeatureEnabled } from '@/servers'
+import { getActivePack, getDefaultDepartment, getArrestTimerSeconds, isFeatureEnabled } from '@/servers'
+import { calculateTotals } from '@/utils/chargeCalculator'
+import { money } from '@/utils/reports'
+import { DiscordPostButton } from '@/components/DiscordPost'
+import ArrestProcessingTimer from '@/components/arrest/ArrestProcessingTimer'
+import { useT } from '@/i18n/I18nProvider'
 
 interface ArrestCommandCenterModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
-/**
- * Isolated 25-Minute Processing Timer Component
- * Self-contained ticker that updates its own timer without causing the parent modal to re-render every second.
- */
-function ArrestProcessingTimer({
-  detention,
-  onRequestLawyer,
-  onResumeTimer,
-}: {
-  detention: any
-  onRequestLawyer: () => void
-  onResumeTimer: () => void
-}) {
-  const [remainingSec, setRemainingSec] = useState<number>(() =>
-    calculateRemainingArrestTimerSeconds(detention)
-  )
-
-  useEffect(() => {
-    if (!detention) {
-      setRemainingSec(getArrestTimerSeconds())
-      return
-    }
-
-    const update = () => {
-      setRemainingSec(calculateRemainingArrestTimerSeconds(detention))
-    }
-
-    update()
-    if (detention.isTimerPaused) return
-
-    const interval = setInterval(update, 1000)
-    return () => clearInterval(interval)
-  }, [
-    detention?.id,
-    detention?.timerStartedAt,
-    detention?.startTime,
-    detention?.isTimerPaused,
-    detention?.timerRemainingAtPause,
-    detention?.totalPausedDurationSeconds,
-  ])
-
-  if (!detention) return null
-
-  const isPaused = detention.isTimerPaused
-  const isLawyer = detention.lawyerRequested
-  const isExpired = remainingSec === 0
-
-  let colorClasses = 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
-  if (isExpired) {
-    colorClasses = 'text-rose-400 border-rose-500/60 bg-rose-500/20'
-  } else if (remainingSec <= 300) {
-    colorClasses = 'text-rose-400 border-rose-500/40 bg-rose-500/10'
-  } else if (remainingSec <= 600) {
-    colorClasses = 'text-amber-400 border-amber-500/40 bg-amber-500/10'
-  }
-
-  return (
-    <div className="flex items-center gap-2 font-mono">
-      {/* Lawyer Button / State (if this server allows pausing for a lawyer) */}
-      {!isFeatureEnabled('lawyerPause') && !isPaused ? null : isPaused ? (
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded text-xs font-bold flex items-center gap-1.5 animate-pulse">
-            <span>⏸</span> {isLawyer ? 'LAWYER REQUESTED' : 'TIMER PAUSED'}
-          </span>
-          <button
-            onClick={onResumeTimer}
-            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
-          >
-            <span>▶</span> RESUME TIMER
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={onRequestLawyer}
-          className="px-3 py-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/40 rounded text-xs font-bold transition-colors flex items-center gap-1.5"
-          title="Pause timer when suspect requests a lawyer"
-        >
-          <span>⚖</span> ASKED FOR LAWYER
-        </button>
-      )}
-
-      {/* Timer Countdown Badge */}
-      <div
-        className={`px-3 py-1 rounded border font-bold text-xs flex items-center gap-1.5 transition-colors ${colorClasses}`}
-      >
-        <span>⏱</span>
-        <span>
-          {isExpired ? (
-            <span className="text-rose-400 font-bold">🔴 ARREST TIMER EXPIRED (00:00)</span>
-          ) : (
-            formatTimerDisplay(remainingSec)
-          )}
-        </span>
-      </div>
-    </div>
-  )
-}
-
 export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestCommandCenterModalProps) {
+  const t = useT()
   const {
     activeDetention,
     updateActiveDetention,
@@ -224,39 +132,20 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
       }
     }
 
-    let totalFineAmount = 0
-    let totalSentenceMonths = 0
-    let maxStars = ''
-    let hasNoBail = false
-    let hasBail = false
-    let totalFinesRequiredCount = 0
-    let finesIssuedCount = 0
-
-    activeDetention.charges.forEach((c) => {
-      totalFineAmount += c.fineAmount || 0
-      totalSentenceMonths += c.sentenceMonths || 0
-      if (c.fineAmount > 0) {
-        totalFinesRequiredCount++
-        if (c.fineStatus === 'ISSUED') {
-          finesIssuedCount++
-        }
-      }
-      if (c.stars && c.stars.length > maxStars.length) maxStars = c.stars
-      if (c.bail?.toLowerCase().includes('no bail')) hasNoBail = true
-      else if (c.bail) hasBail = true
-    })
-
-    const unissuedCount = totalFinesRequiredCount - finesIssuedCount
-    const bailStatus = hasNoBail ? 'NO BAIL' : hasBail ? 'Bail Eligible' : '-'
+    // Fines and sentence follow this server's stacking rules (server.json → rules)
+    const totals = calculateTotals(activeDetention.charges, getActivePack().server.rules)
+    const totalFinesRequiredCount = activeDetention.charges.filter((c) => c.fineAmount > 0).length
+    const finesIssuedCount = activeDetention.charges.filter((c) => c.fineAmount > 0 && c.fineStatus === 'ISSUED').length
 
     return {
       totalFinesRequiredCount,
       finesIssuedCount,
-      unissuedCount,
-      totalFineAmount,
-      totalSentenceMonths,
-      maxStars: maxStars || '-',
-      bailStatus,
+      unissuedCount: totalFinesRequiredCount - finesIssuedCount,
+      totalFineAmount: totals.fineTotal,
+      totalSentenceMonths: totals.sentenceMonths,
+      sentenceCapped: totals.sentenceCapped,
+      maxStars: totals.maxStars || '-',
+      bailStatus: totals.bailStatus,
     }
   }, [activeDetention])
 
@@ -406,7 +295,7 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-bold text-sm font-mono uppercase tracking-wider text-on-surface">
-                    Arrest Command Center
+                    {t('arrest.title')}
                   </h2>
                   <span className="px-2 py-0.5 bg-primary/20 text-primary border border-primary/40 font-mono text-[10px] font-bold rounded">
                     {currentOrganization}
@@ -741,12 +630,12 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                   </div>
                   <div>
                     <div className="text-[10px] uppercase text-on-surface-variant">Total Fines</div>
-                    <div className="font-bold text-amber-400">${detentionTotals.totalFineAmount.toLocaleString()}</div>
+                    <div className="font-bold text-amber-400">{money(detentionTotals.totalFineAmount)}</div>
                   </div>
                   <div>
                     <div className="text-[10px] uppercase text-on-surface-variant">Total Sentence</div>
                     <div className="font-bold text-blue-400">
-                      {detentionTotals.totalSentenceMonths > 0 ? `${detentionTotals.totalSentenceMonths}m` : '-'}
+                      {detentionTotals.totalSentenceMonths > 0 ? `${detentionTotals.totalSentenceMonths}m${detentionTotals.sentenceCapped ? " (max)" : ""}` : "-"}
                     </div>
                   </div>
                 </div>
@@ -928,9 +817,9 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3 font-mono">
               <span className="text-4xl">🚨</span>
-              <h3 className="text-base font-bold text-on-surface">No Active Detention</h3>
+              <h3 className="text-base font-bold text-on-surface">{t('arrest.noDetention')}</h3>
               <p className="text-xs text-on-surface-variant max-w-md">
-                Take a subject into custody to initiate charge selection, fine issuing, and the custodial arrest workflow.
+                {t('arrest.noDetentionHint')}
               </p>
             </div>
           )
@@ -1006,22 +895,24 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                 onClick={() => copyWithFeedback(formatAllChargesText(), 'All Charges')}
                 className="px-3 py-1.5 bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-bold rounded border border-outline-variant transition-colors flex items-center gap-1"
               >
-                <span>📋</span> Copy All Charges
+                <span>📋</span> {t('arrest.copyCharges')}
               </button>
 
               <button
                 onClick={() => copyWithFeedback(formatIssuedFinesText(), 'Issued Fines')}
                 className="px-3 py-1.5 bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-bold rounded border border-outline-variant transition-colors flex items-center gap-1"
               >
-                <span>💰</span> Copy Fines
+                <span>💰</span> {t('arrest.copyFines')}
               </button>
 
               <button
                 onClick={() => copyWithFeedback(formatCompleteArrestRecord(), 'Complete Arrest Record')}
                 className="px-3 py-1.5 bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-bold rounded border border-outline-variant transition-colors flex items-center gap-1"
               >
-                <span>📜</span> Copy Arrest Record
+                <span>📜</span> {t('arrest.copyRecord')}
               </button>
+
+              <DiscordPostButton label={t('arrest.postRecord')} getText={() => formatCompleteArrestRecord()} />
             </div>
 
             <div className="flex items-center gap-2 ml-auto">
@@ -1047,7 +938,7 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                 }`}
               >
                 <span>🟢</span>
-                <span>{isFinalizing ? 'Finalizing...' : 'Finalize Arrest'}</span>
+                <span>{isFinalizing ? t('arrest.finalizing') : t('arrest.finalize')}</span>
               </button>
             </div>
           </footer>
@@ -1066,7 +957,7 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
               <div className="flex items-center justify-between border-b border-outline-variant pb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">📜</span>
-                  <h3 className="font-bold text-sm uppercase">Historical Arrest Record</h3>
+                  <h3 className="font-bold text-sm uppercase">{t('arrest.history')}</h3>
                 </div>
                 <button
                   onClick={() => setSelectedHistoricalArrest(null)}
@@ -1085,8 +976,9 @@ export default function ArrestCommandCenterModal({ isOpen, onClose }: ArrestComm
                   onClick={() => copyWithFeedback(formatCompleteArrestRecord(selectedHistoricalArrest), 'Arrest Record')}
                   className="px-4 py-1.5 bg-primary text-on-primary text-xs font-bold rounded"
                 >
-                  📋 Copy Record
+                  📋 {t('arrest.copyRecordShort')}
                 </button>
+                <DiscordPostButton getText={() => formatCompleteArrestRecord(selectedHistoricalArrest)} />
               </div>
             </div>
           </div>

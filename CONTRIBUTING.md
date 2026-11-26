@@ -4,7 +4,22 @@ This toolkit works for any GTA RP server. Everything specific to a server (depar
 radio commands, loadouts, laws, arrest rules) lives in a **server pack**, so adding a server means
 adding data, not changing code.
 
-There are two ways to get your server in.
+There are three ways to get your server in.
+
+## Fastest: share a pack file with your department
+
+A whole server (commands, rules, report templates and laws) fits in one `.pack.json` file.
+
+1. In the app, open Profile → RP Server → **➕ Add** → "Download <server-id>.pack.json" to get a starting file
+   (pick the Generic server first for a clean template).
+2. Edit the JSON (same format as the files in `servers/<id>/`, plus a `laws` array; build laws with the Law Importer).
+   Give it your own `server.id` (lowercase letters, numbers, dashes).
+3. Officers install it with **➕ Add → Install a pack file**. It works right away and stays in their browser.
+
+To list it for everyone, put the file in `public/community/<id>.pack.json`, add it to
+`public/community/directory.json` (`{ "id", "name", "description", "file" }`), run `npm run check-packs`
+and open a pull request. No code changes needed; it shows up under **➕ Add → Community servers**.
+From a pack folder you can generate the file with `npm run bundle-pack -- <id>`.
 
 ## Option A: no coding (server admins)
 
@@ -60,3 +75,16 @@ Needs Node.js 22.18 or newer.
 - Only add content your server allows to be shared (most servers publish their laws and SOPs publicly).
 - Keep commands generic enough for any officer on that server; personal macros belong in the app's own shortcuts.
 - Don't change another server's pack without that server's staff agreeing to it.
+
+## Translations
+
+The interface is available in English, Hindi, Russian, Portuguese (Brazil), Spanish and German
+(Profile → Language). Translations live in `i18n/<code>.ts`; every file must contain every key from
+`i18n/en.ts`, which `npx tsc --noEmit` enforces.
+
+- **Improve a translation:** edit the text in that language's file and open a pull request. Native
+  speakers are very welcome; the first versions were written without a native review.
+- **Add a language:** copy `i18n/de.ts` to `i18n/<code>.ts`, translate the values (keep `{placeholders}`
+  as they are), add the language to `i18n/languages.ts` and `i18n/dictionaries.ts`.
+- Server-specific text (commands, radio phrases, report templates, laws) comes from the server pack,
+  so a server can write those in its own language.

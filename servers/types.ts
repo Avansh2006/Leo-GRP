@@ -25,11 +25,49 @@ export interface ServerInfo {
   /** One line shown in the server picker */
   description?: string
   defaultDepartment: string
-  rules: {
-    /** Length of the arrest processing timer in minutes */
-    arrestTimerMinutes: number
-  }
+  rules: ServerRules
   features?: ServerFeatures
+  /** UI language used when the officer hasn't picked one, e.g. "en", "ru", "pt-BR" */
+  defaultLanguage?: string
+}
+
+export interface ServerRules {
+  /** Length of the arrest processing timer in minutes */
+  arrestTimerMinutes: number
+  /** IANA time zone used for times in reports, e.g. "UTC" or "Europe/Moscow" */
+  timeZone?: string
+  /** Locale used for month names in reports, e.g. "en-GB" */
+  locale?: string
+  /** Currency symbol for fines, e.g. "$" */
+  currencySymbol?: string
+  /** How multiple jail sentences combine: "sum" (add up, default) or "max" (longest one only) */
+  sentenceStacking?: 'sum' | 'max'
+  /** Upper limit on a combined sentence in months (0 / missing = no limit) */
+  maxSentenceMonths?: number
+}
+
+/** A report template: one string, or an array of lines. See utils/templates.ts for the syntax. */
+export type ReportTemplate = string | string[]
+
+export interface ReportsFile {
+  defaults: {
+    /** Statement read after charges at the end of an arrest */
+    docStatement: ReportTemplate
+    /** Rights read to a suspect on arrest */
+    rightsScript: ReportTemplate
+  }
+  templates: {
+    chargeSingle: ReportTemplate
+    chargesList: ReportTemplate
+    finesIssued: ReportTemplate
+    arrestScript: ReportTemplate
+    arrestRecord: ReportTemplate
+    /** End-of-shift summary built from the shift's fines and arrests */
+    shiftSummary: ReportTemplate
+    /** Duty report copied when ending duty on the Reports page */
+    shiftReport: ReportTemplate
+    evidenceReport: ReportTemplate
+  }
 }
 
 export interface Department {
@@ -150,4 +188,9 @@ export interface ServerPack {
   commands: CommandsFile
   presets: PresetsFile
   legislation: LegislationFile
+  reports: ReportsFile
+  /** "installed" = added by the officer from a pack file; laws then come from `laws` below */
+  source?: 'built-in' | 'installed'
+  /** Inline laws for installed packs (built-in packs load public/servers/<id>/laws.json) */
+  laws?: import('../utils/lawImport').LawEntry[]
 }

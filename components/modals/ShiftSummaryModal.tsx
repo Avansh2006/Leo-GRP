@@ -9,7 +9,9 @@ import React from 'react'
 import { ShiftRecord } from '@/utils/db'
 import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
+import { DiscordPostButton } from '@/components/DiscordPost'
 import { getDefaultDepartment } from '@/servers'
+import { useT } from '@/i18n/I18nProvider'
 
 interface ShiftSummaryModalProps {
   isOpen: boolean
@@ -18,6 +20,7 @@ interface ShiftSummaryModalProps {
 }
 
 export default function ShiftSummaryModal({ isOpen, onClose, shift }: ShiftSummaryModalProps) {
+  const t = useT()
   const { includeSuspectName, formatShiftReportText } = useDuty()
   const { showToast } = useToast()
 
@@ -28,7 +31,7 @@ export default function ShiftSummaryModal({ isOpen, onClose, shift }: ShiftSumma
     navigator.clipboard
       .writeText(text)
       .then(() => {
-        showToast('Shift report copied to clipboard!', 'success')
+        showToast(t('shift.copied'), 'success')
       })
       .catch((err) => {
         console.error('Failed to copy shift report:', err)
@@ -78,8 +81,9 @@ export default function ShiftSummaryModal({ isOpen, onClose, shift }: ShiftSumma
               className="px-3 py-1.5 bg-primary text-on-primary font-mono text-xs font-semibold rounded-lg hover:bg-primary-container flex items-center gap-1.5 transition-colors shadow-sm"
               title="Copy plain-text report"
             >
-              <span>📋</span> Copy Shift Report
+              <span>📋</span> {t('shift.copy')}
             </button>
+            <DiscordPostButton getText={() => formatShiftReportText(shift)} />
             <button
               onClick={onClose}
               className="text-on-surface-variant hover:text-on-surface p-1.5 rounded transition-colors text-sm"

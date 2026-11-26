@@ -10,7 +10,9 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useToast } from '@/components/ToastProvider'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useDuty } from '@/contexts/DutyContext'
+import { useSequence } from '@/contexts/SequenceContext'
 import { useServerPack, resolveCommandCategories, resolveRadioChannels } from '@/servers'
+import { useT } from '@/i18n/I18nProvider'
 
 interface Command {
   text: string
@@ -25,10 +27,12 @@ interface Category {
 }
 
 export default function BodycamCommandsPage() {
+  const t = useT()
   const { showToast } = useToast()
   const { currentOrganization, setCurrentOrganization } = useDuty()
   const { recordRecentItem, pinItem, unpinItem, isItemPinned } = useProductivity()
   const pack = useServerPack()
+  const { startSequence } = useSequence()
   const organizations = pack.departments.map((d) => d.id)
   const [expandedCategories, setExpandedCategories] = useState<string[]>(() =>
     pack.commands.categories.filter((c) => c.expanded).map((c) => c.id)
@@ -36,7 +40,7 @@ export default function BodycamCommandsPage() {
 
   const handleOrgChange = (newOrg: string) => {
     setCurrentOrganization(newOrg)
-    showToast(`Active organization set to ${newOrg}`, 'success')
+    showToast(t('bodycam.orgSet', { org: newOrg }), 'success')
   }
 
   // Commands and radio channels come from the active server pack, filled in for the active organization
@@ -90,14 +94,14 @@ export default function BodycamCommandsPage() {
       title: label || text.slice(0, 35),
       subtitle: text,
     })
-    showToast('Command copied to clipboard!', 'success')
+    showToast(t('bodycam.copied'), 'success')
   }
 
   const handleTogglePin = (command: Command, categoryName: string) => {
     const isPinned = isItemPinned('command', command.text)
     if (isPinned) {
       unpinItem('command', command.text)
-      showToast('Unpinned command', 'info')
+      showToast(t('bodycam.unpinned'), 'info')
     } else {
       pinItem({
         type: 'command',
@@ -106,7 +110,7 @@ export default function BodycamCommandsPage() {
         subtitle: `${currentOrganization} • ${categoryName}`,
         data: { text: command.text, org: currentOrganization },
       })
-      showToast('Pinned command to utility panel', 'success')
+      showToast(t('bodycam.pinned'), 'success')
     }
   }
 
@@ -116,19 +120,19 @@ export default function BodycamCommandsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-primary">{currentOrganization} Bodycam Commands</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-primary">{t('bodycam.title', { org: currentOrganization })}</h1>
             <span className="px-2 py-0.5 bg-primary/20 text-primary border border-primary/40 font-mono text-xs font-bold rounded">
-              {currentOrganization} ACTIVE
+              {t('bodycam.active', { org: currentOrganization })}
             </span>
           </div>
           <p className="text-on-surface-variant text-sm mt-1">
-            Standard Operating Procedure roleplay commands dynamically formatted for {currentOrganization}
+            {t('bodycam.subtitle', { org: currentOrganization })}
           </p>
         </div>
         
         {/* Organization Selector */}
         <div className="flex flex-col items-end gap-1">
-          <label className="text-xs font-mono uppercase text-on-surface-variant font-bold">Active Organization:</label>
+          <label className="text-xs font-mono uppercase text-on-surface-variant font-bold">{t('bodycam.activeOrg')}</label>
           <select
             value={currentOrganization}
             onChange={(e) => handleOrgChange(e.target.value)}
@@ -146,7 +150,7 @@ export default function BodycamCommandsPage() {
       {/* General Commands */}
       <div>
         <h2 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2 font-mono">
-          <span>📋 General SOP & Bodycam Commands</span>
+          <span>📋 {t('bodycam.general')}</span>
         </h2>
         <div className="space-y-3">
           {categories.map((category) => {
@@ -154,9 +158,22 @@ export default function BodycamCommandsPage() {
             
             return (
               <div key={category.id} className="card overflow-hidden border border-outline-variant rounded-lg">
+                <div className="flex items-stretch bg-surface-container-low">
+                {category.commands.length > 1 && (
+                  <button
+                    onClick={() => {
+                      startSequence({ title: category.name, steps: category.commands.map((c) => c.text) })
+                      showToast(t('seq.started'), 'success')
+                    }}
+                    className="px-3 text-[11px] font-mono font-bold text-primary hover:bg-primary/10 border-r border-outline-variant/60 flex-shrink-0"
+                    title={t('seq.buttonHint')}
+                  >
+                    ▶ {t('seq.button')}
+                  </button>
+                )}
                 <button
                   onClick={() => toggleCategory(category.id)}
-                  className="w-full px-5 py-3 flex items-center justify-between bg-surface-container-low hover:bg-surface-container transition-colors"
+                  className="flex-1 px-5 py-3 flex items-center justify-between hover:bg-surface-container transition-colors"
                 >
                   <h3 className="text-sm font-semibold text-on-surface flex items-center gap-2 font-mono">
                     <span>{category.name}</span>
@@ -177,6 +194,7 @@ export default function BodycamCommandsPage() {
                     />
                   </svg>
                 </button>
+                </div>
 
                 {isExpanded && (
                   <div className="px-5 pb-4 pt-2 space-y-2.5 bg-surface-container-lowest border-t border-outline-variant/60">
@@ -199,16 +217,16 @@ export default function BodycamCommandsPage() {
                                     ? 'text-primary bg-primary/10'
                                     : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
                                 }`}
-                                title={isPinned ? 'Unpin Command' : 'Pin to Utility Panel'}
+                                title={isPinned ? t('bodycam.unpin') : t('bodycam.pin')}
                               >
                                 📌
                               </button>
                               <button
                                 onClick={() => handleCopy(command.text, command.label)}
                                 className="px-2 py-1 text-xs font-mono font-bold bg-primary hover:bg-primary-container text-on-primary rounded transition-colors flex items-center gap-1 shadow-sm"
-                                title="Copy Command"
+                                title={t('bodycam.copyCommand')}
                               >
-                                <span>📋</span> Copy
+                                <span>📋</span> {t('common.copy')}
                               </button>
                             </div>
                           </div>
@@ -226,7 +244,7 @@ export default function BodycamCommandsPage() {
       {/* Department Messages */}
       <div>
         <h2 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2 font-mono">
-          <span>📩 Inter-Department Radio Communications</span>
+          <span>📩 {t('bodycam.radio')}</span>
         </h2>
         <div className="space-y-3">
           {departmentMessages.map((category) => {
@@ -275,16 +293,16 @@ export default function BodycamCommandsPage() {
                                   ? 'text-primary bg-primary/10'
                                   : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
                               }`}
-                              title={isPinned ? 'Unpin Command' : 'Pin to Utility Panel'}
+                              title={isPinned ? t('bodycam.unpin') : t('bodycam.pin')}
                             >
                               📌
                             </button>
                             <button
                               onClick={() => handleCopy(command.text)}
                               className="px-2 py-1 text-xs font-mono font-bold bg-primary hover:bg-primary-container text-on-primary rounded transition-colors flex items-center gap-1 shadow-sm"
-                              title="Copy Command"
+                              title={t('bodycam.copyCommand')}
                             >
-                              <span>📋</span> Copy
+                              <span>📋</span> {t('common.copy')}
                             </button>
                           </div>
                         </div>

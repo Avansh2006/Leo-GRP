@@ -7,6 +7,8 @@ import { useProductivity } from '@/contexts/ProductivityContext'
 import { useToast } from '@/components/ToastProvider'
 import { QuickAccessItem } from '@/utils/db'
 import { useFeature } from '@/servers'
+import PwaSupport from '@/components/PwaSupport'
+import { useT } from '@/i18n/I18nProvider'
 
 interface SidebarProps {
   mobileOpen: boolean
@@ -14,6 +16,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
+  const t = useT()
   const assistantEnabled = useFeature('legalAssistant')
   const pathname = usePathname()
   const { showToast } = useToast()
@@ -49,7 +52,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
 
   const navItems = [
     {
-      name: 'Dashboard',
+      name: t('nav.dashboard'),
       href: '/',
       icon: (
         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,7 +61,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
       ),
     },
     {
-      name: 'Commands',
+      name: t('nav.commands'),
       href: '/bodycam-commands',
       icon: (
         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,7 +70,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
       ),
     },
     {
-      name: 'Legislation',
+      name: t('nav.legislation'),
       href: '/patrolman-guide',
       icon: (
         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,7 +79,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
       ),
     },
     {
-      name: 'Reports',
+      name: t('nav.reports'),
       href: '/reports',
       icon: (
         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,7 +88,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
       ),
     },
     {
-      name: 'Profile',
+      name: t('nav.profile'),
       href: '/profile',
       icon: (
         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -147,7 +150,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
           <button
             onClick={toggleCollapse}
             className="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors hidden lg:block"
-            title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            title={isCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
           >
             <svg
               className={`w-4 h-4 transition-transform ${isCollapsed ? 'rotate-180' : ''}`}
@@ -166,7 +169,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
             {!isCollapsed && (
               <div className="px-4 mb-2">
                 <span className="font-mono text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                  NAVIGATION
+                  {t('nav.navigation')}
                 </span>
               </div>
             )}
@@ -199,25 +202,25 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
               <div className="mt-6 pt-4 border-t border-outline-variant">
                 <div className="px-4 mb-2 flex items-center justify-between">
                   <span className="font-mono text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    QUICK ACCESS
+                    {t('sidebar.quickAccess')}
                   </span>
                   <button
                     onClick={() => setIsAddShortcutOpen(true)}
                     className="text-[10px] font-mono text-primary hover:text-primary-container px-1.5 py-0.5 rounded hover:bg-surface-container transition-colors"
-                    title="Add Shortcut"
+                    title={t('sidebar.addShortcut')}
                   >
-                    + Add
+                    + {t('sidebar.add')}
                   </button>
                 </div>
 
                 {quickAccessItems.length === 0 ? (
                   <div className="px-4 py-3 text-center">
-                    <p className="text-xs text-on-surface-variant mb-2">No shortcuts yet</p>
+                    <p className="text-xs text-on-surface-variant mb-2">{t('sidebar.noShortcuts')}</p>
                     <button
                       onClick={() => setIsAddShortcutOpen(true)}
                       className="text-xs font-mono text-primary hover:underline"
                     >
-                      + Add Shortcut
+                      + {t('sidebar.addShortcut')}
                     </button>
                   </div>
                 ) : (
@@ -256,7 +259,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
                                 reorderQuickAccess(qa.id, 'up')
                               }}
                               className="p-0.5 text-on-surface-variant hover:text-on-surface text-[10px]"
-                              title="Move Up"
+                              title={t('sidebar.moveUp')}
                             >
                               ▲
                             </button>
@@ -268,7 +271,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
                                 reorderQuickAccess(qa.id, 'down')
                               }}
                               className="p-0.5 text-on-surface-variant hover:text-on-surface text-[10px]"
-                              title="Move Down"
+                              title={t('sidebar.moveDown')}
                             >
                               ▼
                             </button>
@@ -279,7 +282,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
                               removeQuickAccessItem(qa.id)
                             }}
                             className="p-0.5 text-on-surface-variant hover:text-error text-[10px]"
-                            title="Remove Shortcut"
+                            title={t('sidebar.removeShortcut')}
                           >
                             ✕
                           </button>
@@ -294,6 +297,9 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
 
           {/* Footer Support / Legislation Assistant */}
           <div className="p-3 border-t border-outline-variant bg-surface-container-lowest">
+            <div className={isCollapsed ? 'mb-1' : 'mb-2'}>
+              <PwaSupport compact={isCollapsed} />
+            </div>
             {!isCollapsed ? (
               <div className="flex flex-col gap-2">
                 {assistantEnabled && (
@@ -304,24 +310,24 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
                   <div className="flex items-center gap-2 truncate">
                     <span className="text-sm">⚖️</span>
                     <span className="font-mono text-xs text-primary font-semibold truncate group-hover:underline">
-                      AI Assistant
+                      {t('sidebar.aiAssistant')}
                     </span>
                   </div>
                   <span className="text-[9px] font-mono uppercase bg-primary text-on-primary px-1.5 py-0.2 rounded font-bold">
-                    Ask
+                    {t('sidebar.ask')}
                   </span>
                 </button>
                 )}
                 <div className="flex items-center justify-between px-1 text-[10px] font-mono text-on-surface-variant">
                   <span>LEO-GRP v2.0</span>
-                  <span className="text-secondary">● 100% Local</span>
+                  <span className="text-secondary">● {t('sidebar.local')}</span>
                 </div>
               </div>
             ) : assistantEnabled ? (
               <button
                 onClick={() => openAssistant()}
                 className="w-full text-center text-sm p-1 rounded hover:bg-surface-container-high transition-colors"
-                title="Open Legislation Assistant"
+                title={t('sidebar.openAssistant')}
               >
                 ⚖️
               </button>

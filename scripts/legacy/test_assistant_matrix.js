@@ -2,10 +2,10 @@ const fs = require('fs')
 const path = require('path')
 
 // Load mock DOM or parse files directly for test
-const penalHtml = fs.readFileSync(path.join(__dirname, '../servers/grandrp-en3/sources/Penal Code.html'), 'utf-8')
-const trafficHtml = fs.readFileSync(path.join(__dirname, '../servers/grandrp-en3/sources/Traffic Codes.html'), 'utf-8')
-const article7Html = fs.readFileSync(path.join(__dirname, '../servers/grandrp-en3/sources/Article 7.html'), 'utf-8')
-const procHtml = fs.readFileSync(path.join(__dirname, '../servers/grandrp-en3/sources/Arresting Procedure.html'), 'utf-8')
+const penalHtml = fs.readFileSync(path.join(__dirname, '../../servers/grandrp-en3/sources/Penal Code.html'), 'utf-8')
+const trafficHtml = fs.readFileSync(path.join(__dirname, '../../servers/grandrp-en3/sources/Traffic Codes.html'), 'utf-8')
+const article7Html = fs.readFileSync(path.join(__dirname, '../../servers/grandrp-en3/sources/Article 7.html'), 'utf-8')
+const procHtml = fs.readFileSync(path.join(__dirname, '../../servers/grandrp-en3/sources/Arresting Procedure.html'), 'utf-8')
 
 // Minimal DOM parser for Node test environment
 function extractRows(html) {

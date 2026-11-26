@@ -15,6 +15,8 @@ import ProfileEditModal from '@/components/modals/ProfileEditModal'
 import { useProductivity } from '@/contexts/ProductivityContext'
 import { useDuty } from '@/contexts/DutyContext'
 import { useFeature } from '@/servers'
+import SequenceBar from './SequenceBar'
+import NoticeBanners from './NoticeBanners'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -42,6 +44,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Global Active Detention Banner */}
         <ActiveDetentionBanner />
 
+        {/* Laws-updated notice and backup reminder */}
+        <NoticeBanners />
+
         {/* Content Workspace + Right Utility Panel */}
         <div className="flex-1 flex min-h-0 overflow-hidden relative">
           {/* Main Page Workspace */}
@@ -53,6 +58,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <UtilityPanel />
         </div>
       </div>
+
+      {/* Step-through command sequence */}
+      <SequenceBar />
 
       {/* Global Modals */}
       <OnboardingModal />

@@ -2,8 +2,8 @@ const fs = require('fs')
 const path = require('path')
 
 // Load legislation data
-const penalHtml = fs.readFileSync(path.join(__dirname, '../servers/grandrp-en3/sources/Penal Code.html'), 'utf-8')
-const trafficHtml = fs.readFileSync(path.join(__dirname, '../servers/grandrp-en3/sources/Traffic Codes.html'), 'utf-8')
+const penalHtml = fs.readFileSync(path.join(__dirname, '../../servers/grandrp-en3/sources/Penal Code.html'), 'utf-8')
+const trafficHtml = fs.readFileSync(path.join(__dirname, '../../servers/grandrp-en3/sources/Traffic Codes.html'), 'utf-8')
 
 function extractRows(html) {
   const rows = []
