@@ -11,7 +11,9 @@ import { UserProfileProvider } from '@/contexts/UserProfileContext'
 import { ProductivityProvider } from '@/contexts/ProductivityContext'
 import AppShell from '@/components/shell/AppShell'
 import { SequenceProvider } from '@/contexts/SequenceContext'
-import { SERVER_COOKIE, DEFAULT_SERVER_ID } from '@/servers/registry'
+import { SERVER_COOKIE, DEFAULT_SERVER_ID, SERVER_PACKS } from '@/servers/registry'
+import { I18nProvider } from '@/i18n/I18nProvider'
+import { LANG_COOKIE, DEFAULT_LANG, isLang } from '@/i18n/languages'
 import { PACK_ID_RE } from '@/utils/packValidation'
 import { ServerProvider } from '@/servers/ServerContext'
 
@@ -38,10 +40,16 @@ export default function RootLayout({
   // Built-in ids render on the server; ids of packs installed in the browser are resolved client-side
   const serverId = cookieServer && PACK_ID_RE.test(cookieServer) ? cookieServer : DEFAULT_SERVER_ID
 
+  // Interface language: cookie, else the server pack's default, else English
+  const cookieLang = cookies().get(LANG_COOKIE)?.value
+  const packLang = SERVER_PACKS[serverId]?.server.defaultLanguage
+  const lang = isLang(cookieLang) ? cookieLang : isLang(packLang) ? packLang : DEFAULT_LANG
+
   return (
-    <html lang="en" className="dark">
+    <html lang={lang} className="dark">
       <body className={`${inter.className} bg-background text-on-surface antialiased overflow-hidden`}>
         <ServerProvider serverId={serverId}>
+          <I18nProvider initialLang={lang} hasCookie={isLang(cookieLang)} serverDefault={packLang}>
           <ThemeProvider>
             <NotificationProvider>
               <UserProfileProvider>
@@ -59,6 +67,7 @@ export default function RootLayout({
               </UserProfileProvider>
             </NotificationProvider>
           </ThemeProvider>
+          </I18nProvider>
         </ServerProvider>
         <Analytics />
       </body>

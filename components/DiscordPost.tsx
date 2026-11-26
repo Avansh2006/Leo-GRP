@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { scopedStorage } from '@/servers'
 import { useToast } from '@/components/ToastProvider'
 import { isValidWebhookUrl, postToDiscord } from '@/utils/discord'
+import { useT } from '@/i18n/I18nProvider'
 
 const WEBHOOK_KEY = 'leogrp_discord_webhook'
 const USERNAME_KEY = 'leogrp_discord_username'
@@ -30,13 +31,14 @@ function useDiscordSettings() {
 /** "Post to Discord" button; hidden until a webhook is set up on the Profile page. */
 export function DiscordPostButton({
   getText,
-  label = 'Post to Discord',
+  label,
   className,
 }: {
   getText: () => string
   label?: string
   className?: string
 }) {
+  const t = useT()
   const { webhook, username } = useDiscordSettings()
   const { showToast } = useToast()
   const [busy, setBusy] = useState(false)
@@ -50,9 +52,9 @@ export function DiscordPostButton({
         setBusy(true)
         try {
           const n = await postToDiscord(webhook, getText(), { username })
-          showToast(n > 1 ? `Posted to Discord (${n} messages)` : 'Posted to Discord', 'success')
+          showToast(n > 1 ? t('discord.postedMany', { n }) : t('discord.posted'), 'success')
         } catch (e) {
-          showToast(e instanceof Error ? e.message : 'Could not post to Discord', 'error')
+          showToast(e instanceof Error ? e.message : t('discord.postFailed'), 'error')
         } finally {
           setBusy(false)
         }
@@ -61,15 +63,16 @@ export function DiscordPostButton({
         className ||
         'px-3 py-1.5 text-xs font-mono font-bold rounded bg-[#5865F2] hover:bg-[#4752c4] text-white flex items-center gap-1.5 disabled:opacity-60'
       }
-      title="Send this report to your department's Discord channel"
+      title={t('discord.postHint')}
     >
-      <span>💬</span> {busy ? 'Posting…' : label}
+      <span>💬</span> {busy ? t('discord.posting') : label || t('discord.post')}
     </button>
   )
 }
 
 /** Profile-page settings card for the Discord webhook. */
 export function DiscordSettings() {
+  const t = useT()
   const { showToast } = useToast()
   const [webhook, setWebhook] = useState('')
   const [username, setUsername] = useState('')
@@ -85,7 +88,7 @@ export function DiscordSettings() {
 
   const save = () => {
     if (!valid) {
-      showToast('That is not a Discord webhook link', 'error')
+      showToast(t('discord.invalid'), 'error')
       return
     }
     if (webhook.trim()) scopedStorage.setItem(WEBHOOK_KEY, webhook.trim())
@@ -93,35 +96,33 @@ export function DiscordSettings() {
     if (username.trim()) scopedStorage.setItem(USERNAME_KEY, username.trim())
     else scopedStorage.removeItem(USERNAME_KEY)
     window.dispatchEvent(new Event(CHANGED_EVENT))
-    showToast(webhook.trim() ? 'Discord webhook saved' : 'Discord posting turned off', 'success')
+    showToast(webhook.trim() ? t('discord.saved') : t('discord.off'), 'success')
   }
 
   return (
     <div className="space-y-2 text-xs font-mono">
       <p className="text-on-surface-variant">
-        Post shift, arrest and evidence reports straight to your department&apos;s Discord channel. In Discord: channel settings →
-        Integrations → Webhooks → New Webhook → Copy Webhook URL. The link stays in this browser only and is used only when you
-        click &quot;Post to Discord&quot;.
+        {t('discord.help')}
       </p>
       <input
         type="url"
         value={webhook}
         onChange={(e) => setWebhook(e.target.value)}
         placeholder="https://discord.com/api/webhooks/…"
-        aria-label="Discord webhook URL"
+        aria-label={t('discord.urlLabel')}
         className={`w-full px-2 py-1.5 bg-surface-container-lowest border rounded text-xs text-on-surface ${valid ? 'border-outline-variant' : 'border-error'}`}
       />
-      {!valid && <p className="text-error text-[11px]">Paste the full webhook link that starts with https://discord.com/api/webhooks/</p>}
+      {!valid && <p className="text-error text-[11px]">{t('discord.invalidHint')}</p>}
       <input
         value={username}
         onChange={(e) => setUsername(e.target.value)}
-        placeholder="Post as (optional, e.g. your officer name)"
-        aria-label="Discord display name"
+        placeholder={t('discord.namePlaceholder')}
+        aria-label={t('discord.nameLabel')}
         className="w-full px-2 py-1.5 bg-surface-container-lowest border border-outline-variant rounded text-xs text-on-surface"
       />
       <div className="flex flex-wrap gap-2">
         <button onClick={save} className="px-3 py-1.5 rounded bg-primary text-on-primary font-bold">
-          Save
+          {t('common.save')}
         </button>
         <button
           disabled={!webhook.trim() || !valid || testing}
@@ -129,16 +130,16 @@ export function DiscordSettings() {
             setTesting(true)
             try {
               await postToDiscord(webhook, '✅ LEO Toolkit is connected to this channel.', { username })
-              showToast('Test message sent. Check your Discord channel', 'success')
+              showToast(t('discord.testSent'), 'success')
             } catch (e) {
-              showToast(e instanceof Error ? e.message : 'Test failed', 'error')
+              showToast(e instanceof Error ? e.message : t('discord.testFailed'), 'error')
             } finally {
               setTesting(false)
             }
           }}
           className="px-3 py-1.5 rounded border border-outline-variant text-on-surface disabled:opacity-50"
         >
-          {testing ? 'Sending…' : 'Send test message'}
+          {testing ? t('discord.sending') : t('discord.test')}
         </button>
       </div>
     </div>

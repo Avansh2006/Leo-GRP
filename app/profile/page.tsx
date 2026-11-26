@@ -11,8 +11,11 @@ import { aiModelProvider, AIModelStatus, RECOMMENDED_LOCAL_MODEL } from '@/utils
 import { getDefaultDepartment, scopedStorage, useServerPack, useFeature } from '@/servers'
 import ServerPicker from '@/components/ServerPicker'
 import { DiscordSettings } from '@/components/DiscordPost'
+import { useT } from '@/i18n/I18nProvider'
+import LanguagePicker from '@/components/LanguagePicker'
 
 export default function ProfilePage() {
+  const t = useT()
   const pack = useServerPack()
   const assistantEnabled = useFeature('legalAssistant')
   const {
@@ -442,21 +445,29 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
           {/* RP Server */}
-          <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2 md:col-span-2">
+          <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2">
             <div className="text-on-surface-variant font-bold uppercase text-[11px]">
-              RP Server:
+              {t('server.label')}:
             </div>
             <ServerPicker compact />
             <p className="text-[10px] text-on-surface-variant">
-              Server not listed? Admins can convert their law sheet with the{' '}
-              <a href="/tools/law-importer" className="text-primary underline">Law Importer</a>.
+              {t('server.notListed')}{' '}
+              <a href="/tools/law-importer" className="text-primary underline">{t('server.lawImporter')}</a>
             </p>
+          </div>
+
+          {/* Interface language */}
+          <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2">
+            <div className="text-on-surface-variant font-bold uppercase text-[11px]">
+              {t('language.label')}:
+            </div>
+            <LanguagePicker />
           </div>
 
           {/* Active Agency / Org */}
           <div className="p-3.5 bg-surface-container rounded-lg border border-outline-variant space-y-2">
             <div className="text-on-surface-variant font-bold uppercase text-[11px]">
-              Active Organization / Agency:
+              {t('profile.activeOrg')}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {pack.departments.map((d) => d.id).map((org) => (
@@ -477,7 +488,7 @@ export default function ProfilePage() {
               ))}
             </div>
             <p className="text-[10px] text-on-surface-variant">
-              Applies dynamically to macro commands, bodycam cloud uploads, and duty logs.
+              {t('profile.activeOrgHint')}
             </p>
           </div>
 
@@ -567,7 +578,7 @@ export default function ProfilePage() {
       {/* Discord reports */}
       <div className="card mb-6 border border-outline-variant bg-surface-container-low">
         <h2 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2 font-mono">
-          <span>💬</span> Post Reports to Discord
+          <span>💬</span> {t('discord.title')}
         </h2>
         <DiscordSettings />
       </div>

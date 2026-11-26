@@ -11,8 +11,10 @@ import { useDuty } from '@/contexts/DutyContext'
 import { useToast } from '@/components/ToastProvider'
 import { useServerPack } from '@/servers'
 import ServerPicker from '@/components/ServerPicker'
+import { useT } from '@/i18n/I18nProvider'
 
 export default function OnboardingModal() {
+  const t = useT()
   const pack = useServerPack()
   const ORGANIZATIONS = pack.departments.map((d) => ({ id: d.id, name: `${d.id} — ${d.name}`, icon: d.icon, short: d.id }))
   const { profile, completeOnboarding, isOnboardingModalOpen, setIsOnboardingModalOpen } = useUserProfile()
@@ -50,15 +52,15 @@ export default function OnboardingModal() {
     setValidationError(null)
 
     if (!name.trim()) {
-      setValidationError('Officer Name is required to initialize your profile.')
+      setValidationError(t('onboarding.errName'))
       return
     }
     if (!organization.trim()) {
-      setValidationError('Please select an active Organization.')
+      setValidationError(t('onboarding.errOrg'))
       return
     }
     if (!passportNumber.trim()) {
-      setValidationError('Passport / Player ID is required.')
+      setValidationError(t('onboarding.errPassport'))
       return
     }
 
@@ -77,11 +79,11 @@ export default function OnboardingModal() {
         callsign: callsign.trim() || undefined,
       })
       setCurrentOrganization(organization.trim())
-      showToast(`Profile initialized: Officer ${name.trim()} (${organization.trim()})`, 'success')
+      showToast(t('onboarding.toastDone', { name: name.trim(), org: organization.trim() }), 'success')
       setStep('form')
     } catch (err: any) {
       setValidationError(`Failed to save profile: ${err.message}`)
-      showToast('Error saving profile', 'error')
+      showToast(t('onboarding.toastError'), 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -105,11 +107,11 @@ export default function OnboardingModal() {
           <div className="flex items-center gap-2.5">
             <span className="flex h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
             <span className="font-mono text-xs font-bold uppercase tracking-widest text-primary">
-              {step === 'form' ? 'OPERATIONS CENTER INITIALIZATION' : 'IDENTITY VERIFICATION'}
+              {step === 'form' ? t('onboarding.stepSetup') : t('onboarding.stepVerify')}
             </span>
           </div>
           <span className="font-mono text-[10px] bg-primary/10 text-primary px-2.5 py-0.5 rounded-full border border-primary/20 uppercase font-semibold">
-            {step === 'form' ? 'Step 1 of 2' : 'Step 2 of 2'}
+            {step === 'form' ? t('onboarding.step', { n: 1 }) : t('onboarding.step', { n: 2 })}
           </span>
         </div>
 
@@ -118,10 +120,10 @@ export default function OnboardingModal() {
           <form onSubmit={handleNext} className="p-6 space-y-5">
             <div>
               <h2 className="text-xl font-black tracking-tight text-on-surface font-sans">
-                Welcome to LEO-GRP
+                {t('onboarding.welcome')}
               </h2>
               <p className="text-xs text-on-surface-variant mt-1">
-                Configure your Operations Center identity. This will personalize commands, arrest statements, and duty logs.
+                {t('onboarding.intro')}
               </p>
             </div>
 
@@ -139,7 +141,7 @@ export default function OnboardingModal() {
               {/* Officer Name */}
               <div>
                 <label className="block text-xs font-mono font-semibold text-on-surface mb-1.5 uppercase tracking-wider">
-                  Officer Full Name <span className="text-primary">*</span>
+                  {t('onboarding.name')} <span className="text-primary">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-on-surface-variant text-sm">👤</span>
@@ -147,7 +149,7 @@ export default function OnboardingModal() {
                     type="text"
                     required
                     autoFocus
-                    placeholder="e.g. Avansh Vukovic"
+                    placeholder={t('onboarding.namePlaceholder')}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm text-on-surface font-sans placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary transition-colors"
@@ -158,7 +160,7 @@ export default function OnboardingModal() {
               {/* Organization Selector */}
               <div>
                 <label className="block text-xs font-mono font-semibold text-on-surface mb-1.5 uppercase tracking-wider">
-                  Active Department / Organization <span className="text-primary">*</span>
+                  {t('onboarding.department')} <span className="text-primary">*</span>
                 </label>
                 <select
                   required
@@ -173,21 +175,21 @@ export default function OnboardingModal() {
                   ))}
                 </select>
                 <p className="text-[11px] text-on-surface-variant/80 mt-1 font-mono">
-                  Commands and radio channels will automatically adjust to this organization.
+                  {t('onboarding.departmentHint')}
                 </p>
               </div>
 
               {/* Passport / ID */}
               <div>
                 <label className="block text-xs font-mono font-semibold text-on-surface mb-1.5 uppercase tracking-wider">
-                  Passport / Player ID <span className="text-primary">*</span>
+                  {t('onboarding.passport')} <span className="text-primary">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-on-surface-variant text-sm">🪪</span>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 129253"
+                    placeholder={t('onboarding.passportPlaceholder')}
                     value={passportNumber}
                     onChange={(e) => setPassportNumber(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm text-on-surface font-mono placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary transition-colors"
@@ -203,7 +205,7 @@ export default function OnboardingModal() {
                   className="text-xs text-primary hover:text-primary/80 font-mono font-medium flex items-center gap-1.5 transition-colors"
                 >
                   <span>{showOptionalFields ? '▼' : '▶'}</span>
-                  <span>Operational Credentials (Badge, Rank, Callsign)</span>
+                  <span>{t('onboarding.optional')}</span>
                 </button>
 
                 {showOptionalFields && (
@@ -211,11 +213,11 @@ export default function OnboardingModal() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[11px] font-mono text-on-surface-variant mb-1 uppercase">
-                          Badge Number
+                          {t('onboarding.badge')}
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. 402"
+                          placeholder={t('onboarding.badgePlaceholder')}
                           value={badgeNumber}
                           onChange={(e) => setBadgeNumber(e.target.value)}
                           className="w-full px-2.5 py-1.5 bg-surface-container-lowest border border-outline-variant rounded text-xs text-on-surface font-mono focus:outline-none focus:border-primary"
@@ -223,11 +225,11 @@ export default function OnboardingModal() {
                       </div>
                       <div>
                         <label className="block text-[11px] font-mono text-on-surface-variant mb-1 uppercase">
-                          Rank
+                          {t('onboarding.rank')}
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. Captain III"
+                          placeholder={t('onboarding.rankPlaceholder')}
                           value={rank}
                           onChange={(e) => setRank(e.target.value)}
                           className="w-full px-2.5 py-1.5 bg-surface-container-lowest border border-outline-variant rounded text-xs text-on-surface font-sans focus:outline-none focus:border-primary"
@@ -236,11 +238,11 @@ export default function OnboardingModal() {
                     </div>
                     <div>
                       <label className="block text-[11px] font-mono text-on-surface-variant mb-1 uppercase">
-                        Unit Callsign
+                        {t('onboarding.callsign')}
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. 1-ADAM-12"
+                        placeholder={t('onboarding.callsignPlaceholder')}
                         value={callsign}
                         onChange={(e) => setCallsign(e.target.value)}
                         className="w-full px-2.5 py-1.5 bg-surface-container-lowest border border-outline-variant rounded text-xs text-on-surface font-mono focus:outline-none focus:border-primary"
@@ -257,7 +259,7 @@ export default function OnboardingModal() {
                 type="submit"
                 className="px-5 py-2.5 bg-primary text-on-primary font-mono font-bold text-xs uppercase tracking-wider rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center gap-2"
               >
-                <span>Continue</span>
+                <span>{t('common.continue')}</span>
                 <span>→</span>
               </button>
             </div>
@@ -270,10 +272,10 @@ export default function OnboardingModal() {
                 ✓
               </div>
               <h2 className="text-xl font-black tracking-tight text-on-surface font-sans">
-                You're all set.
+                {t('onboarding.done')}
               </h2>
               <p className="text-xs text-on-surface-variant font-mono">
-                LEO-GRP Operations Center is ready for duty.
+                {t('onboarding.ready')}
               </p>
             </div>
 
@@ -286,7 +288,7 @@ export default function OnboardingModal() {
                   </div>
                   <div>
                     <div className="font-bold text-sm text-on-surface font-sans flex items-center gap-1.5">
-                      <span>Officer {name.trim()}</span>
+                      <span>{t('common.officerName', { name: name.trim() })}</span>
                       {rank.trim() && (
                         <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
                           {rank.trim()}
@@ -294,7 +296,7 @@ export default function OnboardingModal() {
                       )}
                     </div>
                     <div className="text-xs text-on-surface-variant font-mono">
-                      Passport #{passportNumber.trim()}
+                      {t('common.passportNo', { n: passportNumber.trim() })}
                     </div>
                   </div>
                 </div>
@@ -307,11 +309,11 @@ export default function OnboardingModal() {
 
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                 <div className="bg-surface-container-low p-2 rounded border border-outline-variant/40">
-                  <span className="text-on-surface-variant text-[10px] block uppercase">Badge Number</span>
+                  <span className="text-on-surface-variant text-[10px] block uppercase">{t('onboarding.badge')}</span>
                   <span className="text-on-surface font-bold">{badgeNumber.trim() || 'N/A'}</span>
                 </div>
                 <div className="bg-surface-container-low p-2 rounded border border-outline-variant/40">
-                  <span className="text-on-surface-variant text-[10px] block uppercase">Unit Callsign</span>
+                  <span className="text-on-surface-variant text-[10px] block uppercase">{t('onboarding.callsign')}</span>
                   <span className="text-on-surface font-bold">{callsign.trim() || 'N/A'}</span>
                 </div>
               </div>
@@ -324,7 +326,7 @@ export default function OnboardingModal() {
                 onClick={() => setStep('form')}
                 className="px-4 py-2 text-xs font-mono text-on-surface-variant hover:text-on-surface transition-colors"
               >
-                ← Back to Edit
+                ← {t('onboarding.back')}
               </button>
 
               <button
@@ -333,7 +335,7 @@ export default function OnboardingModal() {
                 disabled={isSubmitting}
                 className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-lg shadow-lg hover:shadow-emerald-500/25 transition-all flex items-center gap-2"
               >
-                <span>{isSubmitting ? 'Configuring...' : 'Enter Operations Center'}</span>
+                <span>{isSubmitting ? t('onboarding.saving') : t('onboarding.enter')}</span>
                 <span>🚀</span>
               </button>
             </div>

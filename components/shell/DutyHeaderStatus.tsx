@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useDuty } from '@/contexts/DutyContext'
+import { useT } from '@/i18n/I18nProvider'
 
 export default function DutyHeaderStatus() {
+  const t = useT()
   const { isOnDuty, currentDutyStart, currentShiftArrests, currentShiftFines, currentShiftFinesAmount } = useDuty()
   const [elapsedString, setElapsedString] = useState('00:00:00')
 
@@ -38,11 +40,11 @@ export default function DutyHeaderStatus() {
       <Link
         href="/reports"
         className="flex items-center gap-2 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant px-3 py-1.5 rounded transition-colors group"
-        title="Click to go to Reports and start duty"
+        title={t('duty.offHint')}
       >
         <span className="w-2 h-2 rounded-full bg-outline"></span>
         <span className="font-mono text-[10px] font-bold tracking-wider text-on-surface-variant group-hover:text-on-surface uppercase">
-          OFF DUTY
+          {t('duty.off')}
         </span>
       </Link>
     )
@@ -52,11 +54,11 @@ export default function DutyHeaderStatus() {
     <Link
       href="/reports"
       className="flex items-center gap-2.5 bg-surface-container-lowest hover:bg-surface-container border border-secondary/40 px-3 py-1.5 rounded transition-colors group"
-      title="Active Shift - Click to manage duty"
+      title={t('duty.onHint')}
     >
       <span className="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(78,222,163,0.6)] animate-pulse"></span>
       <span className="font-mono text-[10px] font-bold tracking-widest text-secondary uppercase">
-        ON DUTY
+        {t('duty.on')}
       </span>
       <span className="font-mono text-xs text-on-surface font-semibold pl-1 border-l border-outline-variant">
         {elapsedString}

@@ -75,3 +75,16 @@ Needs Node.js 22.18 or newer.
 - Only add content your server allows to be shared (most servers publish their laws and SOPs publicly).
 - Keep commands generic enough for any officer on that server; personal macros belong in the app's own shortcuts.
 - Don't change another server's pack without that server's staff agreeing to it.
+
+## Translations
+
+The interface is available in English, Hindi, Russian, Portuguese (Brazil), Spanish and German
+(Profile → Language). Translations live in `i18n/<code>.ts`; every file must contain every key from
+`i18n/en.ts`, which `npx tsc --noEmit` enforces.
+
+- **Improve a translation:** edit the text in that language's file and open a pull request. Native
+  speakers are very welcome; the first versions were written without a native review.
+- **Add a language:** copy `i18n/de.ts` to `i18n/<code>.ts`, translate the values (keep `{placeholders}`
+  as they are), add the language to `i18n/languages.ts` and `i18n/dictionaries.ts`.
+- Server-specific text (commands, radio phrases, report templates, laws) comes from the server pack,
+  so a server can write those in its own language.

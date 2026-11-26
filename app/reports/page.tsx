@@ -12,6 +12,7 @@ import { DiscordPostButton } from '@/components/DiscordPost'
 import { ShiftRecord } from '@/utils/db'
 import ShiftSummaryModal from '@/components/modals/ShiftSummaryModal'
 import StartDetentionModal from '@/components/modals/StartDetentionModal'
+import { useT } from '@/i18n/I18nProvider'
 
 const VESTS = [
   'Vest Level 1',
@@ -39,6 +40,7 @@ const WEAPONS = [
 ]
 
 export default function ReportsPage() {
+  const t = useT()
   const { showToast } = useToast()
   const pack = useServerPack()
   const { profile } = useUserProfile()
@@ -156,7 +158,7 @@ export default function ReportsPage() {
 
   const buildEvidenceReport = (): string | null => {
     if (!date || !time || !description) {
-      showToast('Please fill in Date, Time, and Description', 'error')
+      showToast(t('reports.errEvidence'), 'error')
       return null
     }
     return renderReport('evidenceReport', {
@@ -175,7 +177,7 @@ export default function ReportsPage() {
     const report = buildEvidenceReport()
     if (!report) return
     navigator.clipboard.writeText(report)
-    showToast('Evidence report copied! Fine count increased', 'success')
+    showToast(t('reports.evidenceCopied'), 'success')
   }
 
   const handleStartDuty = () => {
@@ -200,7 +202,7 @@ export default function ReportsPage() {
 
     const weapons = [...selectedVests, ...selectedWeapons.map(w => `${w.weapon} (${w.ammo})`)]
     startDuty(weapons)
-    showToast('Duty started!', 'success')
+    showToast(t('reports.dutyStarted'), 'success')
   }
 
   const handleEndDuty = () => {
@@ -269,7 +271,7 @@ export default function ReportsPage() {
 
     setLastDutyReport(report)
     navigator.clipboard.writeText(report)
-    showToast('Shift report copied and duty ended!', 'success')
+    showToast(t('reports.shiftCopied'), 'success')
   }
 
   const updateWeaponAmmo = (weapon: string, ammo: string) => {
@@ -317,18 +319,18 @@ export default function ReportsPage() {
     <div className="max-w-7xl mx-auto space-y-8">
       {lastDutyReport && (
         <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border border-secondary/40 bg-secondary/10 text-xs font-mono">
-          <span className="font-bold text-secondary">✅ Duty report copied.</span>
-          <span className="text-on-surface-variant">Paste it where your department collects reports, or:</span>
+          <span className="font-bold text-secondary">✅ {t('reports.dutyCopied')}</span>
+          <span className="text-on-surface-variant">{t('reports.dutyCopiedHint')}</span>
           <div className="ml-auto flex items-center gap-2">
-            <DiscordPostButton label="Post duty report to Discord" getText={() => lastDutyReport} />
+            <DiscordPostButton label={t('reports.postDuty')} getText={() => lastDutyReport} />
             <button
               onClick={() => {
                 navigator.clipboard.writeText(lastDutyReport)
-                showToast('Duty report copied again', 'success')
+                showToast(t('reports.copiedAgain'), 'success')
               }}
               className="px-3 py-1.5 rounded border border-outline-variant text-on-surface"
             >
-              Copy again
+              {t('reports.copyAgain')}
             </button>
             <button onClick={() => setLastDutyReport('')} className="text-on-surface-variant hover:text-on-surface" aria-label="Dismiss">
               ✕
@@ -340,10 +342,10 @@ export default function ReportsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-container-low border border-outline-variant rounded-lg p-4 shadow-sm">
         <div>
           <h2 className="text-sm font-bold font-mono text-on-surface uppercase tracking-wider flex items-center gap-2">
-            <span>🚨</span> Tactical Custody & Arrest Operations
+            <span>🚨</span> {t('reports.arrestOps')}
           </h2>
           <p className="text-xs text-on-surface-variant font-mono mt-0.5">
-            Initiate active detention, issue structured fines, and generate dynamic arrest records.
+            {t('reports.arrestOpsHint')}
           </p>
         </div>
 
@@ -352,13 +354,13 @@ export default function ReportsPage() {
             onClick={() => setIsStartDetentionOpen(true)}
             className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-mono text-xs font-bold rounded flex items-center gap-1.5 shadow-sm transition-colors"
           >
-            <span>🚨</span> + Detain Person
+            <span>🚨</span> + {t('reports.detain')}
           </button>
           <button
             onClick={() => setIsArrestCommandCenterOpen(true)}
             className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded flex items-center gap-1.5 shadow-sm transition-colors"
           >
-            <span>⚡</span> Arrest Command Center
+            <span>⚡</span> {t('arrest.title')}
           </button>
         </div>
       </div>
@@ -366,14 +368,14 @@ export default function ReportsPage() {
       {/* Shift / Duty Report Generator (FIRST / AT THE TOP) */}
       <div>
         <div className="mb-6">
-          <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">Shift Report Generator</h1>
-          <p className="text-gray-600 dark:text-gray-400">Track your duty and generate shift reports.</p>
+          <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">{t('reports.shiftTitle')}</h1>
+          <p className="text-gray-600 dark:text-gray-400">{t('reports.shiftHint')}</p>
         </div>
 
         <div className="card p-6 space-y-6">
           {/* Display Officer Info from Profile */}
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">👤 Officer Information</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">👤 {t('reports.officerInfo')}</h3>
             {(!profile.name || !profile.id || !profile.rank || !profile.badgeNumber) ? (
               <div className="text-center py-2">
                 <p className="text-gray-600 dark:text-gray-400 mb-2">Profile information incomplete</p>
@@ -411,7 +413,7 @@ export default function ReportsPage() {
               {/* Weapon Loadout Presets */}
               <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">⚡ Quick Loadouts</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">⚡ {t('reports.loadouts')}</h3>
                   <button
                     onClick={() => setShowPresets(!showPresets)}
                     className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
@@ -555,7 +557,7 @@ export default function ReportsPage() {
           {/* Event Counters Section */}
           {isOnDuty && (
             <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Event Counters</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{t('reports.events')}</h3>
               
               {/* Event Presets */}
               <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -680,12 +682,12 @@ export default function ReportsPage() {
                 className="btn btn-primary" 
                 disabled={!profile.name || !profile.id || !profile.rank || !profile.badgeNumber}
               >
-                Start Duty
+                {t('reports.startDuty')}
               </button>
             ) : (
               <div className="space-y-2">
                 <input type="text" value={eventsAttended} onChange={(e) => setEventsAttended(e.target.value)} className="input w-full" placeholder="Events Attended..." />
-                <button onClick={handleEndDuty} className="btn btn-primary w-full">End Duty & Generate Report</button>
+                <button onClick={handleEndDuty} className="btn btn-primary w-full">{t('reports.endDuty')}</button>
               </div>
             )}
           </div>
@@ -695,9 +697,9 @@ export default function ReportsPage() {
       {/* Evidence Generator (BELOW DUTY REPORT) */}
       <div>
         <div className="mb-6">
-          <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">Evidence Generator</h1>
-          <p className="text-gray-600 dark:text-gray-400">Generate properly formatted evidence reports.</p>
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Current Time: {new Date().toLocaleString()}</p>
+          <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">{t('reports.evidenceTitle')}</h1>
+          <p className="text-gray-600 dark:text-gray-400">{t('reports.evidenceHint')}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{t('reports.currentTime', { time: new Date().toLocaleString() })}</p>
         </div>
 
         <div className="card p-6 space-y-6">
@@ -785,9 +787,9 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          <button onClick={generateEvidenceReport} className="btn btn-primary w-full">Generate & Copy Report</button>
+          <button onClick={generateEvidenceReport} className="btn btn-primary w-full">{t('reports.generateEvidence')}</button>
           <div className="flex justify-end mt-2">
-            <DiscordPostButton label="Post evidence to Discord" getText={() => buildEvidenceReport() || ''} />
+            <DiscordPostButton label={t('reports.postEvidence')} getText={() => buildEvidenceReport() || ''} />
           </div>
         </div>
       </div>
@@ -798,7 +800,7 @@ export default function ReportsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <h2 className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-4">
-                Weapon Status Check
+                {t('reports.weaponCheck')}
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Please mark the status of each weapon taken during your shift:
@@ -859,13 +861,13 @@ export default function ReportsPage() {
                   onClick={() => setShowWeaponModal(false)}
                   className="flex-1 btn bg-gray-500 text-white hover:bg-gray-600"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={finalizeEndDuty}
                   className="flex-1 btn btn-primary"
                 >
-                  Complete & End Duty
+                  {t('reports.completeEnd')}
                 </button>
               </div>
             </div>

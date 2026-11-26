@@ -18,8 +18,10 @@ import { money } from '@/utils/reports'
 import IssueFineModal from '@/components/modals/IssueFineModal'
 import IssueArrestModal from '@/components/modals/IssueArrestModal'
 import StartDetentionModal from '@/components/modals/StartDetentionModal'
+import { useT } from '@/i18n/I18nProvider'
 
 function PatrolmanGuideContent() {
+  const t = useT()
   const pack = useServerPack()
   const assistantEnabled = useFeature('legalAssistant')
   const router = useRouter()
@@ -262,17 +264,17 @@ function PatrolmanGuideContent() {
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-primary/10 text-primary border border-primary/30">
-              Active Source: {pack.legislation.summaryLabel}
+              {t('guide.activeSource', { source: pack.legislation.summaryLabel })}
             </span>
             <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-secondary/10 text-secondary border border-secondary/30">
               Penal Codes of San Andreas
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-on-surface flex items-center gap-2">
-            <span>⚖️</span> Legislation 2.0 & Law Reference
+            <span>⚖️</span> {t('guide.title')}
           </h1>
           <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5 font-sans">
-            Search, reference, pin, and copy penal codes and traffic regulations with charge collector.
+            {t('guide.subtitle')}
           </p>
         </div>
 
@@ -303,7 +305,7 @@ function PatrolmanGuideContent() {
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              📋 Cards
+              📋 {t('guide.cards')}
             </button>
             <button
               onClick={() => setViewMode('table')}
@@ -313,7 +315,7 @@ function PatrolmanGuideContent() {
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              📊 Table
+              📊 {t('guide.table')}
             </button>
           </div>
 
@@ -340,7 +342,7 @@ function PatrolmanGuideContent() {
             </div>
             <input
               type="text"
-              placeholder="Search by code (e.g. 2.1.1, T.C. 3.5), law description, or keyword..."
+              placeholder={t('guide.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value)
@@ -368,7 +370,7 @@ function PatrolmanGuideContent() {
               }}
               className="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded text-on-surface font-mono text-xs focus:outline-none focus:border-primary"
             >
-              <option value="all">All Chapters / Categories</option>
+              <option value="all">{t('guide.allCategories')}</option>
               {availableCategories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
@@ -380,9 +382,9 @@ function PatrolmanGuideContent() {
 
         {/* Document Filter Tabs */}
         <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-outline-variant">
-          <span className="text-[11px] font-mono uppercase text-on-surface-variant mr-1">Filter:</span>
+          <span className="text-[11px] font-mono uppercase text-on-surface-variant mr-1">{t('guide.filter')}</span>
           {[
-            { id: 'all', label: 'All Documents' },
+            { id: 'all', label: t('guide.allDocuments') },
             // One tab per law document this server has (procedures are listed under All)
             ...(['traffic', 'penal', 'article7'] as const).flatMap((docType) => {
               const src = pack.legislation.sources.find((s) => s.docType === docType)
@@ -414,16 +416,16 @@ function PatrolmanGuideContent() {
         <div className="p-3 bg-surface-container border border-secondary/40 rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-md">
           <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
             <span className="font-bold text-secondary flex items-center gap-1.5">
-              <span>⚡</span> {selectedCharges.length} Charges Selected
+              <span>⚡</span> {t('calc.selected', { n: selectedCharges.length })}
             </span>
             <span className="text-on-surface">
-              Fine: <strong className="text-secondary">{money(totals.totalFine)}</strong>
+              {t('calc.fine')}: <strong className="text-secondary">{money(totals.totalFine)}</strong>
             </span>
             <span className="text-on-surface">
-              Sentence: <strong className="text-amber-400">{totals.totalSentenceMonths} months</strong>
+              {t('calc.sentence')}: <strong className="text-amber-400">{t('calc.months', { n: totals.totalSentenceMonths })}</strong>
               {totals.sentenceCapped && (
                 <span className="text-on-surface-variant" title={`Server maximum; charges add up to ${totals.uncappedSentenceMonths} months`}>
-                  {' '}(max)
+                  {' '}({t('calc.max')})
                 </span>
               )}
             </span>
@@ -434,7 +436,7 @@ function PatrolmanGuideContent() {
             )}
             {totals.hasNoBail && (
               <span className="px-1.5 py-0.5 bg-red-900/50 text-red-300 border border-red-700 text-[10px] rounded">
-                NO BAIL
+                {t('calc.noBail')}
               </span>
             )}
           </div>
@@ -444,20 +446,20 @@ function PatrolmanGuideContent() {
               onClick={handleCopyAllCharges}
               className="px-3 py-1 bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-mono font-semibold rounded flex items-center gap-1 border border-outline-variant transition-colors"
             >
-              <span>📋</span> Copy Charges
+              <span>📋</span> {t('calc.copyCharges')}
             </button>
             <button
               onClick={() => setIsArrestModalOpen(true)}
               className="px-3 py-1 bg-primary text-on-primary hover:bg-primary-container text-xs font-mono font-bold rounded flex items-center gap-1 shadow-sm transition-all"
             >
-              <span>🔒</span> Issue Arrest
+              <span>🔒</span> {t('calc.issueArrest')}
             </button>
             <button
               onClick={handleClearCharges}
               className="px-2 py-1 text-on-surface-variant hover:text-error text-xs font-mono"
               title="Clear Selected Charges"
             >
-              Clear
+              {t('common.clear')}
             </button>
           </div>
         </div>
@@ -471,9 +473,9 @@ function PatrolmanGuideContent() {
       ) : filteredData.length === 0 ? (
         <div className="py-16 text-center bg-surface-container-low border border-outline-variant rounded-lg space-y-2">
           <div className="text-3xl text-on-surface-variant">🔍</div>
-          <h3 className="text-base font-semibold text-on-surface">No legislation provisions found</h3>
+          <h3 className="text-base font-semibold text-on-surface">{t('guide.emptyTitle')}</h3>
           <p className="text-xs text-on-surface-variant font-mono">
-            No matches for "{searchTerm}". Try another search term or reset filters.
+            {t('guide.emptyText', { q: searchTerm })}
           </p>
           <button
             onClick={() => {
@@ -483,7 +485,7 @@ function PatrolmanGuideContent() {
             }}
             className="mt-2 px-3 py-1.5 bg-surface-container-high hover:bg-surface-variant border border-outline-variant text-on-surface text-xs font-mono rounded"
           >
-            Reset Filters
+            {t('guide.resetFilters')}
           </button>
         </div>
       ) : viewMode === 'cards' ? (
@@ -616,7 +618,7 @@ function PatrolmanGuideContent() {
                       className="px-3 py-1 bg-secondary text-on-secondary hover:brightness-110 font-bold text-xs font-mono rounded-lg flex items-center gap-1 transition-all shadow-sm active:scale-98"
                       title="Issue fine citation for this provision"
                     >
-                      <span>⚡</span> Issue Fine
+                      <span>⚡</span> {t('guide.issueFine')}
                     </button>
                   </div>
                 </div>
@@ -739,17 +741,17 @@ function PatrolmanGuideContent() {
               disabled={currentPage === 1}
               className="px-3 py-1 bg-surface-container rounded border border-outline-variant text-on-surface disabled:opacity-40"
             >
-              Previous
+              {t('common.previous')}
             </button>
             <span className="px-2">
-              Page {currentPage} of {totalPages}
+              {t('common.page', { n: currentPage, total: totalPages })}
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
               disabled={currentPage === totalPages}
               className="px-3 py-1 bg-surface-container rounded border border-outline-variant text-on-surface disabled:opacity-40"
             >
-              Next
+              {t('common.next')}
             </button>
           </div>
         </div>
@@ -847,7 +849,7 @@ function PatrolmanGuideContent() {
                   }}
                   className="px-3.5 py-1.5 bg-secondary text-on-secondary hover:brightness-110 font-bold text-xs font-mono rounded-lg flex items-center gap-1.5 shadow-sm active:scale-98"
                 >
-                  <span>⚡</span> Issue Fine
+                  <span>⚡</span> {t('guide.issueFine')}
                 </button>
                 <button
                   onClick={() => handleTogglePinLaw(activeDetailEntry)}
@@ -905,11 +907,12 @@ function PatrolmanGuideContent() {
 }
 
 export default function PatrolmanGuidePage() {
+  const t = useT()
   return (
     <Suspense
       fallback={
         <div className="py-16 text-center text-on-surface-variant font-mono text-sm">
-          <span className="inline-block animate-spin mr-2">⚙️</span> Loading Legislation 2.0...
+          <span className="inline-block animate-spin mr-2">⚙️</span> {t('guide.loading')}
         </div>
       }
     >

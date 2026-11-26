@@ -12,6 +12,7 @@ import { loadAllLawData } from '@/utils/htmlParser'
 import { takeSnapshot, diffSnapshots, isEmptyDiff, LawDiff, LawSnapshot } from '@/utils/lawChanges'
 import { getAllShifts, getAllArrests } from '@/utils/db'
 import { useProductivity } from '@/contexts/ProductivityContext'
+import { useT } from '@/i18n/I18nProvider'
 
 const LAW_SNAPSHOT_KEY = 'leogrp_law_snapshot'
 export const LAST_BACKUP_KEY = 'leogrp_last_backup_at'
@@ -24,9 +25,10 @@ export function markBackupDone() {
   scopedStorage.setItem(LAST_BACKUP_KEY, String(Date.now()))
 }
 
-const FIELD_LABEL: Record<string, string> = { fine: 'fine', sentence: 'sentence', stars: 'wanted level', description: 'description' }
+const FIELD_KEY = { fine: 'laws.fieldFine', sentence: 'laws.fieldSentence', stars: 'laws.fieldStars', description: 'laws.fieldDescription' } as const
 
 function LawUpdateBanner() {
+  const t = useT()
   const [diff, setDiff] = useState<LawDiff | null>(null)
   const [next, setNext] = useState<LawSnapshot | null>(null)
   const [open, setOpen] = useState(false)
@@ -63,39 +65,39 @@ function LawUpdateBanner() {
     setDiff(null)
   }
   const parts = [
-    diff.changed.length && `${new Set(diff.changed.map((c) => c.code)).size} changed`,
-    diff.added.length && `${diff.added.length} new`,
-    diff.removed.length && `${diff.removed.length} removed`,
+    diff.changed.length && t('laws.changed', { n: new Set(diff.changed.map((c) => c.code)).size }),
+    diff.added.length && t('laws.new', { n: diff.added.length }),
+    diff.removed.length && t('laws.removed', { n: diff.removed.length }),
   ].filter(Boolean)
 
   return (
     <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/40 text-xs font-mono text-on-surface">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-bold text-amber-400">⚖️ Laws updated:</span>
-        <span>{parts.join(', ')}. Check new amounts before fining.</span>
+        <span className="font-bold text-amber-400">⚖️ {t('laws.updated')}</span>
+        <span>{t('laws.summary', { parts: parts.join(', ') })}</span>
         <button onClick={() => setOpen((o) => !o)} className="text-primary underline">
-          {open ? 'Hide' : 'Show changes'}
+          {open ? t('common.hide') : t('laws.show')}
         </button>
         <button onClick={acknowledge} className="ml-auto px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold">
-          Got it
+          {t('laws.ack')}
         </button>
       </div>
       {open && (
         <ul className="mt-2 max-h-48 overflow-y-auto space-y-0.5 text-[11px]">
           {diff.changed.map((c, i) => (
             <li key={`c${i}`}>
-              <strong>{c.code}</strong> {FIELD_LABEL[c.field]}: <span className="line-through text-on-surface-variant">{c.from}</span> →{' '}
+              <strong>{c.code}</strong> {t(FIELD_KEY[c.field])}: <span className="line-through text-on-surface-variant">{c.from}</span> →{' '}
               <span className="text-amber-300">{c.to}</span>
             </li>
           ))}
           {diff.added.map((code) => (
             <li key={`a${code}`}>
-              <strong>{code}</strong> <span className="text-secondary">new</span>
+              <strong>{code}</strong> <span className="text-secondary">{t('laws.tagNew')}</span>
             </li>
           ))}
           {diff.removed.map((code) => (
             <li key={`r${code}`}>
-              <strong>{code}</strong> <span className="text-error">removed</span>
+              <strong>{code}</strong> <span className="text-error">{t('laws.tagRemoved')}</span>
             </li>
           ))}
         </ul>
@@ -105,6 +107,7 @@ function LawUpdateBanner() {
 }
 
 function BackupReminder() {
+  const t = useT()
   const { setIsBackupModalOpen } = useProductivity()
   const [show, setShow] = useState(false)
   const [never, setNever] = useState(false)
@@ -139,14 +142,13 @@ function BackupReminder() {
   if (!show) return null
   return (
     <div className="px-4 py-2 bg-primary/10 border-b border-primary/30 text-xs font-mono text-on-surface flex flex-wrap items-center gap-2">
-      <span className="font-bold text-primary">💾 Back up your records:</span>
+      <span className="font-bold text-primary">💾 {t('backup.title')}</span>
       <span>
-        {never ? 'You have never exported a backup.' : `Last backup was over ${BACKUP_EVERY_DAYS} days ago.`} Your shifts and arrests
-        are only stored in this browser.
+        {never ? t('backup.never') : t('backup.old', { days: BACKUP_EVERY_DAYS })} {t('backup.why')}
       </span>
       <div className="ml-auto flex items-center gap-2">
         <button onClick={() => setIsBackupModalOpen(true)} className="px-2 py-0.5 rounded bg-primary text-on-primary font-bold">
-          Back up now
+          {t('backup.now')}
         </button>
         <button
           onClick={() => {
@@ -155,7 +157,7 @@ function BackupReminder() {
           }}
           className="text-on-surface-variant hover:text-on-surface"
         >
-          Remind me in 3 days
+          {t('backup.snooze')}
         </button>
       </div>
     </div>
