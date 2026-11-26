@@ -87,6 +87,14 @@ export default function ReportsPage() {
 
   const [eventsAttended, setEventsAttended] = useState('')
   const [lastDutyReport, setLastDutyReport] = useState('')
+  // Live clock, rendered only in the browser (a server-rendered time never matches the client's)
+  const [clock, setClock] = useState('')
+  useEffect(() => {
+    const tick = () => setClock(new Date().toLocaleString())
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
   const [selectedWeapons, setSelectedWeapons] = useState<{weapon: string, ammo: string}[]>([])
   const [selectedVests, setSelectedVests] = useState<string[]>([])
   const [weaponAmmo, setWeaponAmmo] = useState<{[key: string]: string}>({})
@@ -699,7 +707,7 @@ export default function ReportsPage() {
         <div className="mb-6">
           <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">{t('reports.evidenceTitle')}</h1>
           <p className="text-gray-600 dark:text-gray-400">{t('reports.evidenceHint')}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{t('reports.currentTime', { time: new Date().toLocaleString() })}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{t('reports.currentTime', { time: clock })}</p>
         </div>
 
         <div className="card p-6 space-y-6">
